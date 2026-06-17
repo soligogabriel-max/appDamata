@@ -1831,22 +1831,31 @@ async function confirmarGerarContrato() {
         email_testemunha:     p.email_testemunha||null,
       },prefer:"return=minimal"}).catch(()=>{});
     }
+    // Busca data do evento na agenda (para evento existente ou recém-criado)
+    let dataEvtFinal = document.getElementById("gc-data").value || null;
+    if(!dataEvtFinal) {
+      try {
+        const agRow = await dbGet("agenda","select=data_evento,data_fim&cod=eq."+codEvt+"&limit=1");
+        if(agRow.length) { dataEvtFinal = agRow[0].data_evento; }
+      } catch(e){}
+    }
     closeGerarContrato();
     // Abre gerador com evento pré-selecionado
-    _gcAbrirGerador(codEvt);
+    _gcAbrirGerador(codEvt, dataEvtFinal);
   } catch(e){ toast("Erro: "+e.message); }
   finally { btn.disabled=false; btn.textContent="Continuar →"; }
 }
 
-function _gcAbrirGerador(codEvt) {
+function _gcAbrirGerador(codEvt, dataEvt) {
   // Armazena contexto para o gerador usar
   sessionStorage.setItem("dm_gc_evt", codEvt);
   sessionStorage.setItem("dm_gc_user", JSON.stringify(_gcUser));
+  if(dataEvt) sessionStorage.setItem("dm_gc_date", dataEvt);
   setTab("contratos");
   // Notifica o iframe assim que carregar
   const iframe = document.querySelector("#p-contratos iframe");
   if(iframe) {
-    const send = () => iframe.contentWindow.postMessage({type:"damata_init_contrato", codEvt, user:_gcUser},"*");
+    const send = () => iframe.contentWindow.postMessage({type:"damata_init_contrato", codEvt, dataEvt, user:_gcUser},"*");
     if(iframe.contentDocument?.readyState==="complete") send();
     else iframe.addEventListener("load", send, {once:true});
   }

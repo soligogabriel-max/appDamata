@@ -148,10 +148,12 @@ async function sbGet(path){
 }
 
 // ── Contexto do app pai ──
-var _gcEvt=null,_gcUser=null;
+var _gcEvt=null,_gcUser=null,_gcDate=null;
 window.addEventListener("message",function(e){
   if(e.data&&e.data.type==="damata_init_contrato"){
-    _gcEvt=e.data.codEvt; _gcUser=e.data.user; prefillFromContext();
+    _gcEvt=e.data.codEvt; _gcUser=e.data.user;
+    if(e.data.dataEvt) _gcDate=e.data.dataEvt;
+    prefillFromContext();
   }
 });
 
@@ -169,6 +171,7 @@ function prefillFromContext(){
   g("o-noiva").value=p.nome_contratante||_gcUser.name||"";
   g("o-noivo").value=p.nome_nao_contratante||"";
   if(_gcEvt)g("o-code").value=_gcEvt;
+  if(_gcDate){g("o-d1").value=_gcDate;}
 }
 
 // ── Tabelas de preço ──
@@ -420,6 +423,7 @@ function exportPayments(){
 window.addEventListener("load",function(){
   var codEvt=sessionStorage.getItem("dm_gc_evt");
   try{_gcUser=JSON.parse(sessionStorage.getItem("dm_gc_user")||"null");}catch(e){}
+  _gcDate=sessionStorage.getItem("dm_gc_date")||null;
   if(codEvt){_gcEvt=codEvt;prefillFromContext();}
   loadTabelasPreco();
   renderPayments();
