@@ -15,7 +15,22 @@ button,input,select,textarea{font-family:'DM Sans',sans-serif;}
 button{cursor:pointer;}
 .screen{display:none;min-height:100vh;}
 .screen.active{display:flex;}
-#sc-login,#sc-reg,#sc-pending{background:var(--a);align-items:center;justify-content:center;padding:20px;flex-direction:column;}
+#sc-reg,#sc-pending{background:var(--a);align-items:center;justify-content:center;padding:20px;flex-direction:column;}
+#sc-login{flex-direction:row;align-items:stretch;padding:0;}
+#login-landing{flex:1;background:var(--a);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 40px;gap:18px;min-height:100vh;}
+#login-form-wrap{width:420px;min-width:360px;background:var(--a);display:flex;align-items:center;justify-content:center;padding:24px;}
+#ll-carousel-wrap{width:100%;max-width:460px;aspect-ratio:4/3;border-radius:20px;overflow:hidden;position:relative;box-shadow:0 12px 40px rgba(0,0,0,.2);background:rgba(0,0,0,.15);}
+.ll-slide{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1s;}
+.ll-slide.on{opacity:1;}
+#ll-dots{display:flex;gap:6px;justify-content:center;}
+.ll-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4);cursor:pointer;transition:background .3s;}
+.ll-dot.on{background:#fff;}
+#ll-social{display:flex;gap:16px;}
+#ll-social a{color:#fff;text-decoration:none;font-size:13px;font-weight:600;opacity:.9;display:flex;align-items:center;gap:5px;padding:6px 14px;border:1.5px solid rgba(255,255,255,.5);border-radius:20px;}
+#ll-social a:hover{background:rgba(255,255,255,.15);}
+#btn-orcamento{padding:14px 36px;background:#fff;color:var(--a);border:none;border-radius:14px;font-size:15px;font-weight:700;letter-spacing:.5px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.15);transition:transform .15s,box-shadow .15s;}
+#btn-orcamento:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.2);}
+@media(max-width:768px){#login-landing{display:none;}#login-form-wrap{width:100%;min-width:unset;}}
 .acard{background:#fff;border-radius:24px;padding:32px 26px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(46,60,68,.22);}
 .logo-w{display:flex;flex-direction:column;align-items:center;margin-bottom:20px;}
 .logo-n{font-size:18px;font-weight:700;color:var(--dk);letter-spacing:4px;margin-top:9px;}
@@ -268,21 +283,41 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 
 <!-- LOGIN -->
 <div id="sc-login" class="screen">
-  <div class="acard">
-    <div class="logo-w">
-      <svg width="56" height="56"><use href="#logo-sym-lt"/></svg>
-      <div class="logo-n">DAMATA</div>
-      <div class="logo-s">Espaço de Eventos</div>
+  <!-- Painel esquerdo: landing -->
+  <div id="login-landing">
+    <div style="text-align:center;color:#fff">
+      <svg width="68" height="68" style="filter:brightness(0) invert(1)"><use href="#logo-sym-lt"/></svg>
+      <div style="font-size:22px;font-weight:700;letter-spacing:4px;margin-top:10px">DAMATA</div>
+      <div style="font-size:10px;letter-spacing:2px;opacity:.75;margin-top:2px">ESPAÇO DE EVENTOS</div>
     </div>
-    <div class="atitle">Bem-vindo</div>
-    <div class="err" id="lerr"></div>
-    <label class="lbl">Email</label>
-    <input type="email" id="lemail" class="inp" placeholder="seu@email.com"/>
-    <label class="lbl">Senha</label>
-    <input type="password" id="lpass" class="inp" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
-    <button class="btn-p" id="btn-login" onclick="doLogin()">Entrar</button>
-    <button class="btn-s" onclick="showSc('reg')">Solicitar acesso (equipe)</button>
-    <button class="btn-s" style="margin-top:6px;" onclick="showSc('cadastro')">📋 Cadastro de cliente</button>
+    <div id="ll-carousel-wrap">
+      <div id="ll-no-photo" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);font-size:13px">Carregando fotos…</div>
+    </div>
+    <div id="ll-dots"></div>
+    <div id="ll-social">
+      <a href="https://instagram.com/damata.espacodeeventos" target="_blank">📷 Instagram</a>
+      <a href="https://wa.me/5534999999999" target="_blank">💬 WhatsApp</a>
+    </div>
+    <button id="btn-orcamento" onclick="showSc('orcamento')">Fazer Orçamento</button>
+  </div>
+  <!-- Painel direito: login -->
+  <div id="login-form-wrap">
+    <div class="acard">
+      <div class="logo-w">
+        <svg width="56" height="56"><use href="#logo-sym-lt"/></svg>
+        <div class="logo-n">DAMATA</div>
+        <div class="logo-s">Espaço de Eventos</div>
+      </div>
+      <div class="atitle">Bem-vindo</div>
+      <div class="err" id="lerr"></div>
+      <label class="lbl">Email</label>
+      <input type="email" id="lemail" class="inp" placeholder="seu@email.com"/>
+      <label class="lbl">Senha</label>
+      <input type="password" id="lpass" class="inp" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
+      <button class="btn-p" id="btn-login" onclick="doLogin()">Entrar</button>
+      <button class="btn-s" onclick="showSc('reg')">Solicitar acesso (equipe)</button>
+      <button class="btn-s" style="margin-top:6px;" onclick="showSc('cadastro')">📋 Cadastro de cliente</button>
+    </div>
   </div>
 </div>
 
@@ -369,6 +404,22 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div style="font-family:'DM Serif Display',serif;font-size:21px;color:var(--dk);margin-bottom:10px;">Cadastro realizado!</div>
     <div style="font-size:13px;color:var(--dm);line-height:1.6;margin-bottom:22px;">Seus dados foram registrados com sucesso. Assim que seu contrato for gerado, você poderá acessar o portal com o email e senha cadastrados.</div>
     <button class="btn-p" onclick="showSc('login')">Ir para o login</button>
+  </div>
+</div>
+
+<!-- ORÇAMENTO -->
+<div id="sc-orcamento" class="screen" style="background:var(--a);align-items:center;justify-content:center;padding:20px;flex-direction:column;">
+  <div class="acard" style="max-width:460px;text-align:center;">
+    <div class="logo-w">
+      <svg width="48" height="48"><use href="#logo-sym-lt"/></svg>
+      <div class="logo-n">DAMATA</div>
+      <div class="logo-s">Espaço de Eventos</div>
+    </div>
+    <div class="atitle">Fazer Orçamento</div>
+    <div style="font-size:13px;color:var(--dm);line-height:1.6;margin-bottom:22px;">
+      Em breve você poderá simular seu orçamento aqui escolhendo data, tipo de evento e pacotes disponíveis.
+    </div>
+    <button class="btn-p" onclick="showSc('login')">Voltar</button>
   </div>
 </div>
 
@@ -2841,9 +2892,46 @@ window.addEventListener("load", async()=>{
   } catch(e){
     showSc("login");
   }
+  loadLandingCarousel();
   setTimeout(()=>loading.classList.add("hide"),600);
   setTimeout(()=>loading.remove(),1100);
 });
+
+/* ── Landing Carousel ─────────────────────────────────────── */
+let _llTimer=null, _llIdx=0;
+async function loadLandingCarousel(){
+  const res=await sbFetch("app_config?chave=eq.fotos_landing&select=valor");
+  const urls=(res&&res[0]&&Array.isArray(res[0].valor))?res[0].valor.filter(u=>u):[];
+  const wrap=document.getElementById("ll-carousel-wrap");
+  const dots=document.getElementById("ll-dots");
+  const noPhoto=document.getElementById("ll-no-photo");
+  if(!urls.length){ if(noPhoto) noPhoto.textContent="Fotos em breve"; return; }
+  if(noPhoto) noPhoto.remove();
+  wrap.innerHTML="";
+  dots.innerHTML="";
+  urls.forEach((u,i)=>{
+    const img=document.createElement("img");
+    img.src=u; img.className="ll-slide"+(i===0?" on":"");
+    wrap.appendChild(img);
+    const d=document.createElement("div");
+    d.className="ll-dot"+(i===0?" on":""); d.onclick=()=>llGoto(i);
+    dots.appendChild(d);
+  });
+  if(urls.length>1){
+    clearInterval(_llTimer);
+    _llTimer=setInterval(()=>llGoto((_llIdx+1)%urls.length),4000);
+  }
+}
+function llGoto(i){
+  const slides=document.querySelectorAll(".ll-slide");
+  const dotEls=document.querySelectorAll(".ll-dot");
+  if(!slides.length) return;
+  slides[_llIdx].classList.remove("on");
+  dotEls[_llIdx]?.classList.remove("on");
+  _llIdx=i;
+  slides[_llIdx].classList.add("on");
+  dotEls[_llIdx]?.classList.add("on");
+}
 
 // ══════════════════════════════════════════
 // INVENTÁRIO
