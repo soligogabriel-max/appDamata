@@ -1263,7 +1263,7 @@ function tk(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")
 
 function evDay(dk, fi) {
   return cachedEvts.filter(e=>{
-    if(fi && fi.length && !fi.includes(e.id)) return false;
+    if(fi && fi.length && !fi.includes(e.cod)) return false;
     if(!e.data_evento) return false;
     const day=pd(dk);
     const eStart=pd(e.data_evento);
@@ -1359,7 +1359,7 @@ function renderGrid(fi){
 
 function renderListV(fi){
   const wr=document.getElementById("lgrid"); wr.innerHTML="";
-  const evts=cachedEvts.filter(e=>!fi||!fi.length||fi.includes(e.id));
+  const evts=cachedEvts.filter(e=>!fi||!fi.length||fi.includes(e.cod));
   if(!evts.length){wr.innerHTML='<div class="empty"><div class="eicon">📅</div>Nenhum evento este mês.<br/>Clique em "+ Novo Evento" para começar.</div>';return;}
   evts.forEach(ev=>{
     const et=getEvStyle(ev), st=SM[ev.status]||SM.proposta;
@@ -2756,18 +2756,8 @@ async function renderInventario() {
 async function salvarContrato(preset) {
   // preset vem do gerador via postMessage
   try {
-    // 1. Próximo código de evento: ano + sequencial
-    const ano = new Date().getFullYear();
-    const existentes = await dbGet("agenda",`select=cod&cod=like.${ano}%25&order=cod.desc&limit=1`);
-    let seq = 1;
-    if(existentes.length) {
-      const ultimo = existentes[0].cod;
-      seq = parseInt(ultimo.slice(4)) + 1;
-    }
-    const cod = String(ano) + String(seq).padStart(2,"0");
-
-    // 2. Nome do evento: nomes + data
-    const d1 = preset.date1; // YYYY-MM-DD
+    let cod, nomeEvento;
+    const d1 = preset.date1;
     const d2 = preset.date2;
     const fmtNome = d => {
       if(!d) return "";
@@ -2777,18 +2767,47 @@ async function salvarContrato(preset) {
     };
     const dStr = d2 && d2!==d1 ? `${fmtNome(d1)} a ${fmtNome(d2)}` : fmtNome(d1);
     const nomes = [preset.nomeNoivo, preset.nomeNoiva].filter(Boolean).join(" e ") || preset.obs || "Evento";
-    const nomeEvento = `${nomes} - ${dStr}`;
 
-    // 3. Criar evento na agenda
-    const evRec = {
-      cod, nome_evento: nomeEvento,
-      data_evento: d1||null, data_fim: d2||null,
-      cin: preset.cin||null, cout: preset.cout||null,
-      tipo_evento: preset.tipoEvento||"Casamento",
-      valor_locacao: preset.total ? parseFloat(preset.total) : null,
-      obs: preset.obs||null,
-    };
-    await sbFetch("agenda", {method:"POST", body: evRec, prefer:"return=minimal"});
+    if(preset.gcEvt) {
+      // Evento já criado pelo fluxo app_users — apenas atualiza valor
+      cod = preset.gcEvt;
+      const agExist = await dbGet("agenda",`select=nome_evento&cod=eq.${cod}&limit=1`);
+      nomeEvento = agExist.length ? agExist[0].nome_evento : `${nomes} - ${dStr}`;
+      await sbFetch(`agenda?cod=eq.${cod}`, {method:"PATCH", body:{
+        valor_locacao: preset.total ? parseFloat(preset.total) : null,
+        cin: preset.cin||null, cout: preset.cout||null,
+        tipo_evento: preset.tipoEvento||"Casamento",
+        obs: preset.obs||null,
+      }, prefer:"return=minimal"});
+    } else {
+      // 1. Próximo código de evento: ano + sequencial
+      const ano = new Date().getFullYear();
+      const existentes = await dbGet("agenda",`select=cod&cod=like.${ano}%25&order=cod.desc&limit=1`);
+      let seq = 1;
+      if(existentes.length) { seq = parseInt(existentes[0].cod.slice(4)) + 1; }
+      cod = String(ano) + String(seq).padStart(2,"0");
+      nomeEvento = `${nomes} - ${dStr}`;
+      // 3. Criar evento na agenda
+      await sbFetch("agenda", {method:"POST", body:{
+        cod, nome_evento: nomeEvento,
+        data_evento: d1||null, data_fim: d2||null,
+        cin: preset.cin||null, cout: preset.cout||null,
+        tipo_evento: preset.tipoEvento||"Casamento",
+        valor_locacao: preset.total ? parseFloat(preset.total) : null,
+        obs: preset.obs||null,
+      }, prefer:"return=minimal"});
+    }
+
+    // Vincular evento ao usuário (app_users)
+    if(preset.gcUserId) {
+      const uRes = await dbGet("app_users",`select=event_ids&id=eq.${preset.gcUserId}&limit=1`);
+      if(uRes.length) {
+        const ids = Array.isArray(uRes[0].event_ids) ? uRes[0].event_ids : [];
+        if(!ids.includes(cod)) {
+          await sbFetch(`app_users?id=eq.${preset.gcUserId}`,{method:"PATCH",body:{event_ids:[...ids,cod]},prefer:"return=minimal"});
+        }
+      }
+    }
 
     // 4. Criar parcelas em contas_a_receber
     if(preset.payments && preset.payments.length) {
@@ -3483,15 +3502,18 @@ async function openEditUser(u) {
     document.getElementById("eu-eslbl").textContent=u.role==="cliente"?"Vincular ao evento":"Vincular aos eventos";
   } else { wrap.style.display="none"; }
   const [evts, assRows] = await Promise.all([
-    dbGet("agenda","order=data_evento.desc&select=cod,nome_evento,tipo_evento,data_evento&limit=500"),
+    dbGet("agenda","order=assessoria_cod.asc.nullslast,data_evento.desc&select=cod,nome_evento,tipo_evento,data_evento,assessoria_cod&limit=500"),
     dbGet("assessorias","select=cod,nome&order=nome.asc&limit=500")
   ]);
+  const assMapLocal={}; assRows.forEach(a=>assMapLocal[a.cod]=a.nome);
   const esl=document.getElementById("eu-esl"); esl.innerHTML="";
   evts.forEach(ev=>{
     const it=document.createElement("div"); it.className="esitem"; it.dataset.id=ev.cod;
     if(_euEvIds.includes(ev.cod)) it.classList.add("sel");
     it.onclick=()=>_euTogEv(ev.cod,it);
-    it.innerHTML=`<div style="font-weight:700;font-size:12px;">${ev.nome_evento||ev.cod}</div><div style="font-size:10px;color:#7A8F96;">${ev.data_evento||""} · ${getEvLabel(ev)}</div>`;
+    const assTag=ev.assessoria_cod&&assMapLocal[ev.assessoria_cod]
+      ?`<span style="color:#60a5fa;font-weight:700;">${assMapLocal[ev.assessoria_cod]}</span> · `:"";
+    it.innerHTML=`<div style="font-weight:700;font-size:12px;">${assTag}${ev.nome_evento||ev.cod}</div><div style="font-size:10px;color:#7A8F96;">${ev.data_evento||""} · ${getEvLabel(ev)}</div>`;
     esl.appendChild(it);
   });
   const sel=document.getElementById("eu-assessoria");
