@@ -30,6 +30,21 @@ button{cursor:pointer;}
 #ll-social a:hover{background:rgba(255,255,255,.15);}
 #btn-orcamento{padding:14px 36px;background:#fff;color:var(--a);border:none;border-radius:14px;font-size:15px;font-weight:700;letter-spacing:.5px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.15);transition:transform .15s,box-shadow .15s;}
 #btn-orcamento:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.2);}
+.orc-step-ind{padding:8px 16px;font-size:12px;font-weight:700;color:var(--dl);border-radius:20px;transition:all .2s;}
+.orc-step-ind.on{background:var(--a);color:#fff;}
+.orc-step-sep{color:#ccc;padding:0 6px;font-size:14px;}
+.orc-card{background:#fff;border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,.06);}
+.orc-pkg-card{background:#fff;border:2px solid var(--br);border-radius:14px;padding:20px;cursor:pointer;transition:all .2s;margin-bottom:12px;}
+.orc-pkg-card:hover{border-color:var(--a);box-shadow:0 4px 16px rgba(232,165,42,.15);}
+.orc-pkg-card.sel{border-color:var(--a);background:#fffbf0;}
+.orc-pkg-title{font-size:16px;font-weight:700;color:var(--dk);margin-bottom:4px;}
+.orc-pkg-price{font-size:22px;font-weight:700;color:var(--a);margin-top:8px;}
+.orc-pkg-items{font-size:12px;color:var(--dl);line-height:1.8;margin-top:8px;}
+.orc-extra-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--br);}
+.orc-extra-row:last-child{border-bottom:none;}
+.orc-nav{display:flex;gap:10px;margin-top:20px;}
+.orc-btn-next{flex:1;padding:13px;background:var(--a);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;}
+.orc-btn-back{padding:13px 20px;background:transparent;color:var(--dm);border:1.5px solid var(--br);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;}
 @media(max-width:768px){#login-landing{display:none;}#login-form-wrap{width:100%;min-width:unset;}}
 .acard{background:#fff;border-radius:24px;padding:32px 26px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(46,60,68,.22);}
 .logo-w{display:flex;flex-direction:column;align-items:center;margin-bottom:20px;}
@@ -298,7 +313,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <a href="https://instagram.com/damatafazenda" target="_blank">📷 Instagram</a>
       <a href="https://wa.me/5534999999999" target="_blank">💬 WhatsApp</a>
     </div>
-    <button id="btn-orcamento" onclick="showSc('orcamento')">Fazer Orçamento</button>
+    <button id="btn-orcamento" onclick="abrirOrcamento()">Fazer Orçamento</button>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -407,19 +422,30 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   </div>
 </div>
 
-<!-- ORÇAMENTO -->
-<div id="sc-orcamento" class="screen" style="background:var(--a);align-items:center;justify-content:center;padding:20px;flex-direction:column;">
-  <div class="acard" style="max-width:460px;text-align:center;">
-    <div class="logo-w">
-      <svg width="48" height="48"><use href="#logo-sym-lt"/></svg>
-      <div class="logo-n">DAMATA</div>
-      <div class="logo-s">Espaço de Eventos</div>
+<!-- ORÇAMENTO WIZARD -->
+<div id="sc-orcamento" class="screen" style="background:#f5f4f0;flex-direction:column;align-items:stretch;min-height:100vh;">
+  <!-- Header -->
+  <div style="background:var(--a);padding:14px 24px;display:flex;align-items:center;gap:12px;">
+    <svg width="36" height="36" style="filter:brightness(0) invert(1)"><use href="#logo-sym-lt"/></svg>
+    <div>
+      <div style="color:#fff;font-weight:700;letter-spacing:3px;font-size:14px">DAMATA</div>
+      <div style="color:rgba(255,255,255,.75);font-size:10px;letter-spacing:1px">ESPAÇO DE EVENTOS</div>
     </div>
-    <div class="atitle">Fazer Orçamento</div>
-    <div style="font-size:13px;color:var(--dm);line-height:1.6;margin-bottom:22px;">
-      Em breve você poderá simular seu orçamento aqui escolhendo data, tipo de evento e pacotes disponíveis.
-    </div>
-    <button class="btn-p" onclick="showSc('login')">Voltar</button>
+    <button onclick="showSc('login')" style="margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">← Voltar</button>
+  </div>
+  <!-- Steps indicator -->
+  <div id="orc-steps-bar" style="background:#fff;border-bottom:1px solid #e5e5e5;padding:16px 24px;display:flex;gap:0;align-items:center;justify-content:center;flex-wrap:wrap;">
+    <div class="orc-step-ind on" id="osi-1">1 · Dados</div>
+    <div class="orc-step-sep">›</div>
+    <div class="orc-step-ind" id="osi-2">2 · Pacote</div>
+    <div class="orc-step-sep">›</div>
+    <div class="orc-step-ind" id="osi-3">3 · Extras</div>
+    <div class="orc-step-sep">›</div>
+    <div class="orc-step-ind" id="osi-4">4 · Resumo</div>
+  </div>
+  <!-- Step content -->
+  <div style="flex:1;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;">
+    <div id="orc-wizard-body" style="width:100%;max-width:620px;"></div>
   </div>
 </div>
 
@@ -454,6 +480,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <button class="tab" onclick="setTab('contratos');closeGrps()" id="t-contratos">📄 Contratos</button>
         <button class="tab" onclick="setTab('pedidos');closeGrps()" id="t-pedidos">🛒 Pedidos</button>
         <button class="tab" onclick="setTab('vt');closeGrps()" id="t-vt">🔍 Visita Técnica</button>
+        <button class="tab" onclick="setTab('orcamentos');closeGrps()" id="t-orcamentos">💬 Orçamentos</button>
       </div>
     </div>
 
@@ -538,6 +565,26 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div id="p-contratos" class="panel">
       <iframe src="./gerador-contrato-damata.html" style="width:100%;height:calc(100vh - 110px);border:none;display:block;"></iframe>
     </div>
+
+    <!-- ORÇAMENTOS REALIZADOS -->
+    <div id="p-orcamentos" class="panel">
+      <div class="uwrap" style="max-width:1000px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+          <div class="sec-t" style="margin-bottom:0;">Orçamentos Realizados</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <select id="orc-fil-status" class="inp inp-inline" style="width:140px;font-size:12px;" onchange="renderOrcamentos()">
+              <option value="">Todos</option>
+              <option value="pendente">Pendente</option>
+              <option value="convertido">Convertido</option>
+              <option value="expirado">Expirado</option>
+            </select>
+            <input type="text" id="orc-fil-busca" class="inp inp-inline" style="width:180px;font-size:12px;" placeholder="Buscar nome…" oninput="renderOrcamentos()"/>
+          </div>
+        </div>
+        <div id="orc-list"></div>
+      </div>
+    </div>
+
     <!-- A RECEBER -->
     <div id="p-receber" class="panel">
       <div class="uwrap" style="max-width:1100px;">
@@ -1329,7 +1376,7 @@ async function openApp(u) {
 
 // ── Grupos do menu ──
 const TAB_GRP={
-  contratos:"grp-eventos", pedidos:"grp-eventos", vt:"grp-eventos",
+  contratos:"grp-eventos", pedidos:"grp-eventos", vt:"grp-eventos", orcamentos:"grp-eventos",
   receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro",
   fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros",
   relatorio:"grp-admin", pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin"
@@ -1352,7 +1399,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding"};
+  const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(null);
   if(t==="receber") renderReceber();
@@ -1369,6 +1416,7 @@ function setTab(t) {
   if(t==="pend") renderPend();
   if(t==="users") renderUsers();
   if(t==="fotoslanding") renderFotosLanding();
+  if(t==="orcamentos") renderOrcamentos();
 }
 
 /* ── Fotos Landing ─────────────────────────────────────────── */
@@ -2896,6 +2944,289 @@ window.addEventListener("load", async()=>{
   setTimeout(()=>loading.classList.add("hide"),600);
   setTimeout(()=>loading.remove(),1100);
 });
+
+/* ── Orçamentos Realizados ────────────────────────────────── */
+const ORC_STATUS_LABEL={pendente:"Pendente",convertido:"Convertido",expirado:"Expirado"};
+const ORC_STATUS_COLOR={pendente:"#E8A52A",convertido:"#27ae60",expirado:"#e74c3c"};
+async function renderOrcamentos(){
+  const status=document.getElementById("orc-fil-status")?.value||"";
+  const busca=(document.getElementById("orc-fil-busca")?.value||"").toLowerCase();
+  let q="orcamentos?order=created_at.desc&limit=200";
+  if(status) q+=`&status=eq.${status}`;
+  const rows=await sbFetch(q)||[];
+  const list=document.getElementById("orc-list");
+  let filtered=rows.filter(r=>{
+    if(!busca) return true;
+    return [r.nome_noiva,r.nome_noivo,r.nome_contratante,r.tipo_evento].some(v=>v&&v.toLowerCase().includes(busca));
+  });
+  if(!filtered.length){list.innerHTML=`<div style="padding:40px;text-align:center;color:var(--dl)">Nenhum orçamento encontrado.</div>`;return;}
+  list.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="background:#f5f6f7;text-align:left;">
+      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Data solicitação</th>
+      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Data evento</th>
+      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Noiva / Noivo</th>
+      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Tipo</th>
+      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Convidados</th>
+      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Valor</th>
+      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Validade</th>
+      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Status</th>
+      <th style="padding:10px 12px;"></th>
+    </tr></thead>
+    <tbody>${filtered.map(r=>{
+      const hoje=new Date().toISOString().slice(0,10);
+      const exp=r.validade&&r.validade<hoje&&r.status==="pendente";
+      const statusReal=exp?"expirado":r.status||"pendente";
+      const nomes=[r.nome_noiva,r.nome_noivo].filter(Boolean).join(" e ")||r.nome_contratante||"—";
+      return `<tr style="border-bottom:1px solid var(--br);">
+        <td style="padding:10px 12px;">${r.created_at?r.created_at.slice(0,10).split("-").reverse().join("/"):"—"}</td>
+        <td style="padding:10px 12px;">${r.data_evento?r.data_evento.split("-").reverse().join("/"):"—"}</td>
+        <td style="padding:10px 12px;font-weight:600;">${nomes}</td>
+        <td style="padding:10px 12px;">${r.tipo_evento||"—"}</td>
+        <td style="padding:10px 12px;text-align:center;">${r.num_convidados||"—"}</td>
+        <td style="padding:10px 12px;font-weight:700;">R$ ${r.valor_total?Number(r.valor_total).toLocaleString("pt-BR",{minimumFractionDigits:2}):"—"}</td>
+        <td style="padding:10px 12px;">${r.validade?r.validade.split("-").reverse().join("/"):"—"}</td>
+        <td style="padding:10px 12px;"><span style="background:${ORC_STATUS_COLOR[statusReal]}22;color:${ORC_STATUS_COLOR[statusReal]};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">${ORC_STATUS_LABEL[statusReal]||statusReal}</span></td>
+        <td style="padding:10px 12px;display:flex;gap:6px;">
+          <button onclick="orcSetStatus(${r.id},'convertido')" title="Marcar convertido" style="padding:4px 8px;border:1px solid #27ae60;color:#27ae60;border-radius:6px;background:#fff;font-size:11px;">✓</button>
+          <button onclick="orcSetStatus(${r.id},'expirado')" title="Marcar expirado" style="padding:4px 8px;border:1px solid #e74c3c;color:#e74c3c;border-radius:6px;background:#fff;font-size:11px;">✕</button>
+        </td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
+}
+async function orcSetStatus(id,status){
+  await sbFetch(`orcamentos?id=eq.${id}`,{method:"PATCH",body:{status}});
+  renderOrcamentos();
+}
+
+/* ── Orçamento Wizard ─────────────────────────────────────── */
+const ORC_TIPOS=["Casamento","Aniversário","Debutante","Corporativo","Batizado","Confraternização","Outro"];
+let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0};
+
+function abrirOrcamento(){
+  _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0};
+  showSc("orcamento");
+  _orcStep();
+}
+
+function _orcStep(){
+  [1,2,3,4].forEach(i=>{
+    const el=document.getElementById("osi-"+i);
+    if(el) el.classList.toggle("on",i===_orc.step);
+  });
+  const body=document.getElementById("orc-wizard-body");
+  if(_orc.step===1) body.innerHTML=_orcHTML1();
+  else if(_orc.step===2) _orcLoadPacotes();
+  else if(_orc.step===3) _orcLoadExtras();
+  else if(_orc.step===4) body.innerHTML=_orcHTML4();
+}
+
+function _orcHTML1(){
+  const tipos=ORC_TIPOS.map(t=>`<option value="${t}" ${_orc.tipo_evento===t?"selected":""}>${t}</option>`).join("");
+  return `<div class="orc-card">
+    <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:20px;">Conte-nos sobre o seu evento</div>
+    <label class="lbl">Tipo de evento *</label>
+    <select id="orc-tipo" class="inp">${tipos}</select>
+    <label class="lbl">Data do evento *</label>
+    <input type="date" id="orc-data" class="inp" value="${_orc.data_evento}" min="${new Date().toISOString().slice(0,10)}"/>
+    <label class="lbl">Número de convidados *</label>
+    <input type="number" id="orc-conv" class="inp" value="${_orc.num_convidados}" placeholder="ex: 80" min="1" max="110"/>
+    <label class="lbl">Nome da noiva / aniversariante</label>
+    <input type="text" id="orc-noiva" class="inp" value="${_orc.nome_noiva}" placeholder="Primeiro nome"/>
+    <label class="lbl">Nome do noivo</label>
+    <input type="text" id="orc-noivo" class="inp" value="${_orc.nome_noivo}" placeholder="Primeiro nome (opcional)"/>
+    <label class="lbl">Nome do contratante *</label>
+    <input type="text" id="orc-cont" class="inp" value="${_orc.nome_contratante}" placeholder="Nome completo"/>
+    <label class="lbl">WhatsApp *</label>
+    <input type="tel" id="orc-wpp" class="inp" value="${_orc.whatsapp}" placeholder="(34) 99999-9999"/>
+    <label class="lbl">E-mail</label>
+    <input type="email" id="orc-email" class="inp" value="${_orc.email}" placeholder="seu@email.com"/>
+    <div id="orc-err1" class="err"></div>
+  </div>
+  <div class="orc-nav">
+    <button class="orc-btn-next" onclick="_orcNext1()">Próximo →</button>
+  </div>`;
+}
+
+function _orcNext1(){
+  const tipo=document.getElementById("orc-tipo").value;
+  const data=document.getElementById("orc-data").value;
+  const conv=parseInt(document.getElementById("orc-conv").value)||0;
+  const cont=document.getElementById("orc-cont").value.trim();
+  const wpp=document.getElementById("orc-wpp").value.trim();
+  const err=document.getElementById("orc-err1");
+  if(!tipo||!data||!conv||!cont||!wpp){err.style.display="block";err.textContent="Preencha os campos obrigatórios (*)";return;}
+  if(conv>110){err.style.display="block";err.textContent="Capacidade máxima: 110 convidados. Entre em contato para eventos maiores.";return;}
+  _orc.tipo_evento=tipo; _orc.data_evento=data; _orc.num_convidados=conv;
+  _orc.nome_noiva=document.getElementById("orc-noiva").value.trim();
+  _orc.nome_noivo=document.getElementById("orc-noivo").value.trim();
+  _orc.nome_contratante=cont; _orc.whatsapp=wpp;
+  _orc.email=document.getElementById("orc-email").value.trim();
+  _orc.salao=conv<=100?"Salão Flamboyant":"Salão Principal";
+  _orc.step=2; _orcStep();
+}
+
+async function _orcLoadPacotes(){
+  const body=document.getElementById("orc-wizard-body");
+  body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Carregando pacotes…</div></div>`;
+  if(!_orc._pacotes.length){
+    const pkgs=await sbFetch("tabelas_preco?select=cod,nome,tabelas_preco_grupos(tabelas_preco_itens(descricao,valor_unitario,quantidade_padrao))")||[];
+    _orc._pacotes=pkgs.map(p=>{
+      let total=0; const itens=[];
+      (p.tabelas_preco_grupos||[]).forEach(g=>(g.tabelas_preco_itens||[]).forEach(i=>{
+        total+=((i.valor_unitario||0)*(i.quantidade_padrao||1));
+        itens.push(i.descricao);
+      }));
+      return {...p,_total:total,_itens:itens};
+    });
+  }
+  body.innerHTML=_orcHTML2();
+}
+
+function _orcHTML2(){
+  const pkgs=_orc._pacotes;
+  const cards=pkgs.length?pkgs.map(p=>`
+    <div class="orc-pkg-card ${_orc.pacote_cod===p.cod?"sel":""}" onclick="_orcSelPkg('${p.cod}')">
+      <div class="orc-pkg-title">${p.nome}</div>
+      <div class="orc-pkg-items">${p._itens.slice(0,6).join(" · ")+(p._itens.length>6?" · …":"")}</div>
+      <div class="orc-pkg-price">R$ ${p._total.toLocaleString("pt-BR",{minimumFractionDigits:2})}</div>
+    </div>`).join("")
+    :`<div style="padding:20px;text-align:center;color:var(--dl);">Nenhum pacote cadastrado ainda.</div>`;
+  return `<div class="orc-card">
+    <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:4px;">Escolha um pacote</div>
+    <div style="font-size:13px;color:var(--dl);margin-bottom:18px;">Salão sugerido: <strong>${_orc.salao}</strong> · ${_orc.num_convidados} convidados</div>
+    ${cards}
+    <div id="orc-err2" class="err"></div>
+  </div>
+  <div class="orc-nav">
+    <button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button>
+    <button class="orc-btn-next" onclick="_orcNext2()">Próximo →</button>
+  </div>`;
+}
+
+function _orcSelPkg(cod){
+  const p=_orc._pacotes.find(x=>x.cod===cod);
+  if(!p) return;
+  _orc.pacote_cod=cod; _orc.pacote_nome=p.nome; _orc.pacote_valor=p._total;
+  _orc.pacote_itens_desc=p._itens.join(", ");
+  document.querySelectorAll(".orc-pkg-card").forEach(el=>el.classList.remove("sel"));
+  event.currentTarget.classList.add("sel");
+}
+
+function _orcNext2(){
+  if(!_orc.pacote_cod){const e=document.getElementById("orc-err2");e.style.display="block";e.textContent="Selecione um pacote para continuar.";return;}
+  _orc.step=3; _orcStep();
+}
+
+async function _orcLoadExtras(){
+  const body=document.getElementById("orc-wizard-body");
+  body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Carregando itens…</div></div>`;
+  if(!_orc._invItems.length){
+    const items=await sbFetch("inventario?order=descricao.asc&select=cod,descricao")||[];
+    _orc._invItems=items;
+  }
+  body.innerHTML=_orcHTML3();
+}
+
+function _orcHTML3(){
+  const rows=_orc._invItems.map(it=>{
+    const qty=_orc.extras[it.cod]||0;
+    return `<div class="orc-extra-row">
+      <div style="flex:1;font-size:13px;font-weight:600;color:var(--dk)">${it.descricao}</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button onclick="_orcQty('${it.cod}',-1)" style="width:28px;height:28px;border:1px solid var(--br);border-radius:6px;background:#fff;font-size:16px;cursor:pointer;line-height:1">−</button>
+        <span id="orc-qty-${it.cod}" style="min-width:24px;text-align:center;font-weight:700">${qty}</span>
+        <button onclick="_orcQty('${it.cod}',1)" style="width:28px;height:28px;border:1px solid var(--br);border-radius:6px;background:#fff;font-size:16px;cursor:pointer;line-height:1">+</button>
+      </div>
+    </div>`;
+  }).join("");
+  return `<div class="orc-card">
+    <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:4px;">Itens adicionais</div>
+    <div style="font-size:13px;color:var(--dl);margin-bottom:18px;">Opcional — adicione itens além do pacote selecionado</div>
+    ${rows||`<div style="text-align:center;color:var(--dl);padding:20px">Nenhum item cadastrado.</div>`}
+  </div>
+  <div class="orc-nav">
+    <button class="orc-btn-back" onclick="_orc.step=2;_orcStep()">← Voltar</button>
+    <button class="orc-btn-next" onclick="_orc.step=4;_orcStep()">Ver resumo →</button>
+  </div>`;
+}
+
+function _orcQty(cod,delta){
+  const cur=_orc.extras[cod]||0;
+  const nv=Math.max(0,cur+delta);
+  if(nv===0) delete _orc.extras[cod]; else _orc.extras[cod]=nv;
+  const el=document.getElementById("orc-qty-"+cod);
+  if(el) el.textContent=nv;
+}
+
+function _orcHTML4(){
+  const extrasDesc=Object.entries(_orc.extras).map(([cod,qty])=>{
+    const it=_orc._invItems.find(x=>x.cod===cod);
+    return it?`${it.descricao} × ${qty}`:"";
+  }).filter(Boolean).join(", ")||"Nenhum";
+  _orc.valor_total=_orc.pacote_valor;
+  const validade=new Date(); validade.setDate(validade.getDate()+7);
+  const valStr=validade.toLocaleDateString("pt-BR");
+  const nomes=[_orc.nome_noiva,_orc.nome_noivo].filter(Boolean).join(" e ")||_orc.nome_contratante;
+  return `<div class="orc-card">
+    <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:20px;">Resumo do orçamento</div>
+    <div style="display:flex;flex-direction:column;gap:10px;font-size:14px;">
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Evento</span><span style="font-weight:600">${_orc.tipo_evento}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Data</span><span style="font-weight:600">${_orc.data_evento.split("-").reverse().join("/")}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Convidados</span><span style="font-weight:600">${_orc.num_convidados}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Salão</span><span style="font-weight:600">${_orc.salao}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Nome(s)</span><span style="font-weight:600">${nomes}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Pacote</span><span style="font-weight:600">${_orc.pacote_nome}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Extras</span><span style="font-weight:600;text-align:right;max-width:60%">${extrasDesc}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:14px 0;margin-top:4px;"><span style="font-size:16px;font-weight:700;color:var(--dk)">Total</span><span style="font-size:22px;font-weight:700;color:var(--a)">R$ ${_orc.valor_total.toLocaleString("pt-BR",{minimumFractionDigits:2})}</span></div>
+    </div>
+    <div style="background:#f5f6f7;border-radius:10px;padding:12px 16px;font-size:12px;color:var(--dl);margin-top:8px;">
+      ⏱ Este orçamento tem validade até <strong>${valStr}</strong>. Após isso, os valores poderão ser reajustados.
+    </div>
+    <div id="orc-err4" class="err"></div>
+  </div>
+  <div class="orc-nav">
+    <button class="orc-btn-back" onclick="_orc.step=3;_orcStep()">← Voltar</button>
+    <button class="orc-btn-next" id="orc-btn-salvar" onclick="_orcSalvar()">Solicitar orçamento ✓</button>
+  </div>`;
+}
+
+async function _orcSalvar(){
+  const btn=document.getElementById("orc-btn-salvar");
+  btn.disabled=true; btn.textContent="Salvando…";
+  const validade=new Date(); validade.setDate(validade.getDate()+7);
+  const itens=Object.entries(_orc.extras).map(([cod,qty])=>({cod,qty}));
+  try{
+    await sbFetch("orcamentos",{method:"POST",body:{
+      data_evento:_orc.data_evento,
+      nome_noiva:_orc.nome_noiva||null,
+      nome_noivo:_orc.nome_noivo||null,
+      nome_contratante:_orc.nome_contratante,
+      tipo_evento:_orc.tipo_evento,
+      num_convidados:_orc.num_convidados,
+      salao:_orc.salao,
+      pacote_cod:_orc.pacote_cod,
+      itens,
+      valor_total:_orc.valor_total,
+      validade:validade.toISOString().slice(0,10),
+      whatsapp:_orc.whatsapp,
+      email:_orc.email||null,
+      status:"pendente"
+    }});
+    document.getElementById("orc-wizard-body").innerHTML=`
+      <div class="orc-card" style="text-align:center;padding:40px 24px;">
+        <div style="font-size:48px;margin-bottom:16px">🎉</div>
+        <div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--dk);margin-bottom:12px">Orçamento enviado!</div>
+        <div style="font-size:14px;color:var(--dm);line-height:1.6;margin-bottom:24px">Recebemos sua solicitação.<br>Entraremos em contato em breve pelo WhatsApp <strong>${_orc.whatsapp}</strong>.</div>
+        <button class="orc-btn-next" onclick="showSc('login')">Voltar ao início</button>
+      </div>`;
+    document.getElementById("orc-steps-bar").style.display="none";
+  }catch(e){
+    const err=document.getElementById("orc-err4");
+    if(err){err.style.display="block";err.textContent="Erro ao salvar. Tente novamente.";}
+    btn.disabled=false; btn.textContent="Solicitar orçamento ✓";
+  }
+}
 
 /* ── Landing Carousel ─────────────────────────────────────── */
 let _llTimer=null, _llIdx=0;
