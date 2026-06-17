@@ -45,9 +45,18 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .un{font-size:11px;color:var(--dl);}
 .ur{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--a);color:var(--dk);text-transform:uppercase;}
 .btn-out{background:rgba(255,255,255,.08);border:none;color:var(--dl);font-size:11px;font-weight:600;padding:5px 10px;border-radius:20px;}
-#tnav{display:flex;background:#fff;border-bottom:1px solid var(--br);overflow-x:auto;-webkit-overflow-scrolling:touch;}
+#tnav{display:flex;background:#fff;border-bottom:1px solid var(--br);overflow-x:auto;-webkit-overflow-scrolling:touch;position:relative;z-index:100;}
 .tab{padding:12px 16px;border:none;background:transparent;font-size:11px;font-weight:700;color:var(--dl);white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s;}
 .tab.on{color:var(--a);border-bottom-color:var(--a);}
+.tgrp{position:relative;display:inline-flex;}
+.tgrp-btn{padding:12px 16px;border:none;background:transparent;font-size:11px;font-weight:700;color:var(--dl);white-space:nowrap;border-bottom:2px solid transparent;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .2s;}
+.tgrp-btn:hover{color:var(--dk);}
+.tgrp-btn.on{color:var(--a);border-bottom-color:var(--a);}
+.tgrp-btn::after{content:"▾";font-size:9px;opacity:.6;}
+.tgrp-drop{display:none;position:absolute;top:100%;left:0;background:#fff;border:1px solid var(--br);border-radius:0 0 10px 10px;box-shadow:0 6px 20px rgba(0,0,0,.1);min-width:190px;z-index:200;padding:4px 0;}
+.tgrp.open .tgrp-drop{display:block;}
+.tgrp-drop .tab{display:block;width:100%;text-align:left;padding:10px 18px;border-bottom:none;border-left:2px solid transparent;}
+.tgrp-drop .tab.on{border-left-color:var(--a);border-bottom:none;background:rgba(180,140,60,.06);}
 .panel{display:none;}.panel.on{display:block;}
 /* CALENDAR */
 .mnav{display:flex;align-items:center;justify-content:center;gap:20px;padding:20px 12px 6px;}
@@ -244,16 +253,16 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   <!-- Versão clara para usar no header escuro -->
   <symbol id="logo-sym-lt" viewBox="0 0 100 96">
     <path d="M50,4 C62,3 76,8 85,18 C94,28 96,42 92,56 C88,70 77,82 62,88 C47,94 30,92 18,83 C6,74 2,58 5,44 C8,30 18,16 32,9 C40,5 46,4 50,4 Z"
-          stroke="#E8EEF0" stroke-width="2.6" fill="none"/>
+          stroke="#E8A52A" stroke-width="2.6" fill="none"/>
     <path d="M50,14 C60,13 72,17 80,26 C88,35 90,47 86,59 C82,71 73,79 60,84 C47,89 32,86 22,78 C12,70 9,56 12,44 C15,32 24,20 36,15 C42,12 47,14 50,14 Z"
-          stroke="#E8EEF0" stroke-width="2.3" fill="none"/>
+          stroke="#E8A52A" stroke-width="2.3" fill="none"/>
     <path d="M50,23 C58,22 68,26 75,33 C82,41 83,52 80,62 C77,72 69,79 58,82 C47,85 35,81 27,74 C19,67 17,55 20,44 C23,34 31,24 42,21 C46,20 49,23 50,23 Z"
-          stroke="#E8EEF0" stroke-width="2.0" fill="none"/>
+          stroke="#E8A52A" stroke-width="2.0" fill="none"/>
     <path d="M50,32 C56,31 64,34 69,40 C75,47 75,57 72,65 C69,72 62,77 53,79 C44,81 35,77 29,70 C23,63 22,53 25,44 C28,36 36,29 44,28 C47,27 49,32 50,32 Z"
-          stroke="#E8EEF0" stroke-width="1.8" fill="none"/>
+          stroke="#E8A52A" stroke-width="1.8" fill="none"/>
     <path d="M50,41 C54,40 59,43 62,48 C65,53 64,60 61,64 C58,68 53,70 48,69 C43,68 38,64 36,59 C34,54 35,47 39,43 C42,40 47,41 50,41 Z"
-          stroke="#E8EEF0" stroke-width="1.5" fill="none"/>
-    <circle cx="50" cy="55" r="4" fill="#E8EEF0"/>
+          stroke="#E8A52A" stroke-width="1.5" fill="none"/>
+    <circle cx="50" cy="55" r="4" fill="#E8A52A"/>
   </symbol>
 </svg>
 
@@ -261,7 +270,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 <div id="sc-login" class="screen">
   <div class="acard">
     <div class="logo-w">
-      <svg width="56" height="56"><use href="#logo-sym"/></svg>
+      <svg width="56" height="56"><use href="#logo-sym-lt"/></svg>
       <div class="logo-n">DAMATA</div>
       <div class="logo-s">Espaço de Eventos</div>
     </div>
@@ -281,7 +290,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 <div id="sc-reg" class="screen">
   <div class="acard">
     <div class="logo-w">
-      <svg width="44" height="44"><use href="#logo-sym"/></svg>
+      <svg width="44" height="44"><use href="#logo-sym-lt"/></svg>
       <div class="logo-n">DAMATA</div>
     </div>
     <div class="atitle">Solicitar acesso</div>
@@ -304,7 +313,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   <div style="width:100%;max-width:560px;margin:0 auto;padding:20px 16px 40px;">
     <div class="acard" style="max-width:100%;">
       <div class="logo-w">
-        <svg width="44" height="44"><use href="#logo-sym"/></svg>
+        <svg width="44" height="44"><use href="#logo-sym-lt"/></svg>
         <div class="logo-n">DAMATA</div>
         <div class="logo-s">Espaço de Eventos</div>
       </div>
@@ -387,21 +396,45 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   </div>
   <div id="tnav" style="display:none;">
     <button class="tab on" onclick="setTab('agenda')" id="t-agenda">📅 Agenda</button>
-    <button class="tab" onclick="setTab('receber')" id="t-receber">💰 A Receber</button>
-    <button class="tab" onclick="setTab('pagar')" id="t-pagar">💳 A Pagar</button>
-    <button class="tab" onclick="setTab('fluxo')" id="t-fluxo">📊 Fluxo de Caixa</button>
-    <button class="tab" onclick="setTab('extrato')" id="t-extrato">🏦 Extrato C6</button>
-    <button class="tab" onclick="setTab('fluxoreal')" id="t-fluxoreal">📈 Fluxo Real</button>
-    <button class="tab" onclick="setTab('fornec')" id="t-fornec">🏢 Fornecedores</button>
-    <button class="tab" onclick="setTab('inventario')" id="t-inventario">📦 Inventário</button>
-    <button class="tab" onclick="setTab('relatorio')" id="t-relatorio">📋 Relatório</button>
-    <button class="tab" onclick="setTab('contratos')" id="t-contratos">📄 Contratos</button>
-    <button class="tab" onclick="setTab('pedidos')" id="t-pedidos">🛒 Pedidos</button>
-    <button class="tab" onclick="setTab('vt')" id="t-vt">🔍 Visita Técnica</button>
-    <button class="tab" onclick="setTab('tabelaspreco')" id="t-tabelaspreco">💲 Tabelas de Preço</button>
-    <button class="tab" onclick="setTab('pend')" id="t-pend">🔔 Solicitações <span id="pbadge" style="color:var(--a);"></span></button>
-    <button class="tab" onclick="setTab('users')" id="t-users">👥 Usuários</button>
-    <button class="tab" onclick="openSettings()" id="t-settings">⚙ Config</button>
+
+    <div class="tgrp" id="grp-eventos">
+      <button class="tgrp-btn" onclick="toggleGrp('grp-eventos')">📆 Eventos</button>
+      <div class="tgrp-drop">
+        <button class="tab" onclick="setTab('contratos');closeGrps()" id="t-contratos">📄 Contratos</button>
+        <button class="tab" onclick="setTab('pedidos');closeGrps()" id="t-pedidos">🛒 Pedidos</button>
+        <button class="tab" onclick="setTab('vt');closeGrps()" id="t-vt">🔍 Visita Técnica</button>
+      </div>
+    </div>
+
+    <div class="tgrp" id="grp-financeiro">
+      <button class="tgrp-btn" onclick="toggleGrp('grp-financeiro')">💰 Financeiro</button>
+      <div class="tgrp-drop">
+        <button class="tab" onclick="setTab('receber');closeGrps()" id="t-receber">💰 A Receber</button>
+        <button class="tab" onclick="setTab('pagar');closeGrps()" id="t-pagar">💳 A Pagar</button>
+        <button class="tab" onclick="setTab('fluxo');closeGrps()" id="t-fluxo">📊 Fluxo de Caixa</button>
+        <button class="tab" onclick="setTab('extrato');closeGrps()" id="t-extrato">🏦 Extrato C6</button>
+        <button class="tab" onclick="setTab('fluxoreal');closeGrps()" id="t-fluxoreal">📈 Fluxo Real</button>
+      </div>
+    </div>
+
+    <div class="tgrp" id="grp-cadastros">
+      <button class="tgrp-btn" onclick="toggleGrp('grp-cadastros')">📦 Cadastros</button>
+      <div class="tgrp-drop">
+        <button class="tab" onclick="setTab('fornec');closeGrps()" id="t-fornec">🏢 Fornecedores</button>
+        <button class="tab" onclick="setTab('inventario');closeGrps()" id="t-inventario">📦 Inventário</button>
+        <button class="tab" onclick="setTab('tabelaspreco');closeGrps()" id="t-tabelaspreco">💲 Tabelas de Preço</button>
+      </div>
+    </div>
+
+    <div class="tgrp" id="grp-admin">
+      <button class="tgrp-btn" onclick="toggleGrp('grp-admin')">⚙️ Admin</button>
+      <div class="tgrp-drop">
+        <button class="tab" onclick="setTab('relatorio');closeGrps()" id="t-relatorio">📋 Relatório</button>
+        <button class="tab" onclick="setTab('pend');closeGrps()" id="t-pend">🔔 Solicitações <span id="pbadge" style="color:var(--a);"></span></button>
+        <button class="tab" onclick="setTab('users');closeGrps()" id="t-users">👥 Usuários</button>
+        <button class="tab" onclick="openSettings();closeGrps()" id="t-settings">⚙ Config</button>
+      </div>
+    </div>
   </div>
   <div id="app-content">
     <div id="p-agenda" class="panel on">
@@ -1221,9 +1254,30 @@ async function openApp(u) {
   showSc("app");
 }
 
+// ── Grupos do menu ──
+const TAB_GRP={
+  contratos:"grp-eventos", pedidos:"grp-eventos", vt:"grp-eventos",
+  receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro",
+  fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros",
+  relatorio:"grp-admin", pend:"grp-admin", users:"grp-admin"
+};
+function toggleGrp(id){
+  const el=document.getElementById(id);
+  const wasOpen=el.classList.contains("open");
+  closeGrps();
+  if(!wasOpen) el.classList.add("open");
+}
+function closeGrps(){ document.querySelectorAll(".tgrp").forEach(g=>g.classList.remove("open")); }
+document.addEventListener("click",function(e){
+  if(!e.target.closest(".tgrp")) closeGrps();
+});
+
 function setTab(t) {
   document.querySelectorAll(".tab").forEach(b=>b.classList.remove("on"));
   document.getElementById("t-"+t).classList.add("on");
+  // Destaca o grupo correspondente
+  document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
+  if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
   const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco"};
   document.getElementById(map[t]).classList.add("on");
