@@ -432,6 +432,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <button class="tab" onclick="setTab('relatorio');closeGrps()" id="t-relatorio">📋 Relatório</button>
         <button class="tab" onclick="setTab('pend');closeGrps()" id="t-pend">🔔 Solicitações <span id="pbadge" style="color:var(--a);"></span></button>
         <button class="tab" onclick="setTab('users');closeGrps()" id="t-users">👥 Usuários</button>
+        <button class="tab" onclick="setTab('fotoslanding');closeGrps()" id="t-fotoslanding">🖼 Fotos Landing</button>
         <button class="tab" onclick="openSettings();closeGrps()" id="t-settings">⚙ Config</button>
       </div>
     </div>
@@ -690,6 +691,18 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 
     <div id="p-pend" class="panel"><div class="uwrap"><div class="sec-t">Solicitações pendentes</div><div id="pend-list"></div></div></div>
     <div id="p-users" class="panel"><div class="uwrap"><div class="sec-t">Usuários aprovados</div><div id="users-list"></div></div></div>
+    <div id="p-fotoslanding" class="panel">
+      <div class="uwrap" style="max-width:600px">
+        <div class="sec-t">🖼 Fotos Landing Page</div>
+        <p style="color:var(--dl);font-size:13px;margin-bottom:16px">URLs das fotos exibidas na landing page do orçamento. Adicione, remova ou reordene conforme desejar.</p>
+        <div id="fl-lista"></div>
+        <button onclick="flAddItem()" style="margin-top:12px;padding:8px 16px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">+ Adicionar foto</button>
+        <div style="margin-top:20px;display:flex;gap:10px">
+          <button onclick="flSalvar()" style="padding:10px 24px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px">Salvar</button>
+          <span id="fl-status" style="align-self:center;font-size:13px;color:var(--dl)"></span>
+        </div>
+      </div>
+    </div>
     <div id="p-client" class="panel">
       <div class="cli-tabs" id="cli-tabs">
         <button class="cli-tab on" onclick="setCliTab('event')">Meu Evento</button>
@@ -1268,7 +1281,7 @@ const TAB_GRP={
   contratos:"grp-eventos", pedidos:"grp-eventos", vt:"grp-eventos",
   receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro",
   fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros",
-  relatorio:"grp-admin", pend:"grp-admin", users:"grp-admin"
+  relatorio:"grp-admin", pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin"
 };
 function toggleGrp(id){
   const el=document.getElementById(id);
@@ -1288,7 +1301,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco"};
+  const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(null);
   if(t==="receber") renderReceber();
@@ -1304,6 +1317,47 @@ function setTab(t) {
   if(t==="tabelaspreco") renderTabelasPreco();
   if(t==="pend") renderPend();
   if(t==="users") renderUsers();
+  if(t==="fotoslanding") renderFotosLanding();
+}
+
+/* ── Fotos Landing ─────────────────────────────────────────── */
+let _flUrls=[];
+async function renderFotosLanding(){
+  const res=await sbFetch("app_config?chave=eq.fotos_landing&select=valor");
+  const row=res&&res[0];
+  _flUrls=(row&&Array.isArray(row.valor))?[...row.valor]:["","","",""];
+  _flRender();
+}
+function _flRender(){
+  const c=document.getElementById("fl-lista");
+  c.innerHTML=_flUrls.map((u,i)=>`
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <span style="color:var(--dl);font-size:12px;min-width:24px">${i+1}.</span>
+      <input id="fl-url-${i}" value="${u.replace(/"/g,'&quot;')}" placeholder="https://..." style="flex:1;padding:8px 10px;border:1px solid var(--br);border-radius:8px;font-size:13px">
+      <button onclick="flMove(${i},-1)" ${i===0?"disabled":""} style="padding:4px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff">↑</button>
+      <button onclick="flMove(${i},1)" ${i===_flUrls.length-1?"disabled":""} style="padding:4px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff">↓</button>
+      <button onclick="flRemove(${i})" style="padding:4px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff;color:#e74c3c">✕</button>
+    </div>`).join("");
+}
+function flAddItem(){ _flUrls.push(""); _flRender(); }
+function flRemove(i){ _flUrls.splice(i,1); _flRender(); }
+function flMove(i,dir){
+  const j=i+dir;
+  if(j<0||j>=_flUrls.length) return;
+  [_flUrls[i],_flUrls[j]]=[_flUrls[j],_flUrls[i]];
+  _flRender();
+}
+async function flSalvar(){
+  _flUrls=_flUrls.map((_,i)=>document.getElementById("fl-url-"+i).value.trim()).filter(u=>u);
+  const existing=await sbFetch("app_config?chave=eq.fotos_landing&select=chave");
+  if(existing&&existing.length){
+    await sbFetch("app_config?chave=eq.fotos_landing",{method:"PATCH",body:{valor:_flUrls}});
+  } else {
+    await sbFetch("app_config",{method:"POST",body:{chave:"fotos_landing",valor:_flUrls}});
+  }
+  document.getElementById("fl-status").textContent="✓ Salvo!";
+  setTimeout(()=>document.getElementById("fl-status").textContent="",3000);
+  _flRender();
 }
 
 async function updBadge() {
