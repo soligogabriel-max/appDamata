@@ -558,13 +558,22 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <div class="uwrap" style="max-width:1100px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
           <div class="sec-t" style="margin-bottom:0;">Relatório de Eventos Fechados</div>
-          <div style="display:flex;gap:16px;align-items:center;">
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--dk);cursor:pointer;">
-              <input type="radio" name="rel-agrup" value="ano" checked onchange="renderRelatorio()" style="accent-color:var(--a);width:15px;height:15px;"> Por Ano
-            </label>
-            <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--dk);cursor:pointer;">
-              <input type="radio" name="rel-agrup" value="mes" onchange="renderRelatorio()" style="accent-color:var(--a);width:15px;height:15px;"> Por Mês
-            </label>
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:12px;font-weight:600;color:var(--dl);">De</span>
+              <input type="month" id="rel-de" class="inp inp-inline" onchange="renderRelatorio()" style="width:140px;margin-bottom:0;">
+              <span style="font-size:12px;font-weight:600;color:var(--dl);">Até</span>
+              <input type="month" id="rel-ate" class="inp inp-inline" onchange="renderRelatorio()" style="width:140px;margin-bottom:0;">
+              <button onclick="relLimparFiltro()" style="background:none;border:1px solid var(--br);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--dl);cursor:pointer;">✕ Limpar</button>
+            </div>
+            <div style="display:flex;gap:12px;align-items:center;border-left:1px solid var(--br);padding-left:12px;">
+              <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--dk);cursor:pointer;">
+                <input type="radio" name="rel-agrup" value="ano" checked onchange="renderRelatorio()" style="accent-color:var(--a);width:15px;height:15px;"> Por Ano
+              </label>
+              <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--dk);cursor:pointer;">
+                <input type="radio" name="rel-agrup" value="mes" onchange="renderRelatorio()" style="accent-color:var(--a);width:15px;height:15px;"> Por Mês
+              </label>
+            </div>
           </div>
         </div>
         <div id="rel-totais" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;"></div>
@@ -3063,6 +3072,11 @@ async function renderAgendaTabela(){
 // RELATÓRIO
 // ══════════════════════════════════════════
 let _relChart = null;
+function relLimparFiltro(){
+  const de=document.getElementById("rel-de"); if(de) de.value="";
+  const ate=document.getElementById("rel-ate"); if(ate) ate.value="";
+  renderRelatorio();
+}
 async function renderRelatorio() {
   const totWr = document.getElementById("rel-totais");
   const tblWr = document.getElementById("rel-table");
@@ -3089,10 +3103,16 @@ async function renderRelatorio() {
       if(d) dataFechamento[p.cod_evento] = d;
     });
 
+    // Filtro de período
+    const relDe  = document.getElementById("rel-de")?.value  || "";
+    const relAte = document.getElementById("rel-ate")?.value || "";
+
     // Contratos = eventos que têm parcela 1 com data
-    const contratos = Object.entries(dataFechamento).map(([cod, dataRef]) => ({
+    let contratos = Object.entries(dataFechamento).map(([cod, dataRef]) => ({
       cod, dataRef, valor: valorPorEvento[cod] || 0
     }));
+    if(relDe)  contratos = contratos.filter(c => c.dataRef.slice(0,7) >= relDe);
+    if(relAte) contratos = contratos.filter(c => c.dataRef.slice(0,7) <= relAte);
 
     if(!contratos.length) {
       totWr.innerHTML = '<div class="empty"><div class="eicon">📋</div>Nenhum contrato fechado encontrado.</div>';
