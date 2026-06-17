@@ -2540,13 +2540,11 @@ async function _renderImportStep2(){
     return;
   }
 
-  // Load fornecedores + naturezas
-  if(!_allFornecedores) _allFornecedores=await dbGet("fornecedores","order=nome.asc&limit=500");
+  // Load fornecedores + naturezas (sempre recarrega para evitar cache desatualizado)
+  _allFornecedores=await dbGet("fornecedores","order=nome.asc&limit=500");
   _impFornecList=_allFornecedores||[];
-  if(!_impNaturezas.length){
-    const nats=await dbGet("naturezas","select=cod,descricao&order=cod.asc&limit=500");
-    _impNaturezas=nats||[];
-  }
+  const natsImp=await dbGet("naturezas","select=cod,descricao&order=cod.asc&limit=500");
+  _impNaturezas=natsImp||[];
 
   // Load natureza history per fornecedor (most common)
   const pagHistory=await dbGetAll("contas_a_pagar","select=fornecedor_cod,natureza&natureza=not.is.null&fornecedor_cod=not.is.null");
@@ -4142,9 +4140,7 @@ async function openTpModal(tp) {
   document.getElementById("tpm-grupos-wrap").innerHTML = "";
   document.getElementById("tpm-itens-body").innerHTML = "";
   document.getElementById("m-tp").classList.add("open");
-  if(!_tpInvItems.length) {
-    try { _tpInvItems = await dbGet("inventario","select=cod,descricao,valor_unitario&order=cod.asc&limit=500"); } catch(e){ _tpInvItems=[]; }
-  }
+  try { _tpInvItems = await dbGet("inventario","select=cod,descricao,valor_unitario&order=cod.asc&limit=500"); } catch(e){ _tpInvItems=[]; }
   if(tp) {
     const [grupos, itens] = await Promise.all([
       dbGet("tabelas_preco_grupos","tabela_id=eq."+tp.id+"&order=ordem.asc,id.asc&limit=100"),
@@ -4311,11 +4307,9 @@ function setDespPrevConfig(cfg) {
 }
 
 async function openSettings() {
-  if(!_allFornecedores) _allFornecedores = await dbGet("fornecedores","order=nome.asc&limit=500");
-  if(!_impNaturezas.length){
-    const nats = await dbGet("naturezas","select=cod,descricao&order=cod.asc&limit=500");
-    _impNaturezas = nats||[];
-  }
+  _allFornecedores = await dbGet("fornecedores","order=nome.asc&limit=500");
+  const natsSet = await dbGet("naturezas","select=cod,descricao&order=cod.asc&limit=500");
+  _impNaturezas = natsSet||[];
   const cfg = getDespPrevConfig();
   const fornecOpts = `<option value="">— Sem fornecedor —</option>` +
     (_allFornecedores||[]).map(f=>`<option value="${_esc(f.codigo)}" ${cfg.fornecedor_cod===f.codigo?"selected":""}>${_esc(f.nome)}</option>`).join("");
