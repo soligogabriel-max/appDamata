@@ -265,13 +265,17 @@ function renderItens(grupos,itens){
   if(avulsos.length){
     html+='<div style="font-size:11px;font-weight:700;color:#93c5fd;letter-spacing:1px;margin:12px 0 8px;text-transform:uppercase;">📋 Itens Avulsos</div>';
     avulsos.forEach(function(it){
-      html+='<label class="cb" id="lb-av-'+it.id+'">'+
+      html+='<div class="cb" id="lb-av-'+it.id+'" style="align-items:center;">'+
         '<input type="checkbox" id="av-'+it.id+'" data-vun="'+(it.valor_unitario||0)+'" onchange="recalcTotal()">'+
-        '<div style="display:flex;justify-content:space-between;width:100%;">'+
-          '<span>'+(it.descricao||it.cod_item||"")+'</span>'+
-          '<span style="color:#64748b;font-size:12px;">R$ '+fc(it.valor_unitario||0)+'</span>'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;gap:10px;">'+
+          '<span style="flex:1;">'+(it.descricao||it.cod_item||"")+'</span>'+
+          '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">'+
+            '<span style="color:#64748b;font-size:11px;">Qtd:</span>'+
+            '<input type="number" id="qtd-av-'+it.id+'" value="1" min="1" style="width:52px;padding:4px 6px;border:1px solid #334155;border-radius:6px;background:#0f172a;color:#f1f5f9;font-size:12px;text-align:center;" oninput="recalcTotal()">'+
+            '<span style="color:#64748b;font-size:12px;min-width:70px;text-align:right;">R$ '+fc(it.valor_unitario||0)+'</span>'+
+          '</div>'+
         '</div>'+
-      '</label>';
+      '</div>';
     });
   }
   if(!grupos.length&&!avulsos.length)html='<div style="color:#64748b;padding:10px;">Nenhum item cadastrado nesta tabela.</div>';
@@ -305,7 +309,11 @@ function recalcTotal(){
     }
   });
   document.querySelectorAll("[id^='av-']").forEach(function(cb){
-    if(cb.checked)total+=parseFloat(cb.dataset.vun||0);
+    if(cb.checked){
+      var qtdEl=document.getElementById("qtd-"+cb.id);
+      var qtd=qtdEl?parseFloat(qtdEl.value||1):1;
+      total+=parseFloat(cb.dataset.vun||0)*qtd;
+    }
   });
   g("o-total").value=total?total.toFixed(2):"";
 }
@@ -332,7 +340,11 @@ function collectItens(){
     if(!cb.checked)return;
     var id=parseInt(cb.id.replace("av-",""));
     var it=_itens.find(function(i){return i.id===id;});
-    if(it)itens.push({cod:it.cod_item,descricao:it.descricao,quantidade:1,valor_unitario:it.valor_unitario||0});
+    if(it){
+      var qtdEl=document.getElementById("qtd-"+cb.id);
+      var qtd=qtdEl?parseInt(qtdEl.value||1):1;
+      itens.push({cod:it.cod_item,descricao:it.descricao,quantidade:qtd,valor_unitario:it.valor_unitario||0});
+    }
   });
   return itens;
 }

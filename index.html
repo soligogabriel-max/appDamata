@@ -2743,12 +2743,11 @@ async function renderInventario() {
     const rows = busca ? _inventario.filter(r=>(r.descricao||"").toLowerCase().includes(busca)) : _inventario;
     if(!rows.length){ wr.innerHTML='<div class="empty"><div class="eicon">📦</div>Nenhum item encontrado.</div>'; return; }
     wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
-      <thead><tr><th>Código</th><th>Descrição</th><th>Qtd Máx</th><th>Valor Unit.</th><th>Valor Reposição</th><th>Obs</th><th></th></tr></thead>
+      <thead><tr><th>Código</th><th>Descrição</th><th>Qtd Máx</th><th>Valor Reposição</th><th>Obs</th><th></th></tr></thead>
       <tbody>${rows.map(r=>{const rj=_esc(JSON.stringify(r));return`<tr>
         <td style="font-weight:700;color:var(--dl);">${r.cod}</td>
         <td style="font-weight:600;">${r.descricao||"—"}</td>
         <td style="text-align:center;">${r.quantidade_max??"—"}</td>
-        <td>${r.valor_unitario!=null?fmt(r.valor_unitario):"—"}</td>
         <td>${r.valor_reposicao!=null?fmt(r.valor_reposicao):"—"}</td>
         <td style="color:var(--dl);font-size:11px;">${r.obs||""}</td>
         <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openCrud("inventario",JSON.parse(this.dataset.r),()=>{_inventario=null;renderInventario()})' data-r="${rj}">✏️</button></div></td>
@@ -3167,7 +3166,6 @@ const CRUD_CFG = {
       {n:"cod",             l:"Código",          t:"text", req:true},
       {n:"descricao",       l:"Descrição",       t:"text", req:true},
       {n:"quantidade_max",  l:"Qtd. Máxima",     t:"number"},
-      {n:"valor_unitario",  l:"Valor Unitário",  t:"decimal"},
       {n:"valor_reposicao", l:"Valor Reposição", t:"decimal"},
       {n:"obs",             l:"Observação",      t:"text"},
     ]
