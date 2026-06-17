@@ -45,8 +45,16 @@ select.inp{cursor:pointer}
 <div class="card">
   <div class="ctitle">🔖 Identificação</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-    <div><span class="lbl">Nome / Noiva (Contratante)</span><input class="inp" type="text" id="o-noiva" placeholder="Ex: Ana Paula"></div>
-    <div><span class="lbl">Nome / Noivo (Parceiro)</span><input class="inp" type="text" id="o-noivo" placeholder="Ex: Carlos"></div>
+    <div><span class="lbl">Nome da Noiva</span><input class="inp" type="text" id="o-noiva" placeholder="Ex: Ana Paula" oninput="autoNomeEvento()"></div>
+    <div><span class="lbl">Nome do Noivo</span><input class="inp" type="text" id="o-noivo" placeholder="Ex: Carlos" oninput="autoNomeEvento()"></div>
+  </div>
+  <div style="margin-bottom:12px">
+    <span class="lbl">Contratante (quem assina o contrato)</span>
+    <input class="inp" type="text" id="o-contratante" placeholder="Nome completo do contratante">
+  </div>
+  <div style="margin-bottom:12px">
+    <span class="lbl">Nome do Evento <span style="color:#475569;font-weight:400;text-transform:none;letter-spacing:0">(gerado automaticamente — editável)</span></span>
+    <input class="inp" type="text" id="o-nome-evento" placeholder="Ex: Ana e Pedro - 22jun26">
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
     <div>
@@ -68,7 +76,7 @@ select.inp{cursor:pointer}
 <div class="card">
   <div class="ctitle">📅 Dados do Evento</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-    <div><span class="lbl">Data do Evento</span><input class="inp" type="date" id="o-d1"></div>
+    <div><span class="lbl">Data do Evento</span><input class="inp" type="date" id="o-d1" onchange="autoNomeEvento()"></div>
     <div><span class="lbl">Data Final</span><input class="inp" type="date" id="o-d2"></div>
     <div><span class="lbl">Check-in</span><input class="inp" type="time" id="o-cin" value="18:00"></div>
     <div><span class="lbl">Check-out</span><input class="inp" type="time" id="o-cout" value="14:00"></div>
@@ -164,14 +172,34 @@ function fd(d){if(!d)return "";var p=d.split("-");return p.length<3?d:p[2]+"/"+p
 function fc(val){if(val==null||val==="")return "";return parseFloat(val).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function onTotalChange(){}
 
+// ── Nome do evento automático ──
+var MESES_PT=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+function _primeiroNome(n){return n?n.trim().split(/\s+/)[0]:"";}
+function autoNomeEvento(){
+  var noiva=_primeiroNome(v("o-noiva"));
+  var noivo=_primeiroNome(v("o-noivo"));
+  var d1=v("o-d1");
+  var partes=[];
+  if(noiva)partes.push(noiva);
+  if(noivo)partes.push(noivo);
+  var nome=partes.join(" e ");
+  if(d1){
+    var dt=new Date(d1+"T12:00:00");
+    nome+=" - "+dt.getDate()+MESES_PT[dt.getMonth()]+String(dt.getFullYear()).slice(2);
+  }
+  if(nome.trim())g("o-nome-evento").value=nome;
+}
+
 // ── Pré-preenchimento ──
 function prefillFromContext(){
   if(!_gcUser)return;
   var p=_gcUser.personal||{};
   g("o-noiva").value=p.nome_contratante||_gcUser.name||"";
   g("o-noivo").value=p.nome_nao_contratante||"";
+  g("o-contratante").value=p.nome_contratante||_gcUser.name||"";
   if(_gcEvt)g("o-code").value=_gcEvt;
   if(_gcDate){g("o-d1").value=_gcDate;}
+  autoNomeEvento();
 }
 
 // ── Tabelas de preço ──
@@ -396,10 +424,12 @@ function collectPreset(){
   var itens=collectItens();
   return {
     code:v("o-code"),obs:v("o-obs"),
+    nomeEvento:v("o-nome-evento"),
     date1:v("o-d1"),date2:v("o-d2"),cin:v("o-cin"),cout:v("o-cout"),
     total:v("o-total"),
     payments:payments.map(function(p){return{desc:p.desc,date:p.date,value:p.value};}),
     nomeNoiva:v("o-noiva"),nomeNoivo:v("o-noivo"),
+    contratante:v("o-contratante"),
     tipoEvento:v("o-tipo")||"Casamento",
     itens:itens
   };
