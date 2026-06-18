@@ -3071,7 +3071,7 @@ async function _orcLoadPacotes(){
   body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Carregando pacotes…</div></div>`;
   if(!_orc._pacotes.length){
     try{
-      const pkgs=await sbFetch("tabelas_preco?select=cod,nome,tabelas_preco_grupos(tabelas_preco_itens(descricao,valor_unitario,quantidade_padrao))&deleted_at=is.null")||[];
+      const pkgs=await sbFetch("tabelas_preco?select=cod,nome,tabelas_preco_grupos(tabelas_preco_itens(descricao,valor_unitario))&deleted_at=is.null")||[];
       _orc._pacotes=pkgs.map(p=>{
         let total=0; const itens=[];
         (p.tabelas_preco_grupos||[]).forEach(g=>(g.tabelas_preco_itens||[]).forEach(i=>{
