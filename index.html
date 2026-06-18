@@ -26,7 +26,12 @@ button{cursor:pointer;}
 .ll-btn{width:100%;padding:13px 16px;background:#fff;color:var(--a);border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.12);transition:transform .15s,box-shadow .15s;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:7px;}
 .ll-btn:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.18);}
 #ll-carousel-area{flex:1;display:flex;flex-direction:column;gap:10px;align-items:center;min-width:0;}
-#ll-carousel-wrap{width:100%;height:500px;border-radius:20px;overflow:hidden;position:relative;box-shadow:0 12px 40px rgba(0,0,0,.2);background:rgba(0,0,0,.15);}
+#ll-media-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;}
+#ll-carousel-cell{display:flex;flex-direction:column;gap:8px;}
+#ll-carousel-wrap{width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;position:relative;box-shadow:0 12px 40px rgba(0,0,0,.2);background:rgba(0,0,0,.15);}
+.ll-vid{width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.2);background:rgba(0,0,0,.15);}
+.ll-vid iframe{width:100%;height:100%;border:none;display:block;}
+.ll-vid-empty{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.45);font-size:12px;}
 #ll-version{position:absolute;bottom:12px;left:0;right:0;text-align:center;}
 .ll-slide{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1s;}
 .ll-slide.on{opacity:1;}
@@ -48,7 +53,7 @@ button{cursor:pointer;}
 .orc-nav{display:flex;gap:10px;margin-top:20px;}
 .orc-btn-next{flex:1;padding:13px;background:var(--a);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;}
 .orc-btn-back{padding:13px 20px;background:transparent;color:var(--dm);border:1.5px solid var(--br);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;}
-@media(max-width:768px){#sc-login{flex-direction:column;}#login-landing{min-height:unset;padding:24px 20px 32px;}#ll-logo{position:static;transform:none;margin:0 auto 6px;}#ll-main{flex-direction:column;gap:16px;}#ll-buttons{width:100%;order:-1;}#ll-carousel-area{width:100%;}#ll-carousel-wrap{height:260px;}#login-form-wrap .acard{min-height:auto;}#login-form-wrap{width:100%;min-width:unset;padding:16px 20px 28px;}#ll-version{position:static;margin-top:8px;}}
+@media(max-width:768px){#sc-login{flex-direction:column;}#login-landing{min-height:unset;padding:24px 20px 32px;}#ll-logo{position:static;transform:none;margin:0 auto 6px;}#ll-main{flex-direction:column;gap:16px;}#ll-buttons{width:100%;order:-1;}#ll-carousel-area{width:100%;}#ll-media-grid{grid-template-columns:1fr;}#login-form-wrap .acard{min-height:auto;}#login-form-wrap{width:100%;min-width:unset;padding:16px 20px 28px;}#ll-version{position:static;margin-top:8px;}}
 .acard{background:#fff;border-radius:24px;padding:32px 26px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(46,60,68,.22);}
 .logo-w{display:flex;flex-direction:column;align-items:center;margin-bottom:20px;}
 .logo-n{font-size:18px;font-weight:700;color:var(--dk);letter-spacing:4px;margin-top:9px;}
@@ -312,15 +317,23 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <button class="ll-btn" onclick="abrirOrcamento()">📋 Fazer Orçamento</button>
         <a class="ll-btn" href="https://wa.me/5519996383386" target="_blank">💬 WhatsApp</a>
         <a class="ll-btn" href="https://instagram.com/damatafazenda" target="_blank">📷 Instagram</a>
+        <a class="ll-btn" href="https://maps.app.goo.gl/B2KEUapfKFutrrKKA" target="_blank">📍 Como chegar</a>
       </div>
       <div id="ll-carousel-area">
-        <div id="ll-carousel-wrap">
-          <div id="ll-no-photo" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);font-size:13px">Carregando fotos…</div>
+        <div id="ll-media-grid">
+          <div id="ll-carousel-cell">
+            <div id="ll-carousel-wrap">
+              <div id="ll-no-photo" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);font-size:13px">Carregando fotos…</div>
+            </div>
+            <div id="ll-dots"></div>
+          </div>
+          <div class="ll-vid" id="ll-vid-0"></div>
+          <div class="ll-vid" id="ll-vid-1"></div>
+          <div class="ll-vid" id="ll-vid-2"></div>
         </div>
-        <div id="ll-dots"></div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-u</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-w</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -802,6 +815,15 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <div style="margin-top:20px;display:flex;gap:10px">
           <button onclick="flSalvar()" style="padding:10px 24px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px">Salvar</button>
           <span id="fl-status" style="align-self:center;font-size:13px;color:var(--dl)"></span>
+        </div>
+        <div style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px">
+          <div class="sec-t">🎥 Vídeos Landing Page (YouTube)</div>
+          <p style="color:var(--dl);font-size:13px;margin-bottom:16px">Cole os links do YouTube dos 3 vídeos exibidos ao lado do carrossel. Aceita qualquer formato (youtu.be, watch?v=, etc.).</p>
+          <div id="flv-lista"></div>
+          <div style="margin-top:16px;display:flex;gap:10px">
+            <button onclick="flvSalvar()" style="padding:10px 24px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px">Salvar vídeos</button>
+            <span id="flv-status" style="align-self:center;font-size:13px;color:var(--dl)"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -1430,6 +1452,38 @@ async function renderFotosLanding(){
   const row=res&&res[0];
   _flUrls=(row&&Array.isArray(row.valor))?[...row.valor]:["","","",""];
   _flRender();
+  _flvRender();
+}
+/* ── Vídeos Landing ── */
+let _flvUrls=["","",""];
+async function _flvLoad(){
+  try{
+    const res=await sbFetch("app_config?chave=eq.videos_landing&select=valor");
+    const row=res&&res[0];
+    const arr=(row&&Array.isArray(row.valor))?row.valor:[];
+    _flvUrls=[arr[0]||"",arr[1]||"",arr[2]||""];
+  }catch(_){_flvUrls=["","",""];}
+}
+async function _flvRender(){
+  await _flvLoad();
+  const c=document.getElementById("flv-lista");
+  if(!c) return;
+  c.innerHTML=_flvUrls.map((u,i)=>`
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <span style="color:var(--dl);font-size:12px;min-width:60px">Vídeo ${i+1}</span>
+      <input id="flv-url-${i}" value="${(u||'').replace(/"/g,'&quot;')}" placeholder="https://youtu.be/..." style="flex:1;padding:8px 10px;border:1px solid var(--br);border-radius:8px;font-size:13px">
+    </div>`).join("");
+}
+async function flvSalvar(){
+  _flvUrls=[0,1,2].map(i=>document.getElementById("flv-url-"+i).value.trim());
+  const existing=await sbFetch("app_config?chave=eq.videos_landing&select=chave");
+  if(existing&&existing.length){
+    await sbFetch("app_config?chave=eq.videos_landing",{method:"PATCH",body:{valor:_flvUrls}});
+  } else {
+    await sbFetch("app_config",{method:"POST",body:{chave:"videos_landing",valor:_flvUrls}});
+  }
+  document.getElementById("flv-status").textContent="✓ Salvo!";
+  setTimeout(()=>document.getElementById("flv-status").textContent="",3000);
 }
 function _flRender(){
   const c=document.getElementById("fl-lista");
@@ -2945,6 +2999,7 @@ window.addEventListener("load", async()=>{
     showSc("login");
   }
   loadLandingCarousel();
+  loadLandingVideos();
   // URL direta: fazendadamata.com/?orcamento
   if(window.location.search.includes("orcamento") || window.location.hash==="#orcamento"){
     setTimeout(()=>abrirOrcamento(), 800);
@@ -3647,6 +3702,32 @@ function llGoto(i){
   _llIdx=i;
   slides[_llIdx].classList.add("on");
   dotEls[_llIdx]?.classList.add("on");
+}
+
+// Extrai o ID de vídeo de qualquer formato de URL do YouTube
+function _ytId(url){
+  if(!url) return null;
+  const m=String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([\w-]{11})/);
+  if(m) return m[1];
+  const m2=String(url).match(/[?&]v=([\w-]{11})/);
+  return m2?m2[1]:null;
+}
+async function loadLandingVideos(){
+  let urls=[];
+  try{
+    const res=await sbFetch("app_config?chave=eq.videos_landing&select=valor");
+    if(res&&res[0]&&Array.isArray(res[0].valor)) urls=res[0].valor;
+  }catch(_){}
+  for(let i=0;i<3;i++){
+    const cell=document.getElementById("ll-vid-"+i);
+    if(!cell) continue;
+    const id=_ytId(urls[i]);
+    if(id){
+      cell.innerHTML=`<iframe src="https://www.youtube.com/embed/${id}" title="Vídeo Fazenda Damata" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    }else{
+      cell.innerHTML=`<div class="ll-vid-empty">Vídeo em breve</div>`;
+    }
+  }
 }
 
 // ══════════════════════════════════════════
