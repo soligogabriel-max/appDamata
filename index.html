@@ -3081,7 +3081,7 @@ async function _orcLoadPacotes(){
         return {...p,_total:total,_itens:itens};
       });
     }catch(e){
-      body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--er)">Erro ao carregar pacotes. Verifique sua conexão e tente novamente.</div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button><button class="orc-btn-next" onclick="_orcLoadPacotes()">Tentar novamente</button></div></div>`;
+      body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--er)">Erro ao carregar pacotes.</div><div style="font-size:11px;color:var(--dl);padding:8px 16px;word-break:break-all;">${e.message||e}</div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button><button class="orc-btn-next" onclick="_orcLoadPacotes()">Tentar novamente</button></div></div>`;
       return;
     }
   }
