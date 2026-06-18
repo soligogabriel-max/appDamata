@@ -2999,10 +2999,36 @@ async function orcSetStatus(id,status){
 
 /* ── Orçamento Wizard ─────────────────────────────────────── */
 const ORC_TIPOS=["Casamento","Aniversário","Debutante","Corporativo","Batizado","Confraternização","Outro"];
-let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null};
+
+const ORC_ITEM_INFO=[
+  {k:'Tumbérgia',        d:'Salão integrado à natureza · 1000m² · climatizado · até 450 pessoas · estacionamento 300 carros · inclui 10 mesas + 100 cadeiras + 3 staffs + insumos de banheiro', img:'1e7ODpau7Rn2FBIybCz4eXQYYhWqRZWsE'},
+  {k:'Bromélias',        d:'Salão rústico na antiga sede da Fazenda · 300m² · até 150 pessoas · 70 pontos de LED · inclui 10 mesas + 100 cadeiras + 3 staffs + insumos de banheiro',           img:'1cy7bm2nGTK3jgFr1nA4W7333SH39_uA7'},
+  {k:'Peroba Rosa',      d:'Cerimônia coberta com paisagismo ou ao ar livre no gramado · até 400 pessoas · inclui 30 bancos de madeira',                                                         img:'1eS1YETyyXz226T9UiUn_fh-MQHXIzHEe'},
+  {k:'Casa Flamboyant',  d:'350m² para os noivos · climatizada · lavabo · cozinha americana equipada',                                                                                           img:'1eO9bB_WmblgRSfFc_m0nSerSDZ7RxQz5'},
+  {k:'Loft Flamboyant',  d:'70m² · climatizado · integrado à natureza · suíte com cama king size',                                                                                               img:'1eDPG-SxdRR9yi3vRyQTcTEjUvw09x8cy'},
+  {k:'Suite Flamboyant 5',d:'4 camas de solteiro · ar condicionado · enxoval de cama e banho',                                                                                                  img:'1dw6dcH_Z4ERcNthqlEWFqqXtyP6l6w25'},
+  {k:'Suite Flamboyant 4',d:'3 camas de solteiro · ar condicionado · enxoval de cama e banho',                                                                                                  img:'1dw6dcH_Z4ERcNthqlEWFqqXtyP6l6w25'},
+  {k:'Suite Flamboyant 3',d:'4 camas de solteiro · ar condicionado · enxoval de cama e banho',                                                                                                  img:'1dw6dcH_Z4ERcNthqlEWFqqXtyP6l6w25'},
+  {k:'Suite Flamboyant 2',d:'Cama king size · ar condicionado · enxoval de cama e banho',                                                                                                       img:'1dw6dcH_Z4ERcNthqlEWFqqXtyP6l6w25'},
+  {k:'Suite Flamboyant 1',d:'Cama king size · ar condicionado · enxoval de cama e banho',                                                                                                       img:'1dw6dcH_Z4ERcNthqlEWFqqXtyP6l6w25'},
+  {k:'Suíte/Camarim',    d:'Suíte reservada para equipe de assessoria durante o evento',                                                                                                         img:'1dw6dcH_Z4ERcNthqlEWFqqXtyP6l6w25'},
+  {k:'Suite Bromélias 3',d:'Suíte quádrupla: duas camas de casal · ar condicionado · enxoval · frigobar',                                                                                       img:'1eG5yuY4-ZMI2PlXWEJ1oOKWiWllwMs_E'},
+  {k:'Suite Bromélias 2',d:'Suíte dupla: cama de casal · ar condicionado · enxoval · frigobar',                                                                                                 img:'1eG5yuY4-ZMI2PlXWEJ1oOKWiWllwMs_E'},
+  {k:'Suite Bromélias 1',d:'Suíte tripla: casal + solteiro · ar condicionado · enxoval · frigobar',                                                                                             img:'1e7UynIxyr9AwBCwkVvE-CGqWyJ_vSiHE'},
+  {k:'Hospedagem Flamboyant',d:'Casa Flamboyant + Loft + Suítes 1 a 5 · acomoda até 25 pessoas · 1 diária',                                                                                    img:'1eO9bB_WmblgRSfFc_m0nSerSDZ7RxQz5'},
+  {k:'Hospedagem Bromélias', d:'Suítes Bromélias 1, 2 e 3 · acomoda até 9 pessoas · enxoval · frigobar · 1 diária',                                                                            img:'1e7UynIxyr9AwBCwkVvE-CGqWyJ_vSiHE'},
+  {k:'Mesas Madeira',    d:'Madeira maciça com pés de ferro · 2,20m × 1,10m · capacidade 10 pessoas por mesa',                                                                                  img:'1ec8PH0f7RZ6Yl4VjXbrMwZPocrXWSuKF'},
+  {k:'Bancos Madeira',   d:'Madeira maciça · 2,00m × 0,45m · capacidade 4/5 pessoas por banco',                                                                                                 img:'1dz-Bulv_BGc-aA87HrHvGwQ-NbthDbPB'},
+  {k:'Bar Hexagonal',    d:'Bar hexagonal modular em madeira maciça · diâmetro 9,9m · altura 1,10m',                                                                                            img:null},
+  {k:'Cadeira Tiffany',  d:'Cadeira modelo Tiffany · cor marrom Supreme',                                                                                                                       img:null},
+  {k:'Staff',            d:'Profissional de suporte durante o evento · banheiros, salão ou estacionamento · por diária',                                                                        img:null},
+];
+function _orcItemInfo(desc){return ORC_ITEM_INFO.find(e=>desc.includes(e.k))||null;}
+
+let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_saved:false};
 
 function abrirOrcamento(){
-  _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null};
+  _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_saved:false};
   showSc("orcamento");
   _orcStep();
 }
@@ -3015,7 +3041,30 @@ function _orcStep(){
   const body=document.getElementById("orc-wizard-body");
   if(_orc.step===1) body.innerHTML=_orcHTML1();
   else if(_orc.step===2) _orcLoadPacotes();
-  else if(_orc.step===3) body.innerHTML=_orcHTML4();
+  else if(_orc.step===3){body.innerHTML=_orcHTML4();_orcSaveToDb();}
+}
+
+async function _orcSaveToDb(){
+  if(_orc._saved) return;
+  _orc._saved=true;
+  try{
+    const validade=new Date(); validade.setDate(validade.getDate()+7);
+    await sbFetch("orcamentos",{method:"POST",body:{
+      data_evento:_orc.data_evento,
+      nome_noiva:_orc.nome_noiva||null,
+      nome_noivo:_orc.nome_noivo||null,
+      nome_contratante:_orc.nome_contratante,
+      tipo_evento:_orc.tipo_evento,
+      num_convidados:_orc.num_convidados,
+      salao:_orc.salao,
+      pacote_cod:_orc.pacote_cod||null,
+      valor_total:_orc.valor_total,
+      validade:validade.toISOString().slice(0,10),
+      whatsapp:_orc.whatsapp,
+      email:_orc.email||null,
+      status:"pendente"
+    }});
+  }catch(_){_orc._saved=false;}
 }
 
 function _orcHTML1(){
@@ -3116,12 +3165,17 @@ function _orcHTML2(){
   (_orc._selectedItems||[]).forEach(i=>{prevSel.add(i.id);prevQty[i.id]=i.qty;});
   const hasPrev=prevSel.size>0;
   const itemRow=(i,defaultCk)=>{
+    const info=_orcItemInfo(i.descricao||'');
     const ck=(hasPrev?prevSel.has(i.id):defaultCk)?'checked':'';
     const qty=prevQty[i.id]||1;
-    return `<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--br);cursor:pointer;">
-      <input type="checkbox" id="orc-ck-${i.id}" data-vun="${i.valor_unitario||0}" ${ck} style="width:16px;height:16px;accent-color:var(--a);flex-shrink:0">
-      <span style="flex:1;font-size:13px;color:var(--dk)">${i.descricao||''}</span>
-      <input type="number" id="orc-qt-${i.id}" value="${qty}" min="1" style="width:48px;padding:4px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:center;background:var(--bg)">
+    const imgUrl=info?.img?`https://drive.google.com/uc?export=view&id=${info.img}`:null;
+    return `<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--br);cursor:pointer;">
+      <input type="checkbox" id="orc-ck-${i.id}" data-vun="${i.valor_unitario||0}" ${ck} style="width:16px;height:16px;accent-color:var(--a);flex-shrink:0;margin-top:3px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--dk)">${i.descricao||''}</div>
+        ${info?.d?`<div style="font-size:11px;color:var(--dl);margin-top:2px;line-height:1.4">${info.d}</div>`:''}
+      </div>
+      ${imgUrl?`<img src="${imgUrl}" onerror="this.style.display='none'" style="width:80px;height:60px;object-fit:cover;border-radius:6px;flex-shrink:0">`:''}<input type="number" id="orc-qt-${i.id}" value="${qty}" min="1" style="width:44px;padding:4px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:center;background:var(--bg);flex-shrink:0;margin-top:3px">
     </label>`;
   };
   let itemsHtml='';
@@ -3352,25 +3406,8 @@ function _orcHTML4(){
 async function _orcSalvar(){
   const btn=document.getElementById("orc-btn-salvar");
   btn.disabled=true; btn.textContent="Gerando PDF…";
-  // Try to save to Supabase silently (don't block PDF if it fails)
-  try{
-    const validade=new Date(); validade.setDate(validade.getDate()+7);
-    await sbFetch("orcamentos",{method:"POST",body:{
-      data_evento:_orc.data_evento,
-      nome_noiva:_orc.nome_noiva||null,
-      nome_noivo:_orc.nome_noivo||null,
-      nome_contratante:_orc.nome_contratante,
-      tipo_evento:_orc.tipo_evento,
-      num_convidados:_orc.num_convidados,
-      salao:_orc.salao,
-      pacote_cod:_orc.pacote_cod||null,
-      valor_total:_orc.valor_total,
-      validade:validade.toISOString().slice(0,10),
-      whatsapp:_orc.whatsapp,
-      email:_orc.email||null,
-      status:"pendente"
-    }});
-  }catch(_){}
+  // Save to Supabase if not already done when step 3 was shown
+  if(!_orc._saved) await _orcSaveToDb();
   // Generate PDF via print window
   _orcAbrirPDF();
   btn.disabled=false; btn.textContent="Salvar orçamento em PDF";
@@ -3380,34 +3417,7 @@ function _orcAbrirPDF(){
   const fmt=v=>"R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:2});
   const nomes=[_orc.nome_noiva,_orc.nome_noivo].filter(Boolean).join(" e ")||_orc.nome_contratante;
   const validade=new Date(); validade.setDate(validade.getDate()+7);
-  // Descriptions mapped from the commercial proposal PDF
-  const DETALHES=[
-    {k:'Tumbérgia',d:'Salão integrado à natureza · 1000m² · climatizado · capacidade até 450 pessoas · estacionamento para 300 carros · inclui 10 mesas + 100 cadeiras + 3 staffs + insumos de banheiro'},
-    {k:'Bromélias',d:'Salão rústico na antiga sede da Fazenda · 300m² · capacidade até 150 pessoas · 70 pontos de LED · inclui 10 mesas + 100 cadeiras + 3 staffs + insumos de banheiro'},
-    {k:'Peroba Rosa',d:'Dois espaços para cerimônia: coberto com paisagismo ou ao ar livre no gramado · capacidade até 400 pessoas · inclui 30 bancos de madeira'},
-    {k:'Casa Flamboyant',d:'350m² à disposição dos noivos · climatizada · lavabo · cozinha americana equipada'},
-    {k:'Loft Flamboyant',d:'70m² · climatizado · integrado à natureza · suíte com cama king size'},
-    {k:'Suite Flamboyant 5',d:'Suíte com 4 camas de solteiro · ar condicionado · enxoval de cama e banho'},
-    {k:'Suite Flamboyant 4',d:'Suíte com 3 camas de solteiro · ar condicionado · enxoval de cama e banho'},
-    {k:'Suite Flamboyant 3',d:'Suíte com 4 camas de solteiro · ar condicionado · enxoval de cama e banho'},
-    {k:'Suite Flamboyant 2',d:'Suíte com cama king size · ar condicionado · enxoval de cama e banho'},
-    {k:'Suite Flamboyant 1',d:'Suíte com cama king size · ar condicionado · enxoval de cama e banho'},
-    {k:'Suíte/Camarim',d:'Suíte reservada para equipe de assessoria durante o evento'},
-    {k:'Suite Bromélias 3',d:'Suíte quádrupla: duas camas de casal · ar condicionado · enxoval · frigobar'},
-    {k:'Suite Bromélias 2',d:'Suíte dupla: cama de casal · ar condicionado · enxoval · frigobar'},
-    {k:'Suite Bromélias 1',d:'Suíte tripla: cama de casal + cama de solteiro · ar condicionado · enxoval · frigobar'},
-    {k:'Hospedagem Flamboyant',d:'Casa Flamboyant + Loft + Suítes 1 a 5 · acomoda até 25 pessoas · 1 diária'},
-    {k:'Hospedagem Bromélias',d:'Suítes Bromélias 1, 2 e 3 · acomoda até 9 pessoas · ar condicionado · enxoval · frigobar · 1 diária'},
-    {k:'Mesas Madeira',d:'Madeira maciça com pés de ferro · 2,20m × 1,10m · capacidade 10 pessoas por mesa'},
-    {k:'Bancos Madeira',d:'Madeira maciça · 2,00m × 0,45m · capacidade 4/5 pessoas por banco'},
-    {k:'Bar Hexagonal',d:'Bar hexagonal modular em madeira maciça · diâmetro 9,9m · altura 1,10m'},
-    {k:'Cadeira Tiffany',d:'Cadeira modelo Tiffany · cor marrom Supreme'},
-    {k:'Staff',d:'Profissional de suporte durante o evento · banheiros, salão ou estacionamento · por diária'},
-  ];
-  const getDetalhe=desc=>{
-    const d=DETALHES.find(e=>desc.includes(e.k));
-    return d?d.d:null;
-  };
+  const getDetalhe=desc=>{const d=_orcItemInfo(desc);return d?d.d:null;};
   const itemRows=(_orc._selectedItems||[]).map(i=>{
     const det=getDetalhe(i.descricao);
     return `<tr><td><div style="font-weight:600">${i.descricao}${i.qty>1?' × '+i.qty:''}</div>${det?`<div style="font-size:11px;color:#777;margin-top:3px">${det}</div>`:''}</td><td style="text-align:right;vertical-align:top;white-space:nowrap;padding-left:16px">${fmt(i.subtotal)}</td></tr>`;
