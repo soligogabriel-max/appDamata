@@ -98,6 +98,14 @@ select.inp{cursor:pointer}
 <!-- Pagamento -->
 <div class="card">
   <div class="ctitle">💰 Valor e Parcelas</div>
+  <div style="margin-bottom:12px">
+    <span class="lbl">Desconto sobre todos os itens (%)</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <input class="inp" type="number" id="o-desconto-pct" placeholder="0" min="0" max="100" step="0.5" style="max-width:120px" value="0" oninput="recalcTotal()">
+      <span style="color:#64748b;font-size:14px;font-weight:500">%</span>
+    </div>
+    <div id="o-desc-info" style="color:#93c5fd;font-size:12px;margin-top:6px"></div>
+  </div>
   <div style="margin-bottom:16px">
     <span class="lbl">Valor Total do Contrato (calculado automaticamente)</span>
     <div style="display:flex;align-items:center;gap:8px">
@@ -330,7 +338,13 @@ function recalcTotal(){
       total+=parseFloat(cb.dataset.vun||0)*qtd;
     }
   });
-  g("o-total").value=total?total.toFixed(2):"";
+  var pct=parseFloat(g("o-desconto-pct")?g("o-desconto-pct").value:0)||0;
+  if(pct<0)pct=0; if(pct>100)pct=100;
+  var descVal=total*pct/100;
+  var final=total-descVal;
+  g("o-total").value=final?final.toFixed(2):"";
+  var info=g("o-desc-info");
+  if(info) info.textContent = pct>0 ? ("Subtotal R$ "+fc(total)+"  ·  Desconto "+pct+"%  (− R$ "+fc(descVal)+")") : "";
 }
 
 function collectItens(){
@@ -361,6 +375,13 @@ function collectItens(){
       itens.push({cod:it.cod_item,descricao:descOf(it),quantidade:qtd,valor_unitario:it.valor_unitario||0});
     }
   });
+  // Desconto percentual sobre todos os itens
+  var pct=parseFloat(g("o-desconto-pct")?g("o-desconto-pct").value:0)||0;
+  if(pct>0){
+    var sub=itens.reduce(function(s,it){return s+(it.valor_unitario||0)*(it.quantidade||1);},0);
+    var descVal=sub*pct/100;
+    if(descVal>0)itens.push({cod:null,descricao:"Desconto "+pct+"% sobre os itens",quantidade:1,valor_unitario:-descVal});
+  }
   return itens;
 }
 
