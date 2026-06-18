@@ -320,7 +320,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <div id="ll-dots"></div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-o</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-p</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3092,10 +3092,10 @@ function _orcGroupSync(changedId, checked){
   });
 }
 
-let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_saved:false};
+let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_saved:false,_activePkg:null,_uSel:{}};
 
 function abrirOrcamento(){
-  _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_saved:false};
+  _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_saved:false,_activePkg:null,_uSel:{}};
   showSc("orcamento");
   _orcStep();
 }
@@ -3125,6 +3125,7 @@ async function _orcSaveToDb(){
       num_convidados:_orc.num_convidados,
       salao:_orc.salao,
       pacote_cod:_orc.pacote_cod||null,
+      itens:(_orc._selectedItems||[]).map(i=>({cod:i.cod_item,descricao:i.descricao,qty:i.qty,valor_unitario:i.valor_unitario,subtotal:i.subtotal})),
       valor_total:_orc.valor_total,
       validade:validade.toISOString().slice(0,10),
       whatsapp:_orc.whatsapp,
@@ -3211,79 +3212,66 @@ async function _orcLoadPacotes(){
   body.innerHTML=_orcHTML2();
 }
 
-function _orcHTML2(){
-  // Deduplicate groups by name (keep first occurrence per table order)
-  const seenNames=new Set();
-  const allGrupos=_orc._pacotes.flatMap(p=>p.grupos.map(g=>({...g,tabela_id:p.id,pkgItens:p.itens}))).filter(g=>{
-    if(seenNames.has(g.nome)) return false;
-    seenNames.add(g.nome);
-    return true;
+// Build unified item list (dedup by cod_item) + packages with their cod members
+function _orcBuildUnified(){
+  const seen=new Set();
+  const pkgs=[];
+  _orc._pacotes.forEach(p=>{
+    (p.grupos||[]).forEach(g=>{
+      if(seen.has(g.nome)) return;
+      seen.add(g.nome);
+      const cods=(p.itens||[]).filter(i=>i.grupo_id===g.id&&i.cod_item&&_orcInvOf(i)).map(i=>i.cod_item);
+      if(!cods.length) return;
+      pkgs.push({id:g.id,nome:g.nome,desconto:parseFloat(g.desconto||0),cods:[...new Set(cods)]});
+    });
   });
-  if(!allGrupos.length) return `<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Nenhum item cadastrado ainda.</div></div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button></div>`;
-  // Package cards (optional selection — click to toggle pre-check all items of group)
-  const cards=allGrupos.map(g=>{
-    const sel=g.id===_orc.pacote_grupo_id;
-    const gItens=(g.pkgItens||[]).filter(i=>i.grupo_id===g.id);
-    const itemsList=gItens.map(i=>i.descricao).join(' · ');
-    return `<div onclick="_orcSelPkg(${g.id},'${g.nome.replace(/'/g,"&#39;")}',${g.tabela_id})" style="padding:14px 18px;border-radius:12px;border:2px solid ${sel?'var(--a)':'var(--br)'};background:${sel?'rgba(139,90,43,.06)':'#fff'};cursor:pointer;transition:all .2s;margin-bottom:10px;">
-      <div style="display:flex;align-items:flex-start;gap:12px;">
-        <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${sel?'var(--a)':'var(--br)'};background:${sel?'var(--a)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">${sel?'<div style="width:8px;height:8px;border-radius:50%;background:#fff"></div>':''}</div>
-        <div><span style="font-size:14px;font-weight:700;color:var(--dk)">${g.nome}</span>${itemsList?`<div style="font-size:11px;color:var(--dl);margin-top:4px;line-height:1.5">${itemsList}</div>`:''}</div>
-      </div>
-    </div>`;
+  const byCod={};const order=[];
+  _orc._pacotes.forEach(p=>{
+    (p.itens||[]).forEach(i=>{
+      if(!i.cod_item||!_orcInvOf(i)) return;
+      if(!byCod[i.cod_item]){byCod[i.cod_item]={cod:i.cod_item,vun:(i.valor_unitario||0)};order.push(i.cod_item);}
+      else if(!byCod[i.cod_item].vun&&i.valor_unitario){byCod[i.cod_item].vun=i.valor_unitario;}
+    });
+  });
+  _orc._uPkgs=pkgs;
+  _orc._uByCod=byCod;
+  _orc._uItems=order.map(c=>byCod[c]);
+  if(!_orc._uSel) _orc._uSel={};
+}
+
+function _orcHTML2(){
+  _orcBuildUnified();
+  if(!_orc._uItems.length) return `<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Nenhum item habilitado para orçamento. Marque itens em Inventário → "Exibir no Orçamento".</div></div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button></div>`;
+  // Package shortcut buttons
+  const pkgBtns=_orc._uPkgs.map(pk=>{
+    const active=_orc._activePkg===pk.id;
+    const descTxt=pk.desconto>0?` · -R$${pk.desconto.toLocaleString("pt-BR",{minimumFractionDigits:2})}`:'';
+    return `<button type="button" id="orc-pkgbtn-${pk.id}" onclick="_orcTogglePkg(${pk.id})" style="text-align:left;padding:10px 14px;border-radius:10px;border:2px solid ${active?'var(--a)':'var(--br)'};background:${active?'var(--a)':'#fff'};color:${active?'#fff':'var(--dk)'};cursor:pointer;font-size:13px;font-weight:700;transition:all .15s;">${pk.nome}<span style="font-weight:500;opacity:.85">${descTxt}</span></button>`;
   }).join("");
-  // All items with checkboxes (restore previous selection if any)
-  const prevQty={};
-  const prevSel=new Set();
-  (_orc._selectedItems||[]).forEach(i=>{prevSel.add(i.id);prevQty[i.id]=i.qty;});
-  const hasPrev=prevSel.size>0;
-  const itemRow=(i,defaultCk)=>{
-    const inv=_orcInvOf(i);
-    const info=inv?{k:inv.descricao,d:inv.descricao_orc||'',img:inv.imagem||null}:null;
-    const label=inv?inv.descricao:(i.descricao||'');
-    const ck=(hasPrev?prevSel.has(i.id):defaultCk)?'checked':'';
-    const qty=prevQty[i.id]||1;
-    const imgUrl=info?.img?`./${info.img}`:null;
+  // Unified item rows
+  const itemRowU=(u)=>{
+    const inv=_orc._invByCod[u.cod];
+    const label=inv?inv.descricao:u.cod;
+    const sub=inv&&inv.descricao_orc?inv.descricao_orc:'';
+    const imgUrl=inv&&inv.imagem?`./${inv.imagem}`:'';
+    const prev=_orc._uSel[u.cod];
+    const ck=prev?'checked':'';
+    const qty=(prev&&prev.qty)||1;
     return `<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--br);cursor:pointer;">
-      <input type="checkbox" id="orc-ck-${i.id}" data-vun="${i.valor_unitario||0}" ${ck} style="width:16px;height:16px;accent-color:var(--a);flex-shrink:0;margin-top:3px" onchange="_orcGroupSync(${i.id},this.checked)">
+      <input type="checkbox" id="orc-ck-${u.cod}" data-cod="${u.cod}" data-vun="${u.vun}" ${ck} style="width:16px;height:16px;accent-color:var(--a);flex-shrink:0;margin-top:3px" onchange="_orcItemToggle('${u.cod}')">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--dk)">${label}</div>
-        ${info?.d?`<div style="font-size:11px;color:var(--dl);margin-top:2px;line-height:1.4">${info.d}</div>`:''}
+        ${sub?`<div style="font-size:11px;color:var(--dl);margin-top:2px;line-height:1.4">${sub}</div>`:''}
       </div>
-      ${imgUrl?`<div style="position:relative;flex-shrink:0;width:80px;height:60px;" class="orc-img-wrap"><img src="${imgUrl}" onerror="this.parentElement.style.display='none'" style="width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-in;transition:transform .2s;display:block;" onmouseenter="this.style.cssText='width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-out;display:block;position:absolute;width:240px;height:180px;z-index:99;box-shadow:0 8px 32px rgba(0,0,0,.3);border-radius:10px;top:0;right:0;'" onmouseleave="this.style.cssText='width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-in;display:block;'"></div>`:''}<input type="number" id="orc-qt-${i.id}" value="${qty}" min="1" style="width:44px;padding:4px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:center;background:var(--bg);flex-shrink:0;margin-top:3px">
+      ${imgUrl?`<div style="position:relative;flex-shrink:0;width:80px;height:60px;" class="orc-img-wrap"><img src="${imgUrl}" onerror="this.parentElement.style.display='none'" style="width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-in;transition:transform .2s;display:block;" onmouseenter="this.style.cssText='width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-out;display:block;position:absolute;width:240px;height:180px;z-index:99;box-shadow:0 8px 32px rgba(0,0,0,.3);border-radius:10px;top:0;right:0;'" onmouseleave="this.style.cssText='width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-in;display:block;'"></div>`:''}<input type="number" id="orc-qt-${u.cod}" value="${qty}" min="1" style="width:44px;padding:4px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:center;background:var(--bg);flex-shrink:0;margin-top:3px">
     </label>`;
   };
-  // Store all items for group sync (only those enabled in inventario, matched by cod_item)
-  const _invEnabled=(_orc._invOrc||[]);
-  const _orcItemEnabled=(i)=>!_invEnabled.length||!!_orcInvOf(i);
-  _orc._allGroupItems=allGrupos.flatMap(g=>(g.pkgItens||[]).filter(i=>i.grupo_id===g.id&&_orcItemEnabled(i)));
-  let itemsHtml='';
-  allGrupos.forEach(g=>{
-    const gItens=(g.pkgItens||[]).filter(i=>i.grupo_id===g.id&&_orcItemEnabled(i));
-    if(!gItens.length) return;
-    const isSelGrp=!hasPrev&&g.id===_orc.pacote_grupo_id;
-    itemsHtml+=`<div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;padding:14px 0 4px">${g.nome}</div>`;
-    gItens.forEach(i=>{itemsHtml+=itemRow(i,isSelGrp);});
-  });
-  // Items without a group — aggregate from ALL price tables, dedup by cod_item, filter by inventario flag
-  const seenAvulso=new Set();
-  const avulsos=_orc._pacotes.flatMap(p=>(p.itens||[]).filter(i=>!i.grupo_id)).filter(i=>{
-    if(!_orcItemEnabled(i)) return false;
-    const key=i.cod_item||_orcNorm(i.descricao||'');
-    if(seenAvulso.has(key)) return false;
-    seenAvulso.add(key);
-    return true;
-  });
-  if(avulsos.length){
-    _orc._allGroupItems=[..._orc._allGroupItems,...avulsos];
-    itemsHtml+=`<div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;padding:14px 0 4px">Itens avulsos</div>`;
-    avulsos.forEach(i=>{itemsHtml+=itemRow(i,false);});
-  }
+  const itemsHtml=_orc._uItems.map(itemRowU).join("");
   return `<div class="orc-card">
     <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:4px;">Monte seu orçamento</div>
     <div style="font-size:13px;color:var(--dl);margin-bottom:14px;">Salão: <strong>${_orc.salao}</strong> · ${_orc.num_convidados} convidados</div>
-    <div style="font-size:12px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Pacotes (opcional)</div>
-    ${cards}
+    ${_orc._uPkgs.length?`<div style="font-size:12px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Pacotes (clique para marcar os itens)</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">${pkgBtns}</div>`:''}
     <div style="font-size:12px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin:16px 0 0">Itens</div>
     ${itemsHtml}
     <div id="orc-err2" class="err" style="margin-top:10px"></div>
@@ -3294,61 +3282,71 @@ function _orcHTML2(){
   </div>`;
 }
 
-function _orcSelPkg(grupoId,nome,tabelaId){
-  // Toggle: click same package to deselect; click another to select
-  _orc.pacote_grupo_id=(_orc.pacote_grupo_id===grupoId)?null:grupoId;
-  _orc.pacote_nome=_orc.pacote_grupo_id?nome:'';
-  _orc.pacote_cod=_orc.pacote_grupo_id?String(tabelaId):'';
-  // Clear cached selections so items re-render with new defaults
-  _orc._selectedItems=[];
-  document.getElementById("orc-wizard-body").innerHTML=_orcHTML2();
+// Click a package: check/uncheck its member items in the unified list
+function _orcTogglePkg(id){
+  const pk=(_orc._uPkgs||[]).find(p=>p.id===id);
+  if(!pk) return;
+  const turnOn=_orc._activePkg!==id;
+  // Clear any previously active package's items first
+  if(_orc._activePkg!=null){
+    const prev=(_orc._uPkgs||[]).find(p=>p.id===_orc._activePkg);
+    if(prev) prev.cods.forEach(c=>{const ck=document.getElementById('orc-ck-'+c);if(ck)ck.checked=false;});
+  }
+  _orc._activePkg=turnOn?id:null;
+  pk.cods.forEach(c=>{const ck=document.getElementById('orc-ck-'+c);if(ck)ck.checked=turnOn;});
+  document.querySelectorAll('[id^="orc-pkgbtn-"]').forEach(b=>{b.style.background='#fff';b.style.color='var(--dk)';b.style.borderColor='var(--br)';});
+  if(turnOn){const b=document.getElementById('orc-pkgbtn-'+id);if(b){b.style.background='var(--a)';b.style.color='#fff';b.style.borderColor='var(--a)';}}
+}
+
+// Manual item toggle: keep all-or-nothing physical groups (suites flamboyant / bromelias) in sync
+function _orcItemToggle(cod){
+  const inv=_orc._invByCod[cod];
+  if(!inv) return;
+  const grp=_orcGetGroup(inv.descricao||'');
+  if(!grp) return;
+  const checked=document.getElementById('orc-ck-'+cod)?.checked;
+  (_orc._uItems||[]).forEach(u=>{
+    const inv2=_orc._invByCod[u.cod];
+    if(inv2&&_orcGetGroup(inv2.descricao||'')===grp){
+      const ck=document.getElementById('orc-ck-'+u.cod);
+      if(ck) ck.checked=checked;
+    }
+  });
 }
 
 function _orcNext2(){
-  // Gather all checked items across all groups
-  const seenNames=new Set();
-  const allGrupos=_orc._pacotes.flatMap(p=>p.grupos.map(g=>({...g,tabela_id:p.id,pkgItens:p.itens}))).filter(g=>{
-    if(seenNames.has(g.nome)) return false;
-    seenNames.add(g.nome);
-    return true;
-  });
-  const allItens=[
-    ...allGrupos.flatMap(g=>(g.pkgItens||[]).filter(i=>i.grupo_id===g.id)),
-    ..._orc._pacotes.flatMap(p=>(p.itens||[]).filter(i=>!i.grupo_id))
-  ];
   const e=document.getElementById("orc-err2");
   const checked=Array.from(document.querySelectorAll('[id^="orc-ck-"]:checked'));
   if(!checked.length){if(e){e.style.display="block";e.textContent="Selecione ao menos um item.";}return;}
-  const selectedItems=[];
-  let subtotal=0;
+  const selectedItems=[];let subtotal=0;const selCods=new Set();
   checked.forEach(ck=>{
-    const id=parseInt(ck.id.replace("orc-ck-",""));
-    const item=allItens.find(i=>i.id===id);
-    if(!item) return;
-    const qty=parseFloat(document.getElementById("orc-qt-"+id)?.value||1);
-    const sub=(item.valor_unitario||0)*qty;
-    selectedItems.push({...item,qty,subtotal:sub});
-    subtotal+=sub;
+    const cod=ck.dataset.cod;
+    const u=_orc._uByCod[cod];
+    if(!u) return;
+    const qty=parseFloat(document.getElementById("orc-qt-"+cod)?.value||1);
+    const s=(u.vun||0)*qty;
+    const inv=_orc._invByCod[cod];
+    selectedItems.push({cod_item:cod,descricao:inv?inv.descricao:cod,valor_unitario:u.vun,qty,subtotal:s});
+    subtotal+=s;selCods.add(cod);
   });
-  const selectedIds=new Set(selectedItems.map(i=>i.id));
-  // Detect best group discount: if all items of a group are selected → apply its desconto
+  // Best group discount: fully-selected package
   let bestDiscount=0,bestGrupoNome=null;
-  allGrupos.forEach(g=>{
-    const gItens=(g.pkgItens||[]).filter(i=>i.grupo_id===g.id);
-    if(!gItens.length) return;
-    const allMatch=gItens.every(i=>selectedIds.has(i.id));
-    if(allMatch){
-      const disc=parseFloat(g.desconto||0);
-      if(disc>bestDiscount){bestDiscount=disc;bestGrupoNome=g.nome;}
+  (_orc._uPkgs||[]).forEach(pk=>{
+    if(pk.cods.length&&pk.cods.every(c=>selCods.has(c))){
+      if(pk.desconto>bestDiscount){bestDiscount=pk.desconto;bestGrupoNome=pk.nome;}
     }
   });
+  // Persist selection (for restore when going back)
+  _orc._uSel={};
+  selectedItems.forEach(i=>{_orc._uSel[i.cod_item]={qty:i.qty};});
   _orc._selectedItems=selectedItems;
   _orc._subtotal=subtotal;
   _orc._discount=bestDiscount;
   _orc._discountPkg=bestGrupoNome;
+  _orc.pacote_nome=bestGrupoNome||'';
   _orc.pacote_valor=subtotal-bestDiscount;
   _orc.valor_total=_orc.pacote_valor;
-  _orc.pacote_itens_desc=selectedItems.map(i=>_orcDesc(i)+(i.qty>1?' × '+i.qty:'')).join(", ");
+  _orc.pacote_itens_desc=selectedItems.map(i=>i.descricao+(i.qty>1?' × '+i.qty:'')).join(", ");
   _orc.step=3;_orcStep();
 }
 
