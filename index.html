@@ -3345,16 +3345,16 @@ function _orcHTML4(){
   </div>
   <div class="orc-nav">
     <button class="orc-btn-back" onclick="_orc.step=2;_orcStep()">← Voltar</button>
-    <button class="orc-btn-next" id="orc-btn-salvar" onclick="_orcSalvar()">Solicitar orçamento ✓</button>
+    <button class="orc-btn-next" id="orc-btn-salvar" onclick="_orcSalvar()">Salvar orçamento em PDF</button>
   </div>`;
 }
 
 async function _orcSalvar(){
   const btn=document.getElementById("orc-btn-salvar");
-  btn.disabled=true; btn.textContent="Salvando…";
-  const validade=new Date(); validade.setDate(validade.getDate()+7);
-  const itens=Object.entries(_orc.extras).map(([cod,qty])=>({cod,qty}));
+  btn.disabled=true; btn.textContent="Gerando PDF…";
+  // Try to save to Supabase silently (don't block PDF if it fails)
   try{
+    const validade=new Date(); validade.setDate(validade.getDate()+7);
     await sbFetch("orcamentos",{method:"POST",body:{
       data_evento:_orc.data_evento,
       nome_noiva:_orc.nome_noiva||null,
@@ -3363,27 +3363,71 @@ async function _orcSalvar(){
       tipo_evento:_orc.tipo_evento,
       num_convidados:_orc.num_convidados,
       salao:_orc.salao,
-      pacote_cod:_orc.pacote_cod,
-      itens,
+      pacote_cod:_orc.pacote_cod||null,
       valor_total:_orc.valor_total,
       validade:validade.toISOString().slice(0,10),
       whatsapp:_orc.whatsapp,
       email:_orc.email||null,
       status:"pendente"
     }});
-    document.getElementById("orc-wizard-body").innerHTML=`
-      <div class="orc-card" style="text-align:center;padding:40px 24px;">
-        <div style="font-size:48px;margin-bottom:16px">🎉</div>
-        <div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--dk);margin-bottom:12px">Orçamento enviado!</div>
-        <div style="font-size:14px;color:var(--dm);line-height:1.6;margin-bottom:24px">Recebemos sua solicitação.<br>Entraremos em contato em breve pelo WhatsApp <strong>${_orc.whatsapp}</strong>.</div>
-        <button class="orc-btn-next" onclick="showSc('login')">Voltar ao início</button>
-      </div>`;
-    document.getElementById("orc-steps-bar").style.display="none";
-  }catch(e){
-    const err=document.getElementById("orc-err4");
-    if(err){err.style.display="block";err.textContent="Erro ao salvar. Tente novamente.";}
-    btn.disabled=false; btn.textContent="Solicitar orçamento ✓";
-  }
+  }catch(_){}
+  // Generate PDF via print window
+  _orcAbrirPDF();
+  btn.disabled=false; btn.textContent="Salvar orçamento em PDF";
+}
+
+function _orcAbrirPDF(){
+  const fmt=v=>"R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:2});
+  const nomes=[_orc.nome_noiva,_orc.nome_noivo].filter(Boolean).join(" e ")||_orc.nome_contratante;
+  const validade=new Date(); validade.setDate(validade.getDate()+7);
+  const itemRows=(_orc._selectedItems||[]).map(i=>`
+    <tr><td>${i.descricao}${i.qty>1?' × '+i.qty:''}</td><td style="text-align:right">${fmt(i.subtotal)}</td></tr>`).join("");
+  const subtotalRow=_orc._discount>0?`<tr style="color:#888"><td>Subtotal</td><td style="text-align:right">${fmt(_orc._subtotal)}</td></tr>`:"";
+  const discRow=_orc._discount>0?`<tr style="color:#2a7a2a;font-weight:600"><td>Desconto — ${_orc._discountPkg}</td><td style="text-align:right">− ${fmt(_orc._discount)}</td></tr>`:"";
+  const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<title>Orçamento – Fazenda Damata</title>
+<style>
+  body{font-family:Arial,sans-serif;color:#222;padding:40px;max-width:680px;margin:auto}
+  h1{color:#8b5a2b;font-size:22px;margin-bottom:4px}
+  .sub{color:#666;font-size:13px;margin-bottom:24px}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#888;padding:6px 0;border-bottom:2px solid #ddd}
+  td{padding:7px 0;border-bottom:1px solid #eee;font-size:13px}
+  .total-row td{font-size:17px;font-weight:700;color:#8b5a2b;border-top:2px solid #ddd;border-bottom:none;padding-top:12px}
+  .info{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;font-size:13px;margin-bottom:20px}
+  .info span{color:#888;font-size:11px;display:block}
+  .footer{margin-top:24px;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:12px}
+  @media print{body{padding:20px}}
+</style></head><body>
+<h1>Orçamento – Fazenda Damata Espaço de Eventos</h1>
+<div class="sub">Emitido em ${new Date().toLocaleDateString("pt-BR")} · Válido até ${validade.toLocaleDateString("pt-BR")}</div>
+<div class="info">
+  <div><span>Contratante</span>${_orc.nome_contratante}</div>
+  <div><span>WhatsApp</span>${_orc.whatsapp}</div>
+  <div><span>Evento</span>${_orc.tipo_evento}</div>
+  <div><span>Data</span>${_orc.data_evento.split("-").reverse().join("/")}</div>
+  <div><span>Salão</span>${_orc.salao}</div>
+  <div><span>Convidados</span>${_orc.num_convidados}</div>
+  ${nomes?`<div><span>Nome(s)</span>${nomes}</div>`:''}
+  ${_orc.email?`<div><span>E-mail</span>${_orc.email}</div>`:''}
+</div>
+<table>
+  <thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead>
+  <tbody>
+    ${itemRows}
+    ${subtotalRow}
+    ${discRow}
+    <tr class="total-row"><td>Total</td><td style="text-align:right">${fmt(_orc.valor_total)}</td></tr>
+  </tbody>
+</table>
+<div class="footer">Fazenda Damata Espaço de Eventos · fazendadamata.com<br>Este orçamento é válido por 7 dias a partir da data de emissão.</div>
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+  const w=window.open('','_blank','width=750,height=900');
+  if(!w){alert("Permita pop-ups para gerar o PDF.");return;}
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
 }
 
 /* ── Landing Carousel ─────────────────────────────────────── */
