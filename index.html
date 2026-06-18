@@ -333,7 +333,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-y</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-z</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -448,7 +448,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div>
       <div style="color:#fff;font-weight:700;letter-spacing:3px;font-size:14px">DAMATA</div>
     </div>
-    <button onclick="showSc('login')" style="margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">← Voltar</button>
+    <button onclick="_orcVoltar()" style="margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">← Voltar</button>
   </div>
   <!-- Steps indicator -->
   <div id="orc-steps-bar" style="background:#fff;border-bottom:1px solid #e5e5e5;padding:16px 24px;display:flex;gap:0;align-items:center;justify-content:center;flex-wrap:wrap;">
@@ -585,7 +585,10 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div id="p-orcamentos" class="panel">
       <div class="uwrap" style="max-width:1000px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-          <div class="sec-t" style="margin-bottom:0;">Orçamentos Realizados</div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div class="sec-t" style="margin-bottom:0;">Orçamentos Realizados</div>
+            <button onclick="abrirOrcamentoAdmin()" style="padding:8px 16px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;white-space:nowrap;">➕ Novo orçamento</button>
+          </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <select id="orc-fil-status" class="inp inp-inline" style="width:140px;font-size:12px;" onchange="renderOrcamentos()">
               <option value="">Todos</option>
@@ -3152,8 +3155,28 @@ let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",n
 
 function abrirOrcamento(){
   _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_saved:false,_activePkg:null,_uSel:{},_dbId:null,_stage:"lead"};
+  _orc._admin=false;
   showSc("orcamento");
   _orcStep();
+}
+// Abre o wizard de dentro do app (admin) — permite ajustar valores no resumo
+function abrirOrcamentoAdmin(){
+  abrirOrcamento();
+  _orc._admin=isAdmin(getCU());
+}
+// Botão voltar do wizard: admin retorna ao app; público vai ao login
+function _orcVoltar(){ showSc(_orc._admin?"app":"login"); }
+// Admin: alterar valor total no resumo
+function _orcToggleEdit(){
+  const box=document.getElementById("orc-edit-box");
+  if(box) box.style.display = box.style.display==="none" ? "block" : "none";
+}
+function _orcAplicarValor(){
+  const v=parseFloat(document.getElementById("orc-edit-total").value);
+  if(isNaN(v)||v<0) return;
+  _orc.valor_total=v;
+  _orc._valorAjustado=true;
+  document.getElementById("orc-wizard-body").innerHTML=_orcHTML4();
 }
 
 function _orcStep(){
@@ -3424,6 +3447,7 @@ function _orcItemToggle(cod){
 }
 
 async function _orcNext2(){
+  _orc._valorAjustado=false;
   const e=document.getElementById("orc-err2");
   const checked=Array.from(document.querySelectorAll('[id^="orc-ck-"]:checked'));
   if(!checked.length){if(e){e.style.display="block";e.textContent="Selecione ao menos um item.";}return;}
@@ -3547,7 +3571,7 @@ function _orcNext3(){
 }
 
 function _orcHTML4(){
-  _orc.valor_total=_orc.pacote_valor;
+  if(!_orc._valorAjustado) _orc.valor_total=_orc.pacote_valor;
   const validade=new Date(); validade.setDate(validade.getDate()+7);
   const valStr=validade.toLocaleDateString("pt-BR");
   const nomes=[_orc.nome_noiva,_orc.nome_noivo].filter(Boolean).join(" e ")||_orc.nome_contratante;
@@ -3586,10 +3610,21 @@ function _orcHTML4(){
       ${extrasLines}
       ${subtotalLine}
       ${discountLine}
-      <div style="display:flex;justify-content:space-between;padding:14px 0;margin-top:6px;">
+      <div style="display:flex;justify-content:space-between;padding:14px 0;margin-top:6px;align-items:center;">
         <span style="font-size:16px;font-weight:700;color:var(--dk)">Total</span>
         <span style="font-size:22px;font-weight:700;color:var(--a)">${fmt(_orc.valor_total)}</span>
       </div>
+      ${_orc._admin?`<div style="border-top:1px dashed var(--br);padding-top:12px;margin-top:4px;">
+        <button onclick="_orcToggleEdit()" id="orc-edit-btn" style="padding:7px 14px;background:transparent;color:var(--a);border:1.5px solid var(--a);border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">✏️ Alterar valor (admin)</button>
+        <div id="orc-edit-box" style="display:none;margin-top:10px;">
+          <label class="lbl">Valor total ajustado (R$)</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="number" id="orc-edit-total" class="inp inp-inline" step="0.01" value="${_orc.valor_total}" style="max-width:160px;margin-bottom:0;">
+            <button onclick="_orcAplicarValor()" style="padding:8px 14px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">Aplicar</button>
+          </div>
+          <div style="font-size:11px;color:var(--dl);margin-top:4px;">Sobrescreve o valor calculado. Use para negociações.</div>
+        </div>
+      </div>`:''}
     </div>
     <div style="background:#f5f6f7;border-radius:10px;padding:12px 16px;font-size:12px;color:var(--dl);margin-top:8px;">
       ⏱ Este orçamento tem validade até <strong>${valStr}</strong>. Após isso, os valores poderão ser reajustados.
