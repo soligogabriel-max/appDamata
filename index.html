@@ -320,7 +320,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <div id="ll-dots"></div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-s</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-t</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -576,6 +576,8 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <select id="orc-fil-status" class="inp inp-inline" style="width:140px;font-size:12px;" onchange="renderOrcamentos()">
               <option value="">Todos</option>
+              <option value="lead">Lead (incompleto)</option>
+              <option value="orcado">Orçado</option>
               <option value="pendente">Pendente</option>
               <option value="convertido">Convertido</option>
               <option value="expirado">Expirado</option>
@@ -2952,8 +2954,8 @@ window.addEventListener("load", async()=>{
 });
 
 /* ── Orçamentos Realizados ────────────────────────────────── */
-const ORC_STATUS_LABEL={pendente:"Pendente",convertido:"Convertido",expirado:"Expirado"};
-const ORC_STATUS_COLOR={pendente:"#E8A52A",convertido:"#27ae60",expirado:"#e74c3c"};
+const ORC_STATUS_LABEL={lead:"Lead (incompleto)",orcado:"Orçado",pendente:"Pendente",convertido:"Convertido",expirado:"Expirado"};
+const ORC_STATUS_COLOR={lead:"#94a3b8",orcado:"#3b82f6",pendente:"#E8A52A",convertido:"#27ae60",expirado:"#e74c3c"};
 async function renderOrcamentos(){
   const status=document.getElementById("orc-fil-status")?.value||"";
   const busca=(document.getElementById("orc-fil-busca")?.value||"").toLowerCase();
@@ -3091,10 +3093,10 @@ function _orcGroupSync(changedId, checked){
   });
 }
 
-let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_saved:false,_activePkg:null,_uSel:{}};
+let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_saved:false,_activePkg:null,_uSel:{},_dbId:null,_stage:"lead"};
 
 function abrirOrcamento(){
-  _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_saved:false,_activePkg:null,_uSel:{}};
+  _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_saved:false,_activePkg:null,_uSel:{},_dbId:null,_stage:"lead"};
   showSc("orcamento");
   _orcStep();
 }
@@ -3107,47 +3109,83 @@ function _orcStep(){
   const body=document.getElementById("orc-wizard-body");
   if(_orc.step===1) body.innerHTML=_orcHTML1();
   else if(_orc.step===2) _orcLoadPacotes();
-  else if(_orc.step===3){body.innerHTML=_orcHTML4();_orcSaveToDb();}
+  else if(_orc.step===3){body.innerHTML=_orcHTML4();}
 }
 
-async function _orcSaveToDb(){
-  if(_orc._saved) return;
-  _orc._saved=true;
+// Insere o orçamento na 1ª passagem e atualiza nas seguintes (captura de lead)
+async function _orcUpsertLead(){
+  const validade=new Date(); validade.setDate(validade.getDate()+7);
+  const body={
+    data_evento:_orc.data_evento||null,
+    nome_noiva:_orc.nome_noiva||null,
+    nome_noivo:_orc.nome_noivo||null,
+    nome_contratante:_orc.nome_contratante||null,
+    tipo_evento:_orc.tipo_evento||null,
+    num_convidados:_orc.num_convidados||null,
+    salao:_orc.salao||null,
+    pacote_cod:_orc.pacote_cod||null,
+    itens:(_orc._selectedItems||[]).map(i=>({cod:i.cod_item,descricao:i.descricao,qty:i.qty,valor_unitario:i.valor_unitario,subtotal:i.subtotal})),
+    valor_total:_orc.valor_total||null,
+    validade:validade.toISOString().slice(0,10),
+    whatsapp:_orc.whatsapp||null,
+    email:_orc.email||null,
+    status:_orc._stage||"lead"
+  };
   try{
-    const validade=new Date(); validade.setDate(validade.getDate()+7);
-    await sbFetch("orcamentos",{method:"POST",body:{
-      data_evento:_orc.data_evento,
-      nome_noiva:_orc.nome_noiva||null,
-      nome_noivo:_orc.nome_noivo||null,
-      nome_contratante:_orc.nome_contratante,
-      tipo_evento:_orc.tipo_evento,
-      num_convidados:_orc.num_convidados,
-      salao:_orc.salao,
-      pacote_cod:_orc.pacote_cod||null,
-      itens:(_orc._selectedItems||[]).map(i=>({cod:i.cod_item,descricao:i.descricao,qty:i.qty,valor_unitario:i.valor_unitario,subtotal:i.subtotal})),
-      valor_total:_orc.valor_total,
-      validade:validade.toISOString().slice(0,10),
-      whatsapp:_orc.whatsapp,
-      email:_orc.email||null,
-      status:"pendente"
-    }});
-  }catch(_){_orc._saved=false;}
+    if(_orc._dbId){
+      await sbFetch("orcamentos?id=eq."+_orc._dbId,{method:"PATCH",body});
+    }else{
+      const r=await sbFetch("orcamentos",{method:"POST",body});
+      if(r&&r[0]&&r[0].id) _orc._dbId=r[0].id;
+    }
+  }catch(_){}
 }
 
+function _orcNameFieldsHTML(tipo){
+  const nv=_orc.nome_noiva||'', no=_orc.nome_noivo||'';
+  if(tipo==='Casamento'){
+    return `<label class="lbl">Nome da noiva</label>
+    <input type="text" id="orc-noiva" class="inp" value="${nv}" placeholder="Primeiro nome"/>
+    <label class="lbl">Nome do noivo</label>
+    <input type="text" id="orc-noivo" class="inp" value="${no}" placeholder="Primeiro nome"/>`;
+  }
+  if(tipo==='Corporativo'||tipo==='Confraternização'){
+    return `<label class="lbl">Nome da empresa</label>
+    <input type="text" id="orc-noiva" class="inp" value="${nv}" placeholder="Razão social ou nome fantasia"/>`;
+  }
+  if(tipo==='Debutante'){
+    return `<label class="lbl">Nome da debutante</label>
+    <input type="text" id="orc-noiva" class="inp" value="${nv}" placeholder="Nome"/>`;
+  }
+  if(tipo==='Batizado'){
+    return `<label class="lbl">Nome do batizando</label>
+    <input type="text" id="orc-noiva" class="inp" value="${nv}" placeholder="Nome"/>`;
+  }
+  if(tipo==='Aniversário'){
+    return `<label class="lbl">Nome do aniversariante</label>
+    <input type="text" id="orc-noiva" class="inp" value="${nv}" placeholder="Nome"/>`;
+  }
+  return `<label class="lbl">Nome do homenageado</label>
+    <input type="text" id="orc-noiva" class="inp" value="${nv}" placeholder="Nome"/>`;
+}
+function _orcRenderNames(){
+  const nvEl=document.getElementById('orc-noiva'); if(nvEl)_orc.nome_noiva=nvEl.value.trim();
+  const noEl=document.getElementById('orc-noivo'); _orc.nome_noivo=noEl?noEl.value.trim():'';
+  const tipo=document.getElementById('orc-tipo').value;
+  document.getElementById('orc-name-fields').innerHTML=_orcNameFieldsHTML(tipo);
+}
 function _orcHTML1(){
-  const tipos=ORC_TIPOS.map(t=>`<option value="${t}" ${_orc.tipo_evento===t?"selected":""}>${t}</option>`).join("");
+  const curTipo=_orc.tipo_evento||ORC_TIPOS[0];
+  const tipos=ORC_TIPOS.map(t=>`<option value="${t}" ${curTipo===t?"selected":""}>${t}</option>`).join("");
   return `<div class="orc-card">
     <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:20px;">Conte-nos sobre o seu evento</div>
     <label class="lbl">Tipo de evento *</label>
-    <select id="orc-tipo" class="inp">${tipos}</select>
+    <select id="orc-tipo" class="inp" onchange="_orcRenderNames()">${tipos}</select>
     <label class="lbl">Data do evento *</label>
     <input type="date" id="orc-data" class="inp" value="${_orc.data_evento}" min="${new Date().toISOString().slice(0,10)}"/>
     <label class="lbl">Número de convidados *</label>
     <input type="number" id="orc-conv" class="inp" value="${_orc.num_convidados}" placeholder="ex: 80" min="1" max="450"/>
-    <label class="lbl">Nome da noiva / aniversariante</label>
-    <input type="text" id="orc-noiva" class="inp" value="${_orc.nome_noiva}" placeholder="Primeiro nome"/>
-    <label class="lbl">Nome do noivo</label>
-    <input type="text" id="orc-noivo" class="inp" value="${_orc.nome_noivo}" placeholder="Primeiro nome (opcional)"/>
+    <div id="orc-name-fields">${_orcNameFieldsHTML(curTipo)}</div>
     <label class="lbl">Nome do contratante *</label>
     <input type="text" id="orc-cont" class="inp" value="${_orc.nome_contratante}" placeholder="Nome completo"/>
     <label class="lbl">WhatsApp *</label>
@@ -3161,7 +3199,7 @@ function _orcHTML1(){
   </div>`;
 }
 
-function _orcNext1(){
+async function _orcNext1(){
   const tipo=document.getElementById("orc-tipo").value;
   const data=document.getElementById("orc-data").value;
   const conv=parseInt(document.getElementById("orc-conv").value)||0;
@@ -3171,11 +3209,14 @@ function _orcNext1(){
   if(!tipo||!data||!conv||!cont||!wpp){err.style.display="block";err.textContent="Preencha os campos obrigatórios (*)";return;}
   if(conv>450){err.style.display="block";err.textContent="Capacidade máxima: 450 convidados (Tumbergia). Entre em contato para eventos maiores.";return;}
   _orc.tipo_evento=tipo; _orc.data_evento=data; _orc.num_convidados=conv;
-  _orc.nome_noiva=document.getElementById("orc-noiva").value.trim();
-  _orc.nome_noivo=document.getElementById("orc-noivo").value.trim();
+  const nvEl=document.getElementById("orc-noiva"); _orc.nome_noiva=nvEl?nvEl.value.trim():'';
+  const noEl=document.getElementById("orc-noivo"); _orc.nome_noivo=noEl?noEl.value.trim():'';
   _orc.nome_contratante=cont; _orc.whatsapp=wpp;
   _orc.email=document.getElementById("orc-email").value.trim();
   _orc.salao=conv<=100?"Bromélias":"Tumbergia";
+  // Grava o lead já ao sair da fase 1 (captura mesmo quem desistir adiante)
+  _orc._stage="lead";
+  await _orcUpsertLead();
   _orc.step=2; _orcStep();
 }
 
@@ -3327,7 +3368,7 @@ function _orcItemToggle(cod){
   });
 }
 
-function _orcNext2(){
+async function _orcNext2(){
   const e=document.getElementById("orc-err2");
   const checked=Array.from(document.querySelectorAll('[id^="orc-ck-"]:checked'));
   if(!checked.length){if(e){e.style.display="block";e.textContent="Selecione ao menos um item.";}return;}
@@ -3360,6 +3401,9 @@ function _orcNext2(){
   _orc.pacote_valor=subtotal-bestDiscount;
   _orc.valor_total=_orc.pacote_valor;
   _orc.pacote_itens_desc=selectedItems.map(i=>i.descricao+(i.qty>1?' × '+i.qty:'')).join(", ");
+  // Atualiza a gravação com os itens/valor ao passar da fase 2 para a 3
+  _orc._stage="orcado";
+  await _orcUpsertLead();
   _orc.step=3;_orcStep();
 }
 
@@ -3506,8 +3550,9 @@ function _orcHTML4(){
 async function _orcSalvar(){
   const btn=document.getElementById("orc-btn-salvar");
   btn.disabled=true; btn.textContent="Gerando PDF…";
-  // Save to Supabase if not already done when step 3 was shown
-  if(!_orc._saved) await _orcSaveToDb();
+  // Atualiza a gravação como finalizado (PDF gerado)
+  _orc._stage="pendente";
+  await _orcUpsertLead();
   // Generate PDF via print window
   _orcAbrirPDF();
   btn.disabled=false; btn.textContent="Salvar orçamento em PDF";
