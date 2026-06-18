@@ -3002,9 +3002,11 @@ async function orcSetStatus(id,status){
 /* ── Orçamento Wizard ─────────────────────────────────────── */
 const ORC_TIPOS=["Casamento","Aniversário","Debutante","Corporativo","Batizado","Confraternização","Outro"];
 let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0};
+let _orcTabIdx=0;
 
 function abrirOrcamento(){
   _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0};
+  _orcTabIdx=0;
   showSc("orcamento");
   _orcStep();
 }
@@ -3071,15 +3073,18 @@ async function _orcLoadPacotes(){
   body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Carregando pacotes…</div></div>`;
   if(!_orc._pacotes.length){
     try{
-      const tabelas=await dbGet("tabelas_preco","select=id,nome&order=id.asc")||[];
+      const tabelas=await sbFetch("tabelas_preco?select=id,nome&order=id.asc")||[];
       if(tabelas.length){
         const ids=tabelas.map(t=>t.id).join(",");
-        const itens=await dbGet("tabelas_preco_itens","tabela_id=in.("+ids+")&select=tabela_id,descricao,valor_unitario")||[];
-        _orc._pacotes=tabelas.map(t=>{
-          const tItens=itens.filter(i=>i.tabela_id===t.id);
-          const total=tItens.reduce((s,i)=>s+(i.valor_unitario||0),0);
-          return {...t,cod:String(t.id),_total:total,_itens:tItens.map(i=>i.descricao)};
-        });
+        const [grupos,itens]=await Promise.all([
+          sbFetch("tabelas_preco_grupos?tabela_id=in.("+ids+")&select=id,tabela_id,nome,ordem&order=tabela_id.asc,ordem.asc,id.asc")||[],
+          sbFetch("tabelas_preco_itens?tabela_id=in.("+ids+")&select=id,tabela_id,grupo_id,descricao,valor_unitario&order=id.asc")||[]
+        ]);
+        _orc._pacotes=tabelas.map(t=>({
+          id:t.id,cod:String(t.id),nome:t.nome,
+          grupos:grupos.filter(g=>g.tabela_id===t.id),
+          itens:itens.filter(i=>i.tabela_id===t.id)
+        }));
       }
     }catch(e){
       body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--er)">Erro ao carregar pacotes.</div><div style="font-size:11px;color:var(--dl);padding:8px 16px;word-break:break-all;">${e.message||e}</div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button><button class="orc-btn-next" onclick="_orcLoadPacotes()">Tentar novamente</button></div></div>`;
@@ -3091,17 +3096,17 @@ async function _orcLoadPacotes(){
 
 function _orcHTML2(){
   const pkgs=_orc._pacotes;
-  const cards=pkgs.length?pkgs.map(p=>`
-    <div class="orc-pkg-card ${_orc.pacote_cod===p.cod?"sel":""}" onclick="_orcSelPkg('${p.cod}')">
-      <div class="orc-pkg-title">${p.nome}</div>
-      <div class="orc-pkg-items">${p._itens.slice(0,6).join(" · ")+(p._itens.length>6?" · …":"")}</div>
-      <div class="orc-pkg-price">R$ ${p._total.toLocaleString("pt-BR",{minimumFractionDigits:2})}</div>
-    </div>`).join("")
-    :`<div style="padding:20px;text-align:center;color:var(--dl);">Nenhum pacote cadastrado ainda.</div>`;
+  if(!pkgs.length) return `<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Nenhum pacote cadastrado ainda.</div></div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button></div>`;
+  const tabs=pkgs.map((p,i)=>`<button id="orc-tab-${i}" onclick="_orcSelectTab(${i})" style="padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;background:${i===_orcTabIdx?'var(--a)':'transparent'};color:${i===_orcTabIdx?'#fff':'var(--dm)'};border:1.5px solid ${i===_orcTabIdx?'var(--a)':'var(--br)'}">${p.nome}</button>`).join("");
   return `<div class="orc-card">
-    <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:4px;">Escolha um pacote</div>
-    <div style="font-size:13px;color:var(--dl);margin-bottom:18px;">Salão sugerido: <strong>${_orc.salao}</strong> · ${_orc.num_convidados} convidados</div>
-    ${cards}
+    <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:4px;">Monte seu orçamento</div>
+    <div style="font-size:13px;color:var(--dl);margin-bottom:14px;">Salão: <strong>${_orc.salao}</strong> · ${_orc.num_convidados} convidados</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">${tabs}</div>
+    <div id="orc-items-wrap">${_orcPkgItemsHtml(pkgs[_orcTabIdx])}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-top:2px solid var(--br);margin-top:10px;">
+      <span style="font-size:14px;font-weight:700;color:var(--dk)">Total estimado</span>
+      <span id="orc-total2" style="font-size:22px;font-weight:700;color:var(--a)">R$ 0,00</span>
+    </div>
     <div id="orc-err2" class="err"></div>
   </div>
   <div class="orc-nav">
@@ -3110,17 +3115,73 @@ function _orcHTML2(){
   </div>`;
 }
 
-function _orcSelPkg(cod){
-  const p=_orc._pacotes.find(x=>x.cod===cod);
-  if(!p) return;
-  _orc.pacote_cod=cod; _orc.pacote_nome=p.nome; _orc.pacote_valor=p._total;
-  _orc.pacote_itens_desc=p._itens.join(", ");
-  document.querySelectorAll(".orc-pkg-card").forEach(el=>el.classList.remove("sel"));
-  event.currentTarget.classList.add("sel");
+function _orcPkgItemsHtml(pkg){
+  if(!pkg) return '';
+  let html='';
+  const grupos=pkg.grupos||[];
+  const itens=pkg.itens||[];
+  const itemRow=i=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--br);cursor:pointer;">
+    <input type="checkbox" id="orc-ck-${i.id}" data-vun="${i.valor_unitario||0}" onchange="_orcRecalc2()" style="width:16px;height:16px;accent-color:var(--a);flex-shrink:0">
+    <span style="flex:1;font-size:13px;color:var(--dk)">${i.descricao||''}</span>
+    <input type="number" id="orc-qt-${i.id}" value="1" min="1" style="width:48px;padding:4px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:center;background:var(--bg)" oninput="_orcRecalc2()">
+    <span style="font-size:12px;color:var(--dl);min-width:76px;text-align:right">R$ ${(i.valor_unitario||0).toLocaleString("pt-BR",{minimumFractionDigits:2})}</span>
+  </label>`;
+  grupos.forEach(g=>{
+    const gItens=itens.filter(i=>i.grupo_id===g.id);
+    if(!gItens.length) return;
+    html+=`<div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;padding:12px 0 4px">${g.nome}</div>`;
+    gItens.forEach(i=>{html+=itemRow(i);});
+  });
+  const avulsos=itens.filter(i=>!i.grupo_id);
+  if(avulsos.length){
+    if(grupos.length) html+=`<div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;padding:12px 0 4px">Itens avulsos</div>`;
+    avulsos.forEach(i=>{html+=itemRow(i);});
+  }
+  return html||`<div style="padding:20px;text-align:center;color:var(--dl)">Nenhum item neste pacote.</div>`;
+}
+
+function _orcSelectTab(idx){
+  _orcTabIdx=idx;
+  _orc._pacotes.forEach((_,i)=>{
+    const b=document.getElementById("orc-tab-"+i);
+    if(!b) return;
+    b.style.background=i===idx?'var(--a)':'transparent';
+    b.style.color=i===idx?'#fff':'var(--dm)';
+    b.style.borderColor=i===idx?'var(--a)':'var(--br)';
+  });
+  document.getElementById("orc-items-wrap").innerHTML=_orcPkgItemsHtml(_orc._pacotes[idx]);
+  _orcRecalc2();
+}
+
+function _orcRecalc2(){
+  let total=0;
+  document.querySelectorAll('[id^="orc-ck-"]').forEach(ck=>{
+    if(!ck.checked) return;
+    const id=ck.id.replace("orc-ck-","");
+    const qt=parseFloat(document.getElementById("orc-qt-"+id)?.value||1);
+    total+=parseFloat(ck.dataset.vun||0)*qt;
+  });
+  const el=document.getElementById("orc-total2");
+  if(el) el.textContent="R$ "+total.toLocaleString("pt-BR",{minimumFractionDigits:2});
 }
 
 function _orcNext2(){
-  if(!_orc.pacote_cod){const e=document.getElementById("orc-err2");e.style.display="block";e.textContent="Selecione um pacote para continuar.";return;}
+  const checked=Array.from(document.querySelectorAll('[id^="orc-ck-"]:checked'));
+  const e=document.getElementById("orc-err2");
+  if(!checked.length){e.style.display="block";e.textContent="Selecione ao menos um item para continuar.";return;}
+  const pkg=_orc._pacotes[_orcTabIdx];
+  let total=0; const descs=[];
+  checked.forEach(ck=>{
+    const id=ck.id.replace("orc-ck-","");
+    const qt=parseFloat(document.getElementById("orc-qt-"+id)?.value||1);
+    total+=parseFloat(ck.dataset.vun||0)*qt;
+    const item=pkg.itens.find(i=>String(i.id)===id);
+    if(item) descs.push((item.descricao||'')+(qt>1?' × '+qt:''));
+  });
+  _orc.pacote_cod=String(pkg.id);
+  _orc.pacote_nome=pkg.nome;
+  _orc.pacote_valor=total;
+  _orc.pacote_itens_desc=descs.join(", ");
   _orc.step=3; _orcStep();
 }
 
