@@ -3093,16 +3093,26 @@ async function _orcLoadPacotes(){
 }
 
 function _orcHTML2(){
-  // Flatten all groups across all tables as the selectable packages
-  const allGrupos=_orc._pacotes.flatMap(p=>p.grupos.map(g=>({...g,tabela_id:p.id})));
+  // Flatten groups across all tables; deduplicate by name keeping first occurrence (lowest tabela_id)
+  const seenNames=new Set();
+  const allGrupos=_orc._pacotes.flatMap(p=>p.grupos.map(g=>({...g,tabela_id:p.id,pkgItens:p.itens}))).filter(g=>{
+    if(seenNames.has(g.nome)) return false;
+    seenNames.add(g.nome);
+    return true;
+  });
   if(!allGrupos.length) return `<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Nenhum pacote cadastrado ainda.</div></div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button></div>`;
   if(!_orc.pacote_grupo_id) _orc.pacote_grupo_id=allGrupos[0].id;
   const cards=allGrupos.map(g=>{
     const sel=g.id===_orc.pacote_grupo_id;
+    const gItens=(g.pkgItens||[]).filter(i=>i.grupo_id===g.id);
+    const itemsList=gItens.map(i=>i.descricao).join(' · ');
     return `<div onclick="_orcSelPkg(${g.id},'${g.nome.replace(/'/g,"&#39;")}',${g.tabela_id})" style="padding:16px 20px;border-radius:12px;border:2px solid ${sel?'var(--a)':'var(--br)'};background:${sel?'rgba(139,90,43,.06)':'#fff'};cursor:pointer;transition:all .2s;margin-bottom:12px;">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${sel?'var(--a)':'var(--br)'};background:${sel?'var(--a)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">${sel?'<div style="width:8px;height:8px;border-radius:50%;background:#fff"></div>':''}</div>
-        <span style="font-size:15px;font-weight:600;color:var(--dk)">${g.nome}</span>
+      <div style="display:flex;align-items:flex-start;gap:12px;">
+        <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${sel?'var(--a)':'var(--br)'};background:${sel?'var(--a)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px">${sel?'<div style="width:8px;height:8px;border-radius:50%;background:#fff"></div>':''}</div>
+        <div>
+          <span style="font-size:15px;font-weight:600;color:var(--dk)">${g.nome}</span>
+          ${itemsList?`<div style="font-size:12px;color:var(--dl);margin-top:5px;line-height:1.5">${itemsList}</div>`:''}
+        </div>
       </div>
     </div>`;
   }).join("");
