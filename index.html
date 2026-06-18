@@ -320,7 +320,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <div id="ll-dots"></div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-p</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-q</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3270,7 +3270,7 @@ function _orcHTML2(){
   return `<div class="orc-card">
     <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:4px;">Monte seu orçamento</div>
     <div style="font-size:13px;color:var(--dl);margin-bottom:14px;">Salão: <strong>${_orc.salao}</strong> · ${_orc.num_convidados} convidados</div>
-    ${_orc._uPkgs.length?`<div style="font-size:12px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Pacotes (clique para marcar os itens)</div>
+    ${_orc._uPkgs.length?`<div style="font-size:12px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Selecione seu pacote para obter os descontos indicados</div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">${pkgBtns}</div>`:''}
     <div style="font-size:12px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin:16px 0 0">Itens</div>
     ${itemsHtml}
