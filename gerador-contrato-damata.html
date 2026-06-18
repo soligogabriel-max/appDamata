@@ -171,7 +171,26 @@ window.addEventListener("message",function(e){
     if(e.data.dataEvt) _gcDate=e.data.dataEvt;
     prefillFromContext();
   }
+  if(e.data&&e.data.type==="damata_init_orcamento"){
+    prefillFromOrcamento(e.data.orc||{});
+  }
 });
+
+// Pré-preenche a partir de um orçamento efetivado
+function prefillFromOrcamento(o){
+  if(o.tipo_evento==="Casamento"){
+    if(g("o-noiva")) g("o-noiva").value=o.nome_noiva||"";
+    if(g("o-noivo")) g("o-noivo").value=o.nome_noivo||"";
+  } else {
+    if(g("o-noiva")) g("o-noiva").value=o.nome_noiva||o.nome_contratante||"";
+    if(g("o-noivo")) g("o-noivo").value="";
+  }
+  if(g("o-contratante")) g("o-contratante").value=o.nome_contratante||"";
+  if(o.data_evento&&g("o-d1")) g("o-d1").value=o.data_evento;
+  if(o.num_convidados&&g("o-num")) g("o-num").value=o.num_convidados;
+  if(o.valor_total&&g("o-total")) g("o-total").value=Number(o.valor_total).toFixed(2);
+  autoNomeEvento();
+}
 
 // ── Helpers ──
 function g(id){return document.getElementById(id);}

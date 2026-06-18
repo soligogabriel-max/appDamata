@@ -333,7 +333,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-z</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-aa</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3020,6 +3020,7 @@ async function renderOrcamentos(){
   let q="orcamentos?order=created_at.desc&limit=200";
   if(status) q+=`&status=eq.${status}`;
   const rows=await sbFetch(q)||[];
+  _orcRowsCache=rows;
   const list=document.getElementById("orc-list");
   let filtered=rows.filter(r=>{
     if(!busca) return true;
@@ -3053,6 +3054,7 @@ async function renderOrcamentos(){
         <td style="padding:10px 12px;">${r.validade?r.validade.split("-").reverse().join("/"):"—"}</td>
         <td style="padding:10px 12px;"><span style="background:${ORC_STATUS_COLOR[statusReal]}22;color:${ORC_STATUS_COLOR[statusReal]};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">${ORC_STATUS_LABEL[statusReal]||statusReal}</span></td>
         <td style="padding:10px 12px;display:flex;gap:6px;">
+          <button onclick="efetivarOrcamento(${r.id})" title="Efetivar → gerar contrato" style="padding:4px 10px;border:1px solid var(--a);color:#fff;background:var(--a);border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap;">📄 Efetivar</button>
           <button onclick="orcSetStatus(${r.id},'convertido')" title="Marcar convertido" style="padding:4px 8px;border:1px solid #27ae60;color:#27ae60;border-radius:6px;background:#fff;font-size:11px;">✓</button>
           <button onclick="orcSetStatus(${r.id},'expirado')" title="Marcar expirado" style="padding:4px 8px;border:1px solid #e74c3c;color:#e74c3c;border-radius:6px;background:#fff;font-size:11px;">✕</button>
         </td>
@@ -3063,6 +3065,24 @@ async function renderOrcamentos(){
 async function orcSetStatus(id,status){
   await sbFetch(`orcamentos?id=eq.${id}`,{method:"PATCH",body:{status}});
   renderOrcamentos();
+}
+let _orcRowsCache=[];
+async function efetivarOrcamento(id){
+  const orc=(_orcRowsCache||[]).find(r=>r.id===id);
+  if(!orc){toast&&toast("Orçamento não encontrado.");return;}
+  // Marca como convertido
+  try{ await sbFetch(`orcamentos?id=eq.${id}`,{method:"PATCH",body:{status:"convertido"}}); }catch(_){}
+  // Abre o gerador na aba Contratos e pré-preenche com os dados do orçamento
+  setTab("contratos");
+  const iframe=document.querySelector("#p-contratos iframe");
+  if(iframe){
+    const send=()=>iframe.contentWindow.postMessage({type:"damata_init_orcamento",orc},"*");
+    if(iframe.contentDocument?.readyState==="complete") send();
+    else iframe.addEventListener("load",send,{once:true});
+    // garante envio mesmo se já carregado
+    setTimeout(send,300);
+  }
+  toast&&toast("Orçamento efetivado — revise e salve o contrato.");
 }
 
 /* ── Orçamento Wizard ─────────────────────────────────────── */
