@@ -3071,15 +3071,16 @@ async function _orcLoadPacotes(){
   body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Carregando pacotes…</div></div>`;
   if(!_orc._pacotes.length){
     try{
-      const pkgs=await sbFetch("tabelas_preco?select=cod,nome,tabelas_preco_grupos(tabelas_preco_itens(descricao,valor_unitario))&deleted_at=is.null")||[];
-      _orc._pacotes=pkgs.map(p=>{
-        let total=0; const itens=[];
-        (p.tabelas_preco_grupos||[]).forEach(g=>(g.tabelas_preco_itens||[]).forEach(i=>{
-          total+=((i.valor_unitario||0)*(i.quantidade_padrao||1));
-          itens.push(i.descricao);
-        }));
-        return {...p,_total:total,_itens:itens};
-      });
+      const tabelas=await dbGet("tabelas_preco","select=id,nome&order=id.asc")||[];
+      if(tabelas.length){
+        const ids=tabelas.map(t=>t.id).join(",");
+        const itens=await dbGet("tabelas_preco_itens","tabela_id=in.("+ids+")&select=tabela_id,descricao,valor_unitario")||[];
+        _orc._pacotes=tabelas.map(t=>{
+          const tItens=itens.filter(i=>i.tabela_id===t.id);
+          const total=tItens.reduce((s,i)=>s+(i.valor_unitario||0),0);
+          return {...t,_total:total,_itens:tItens.map(i=>i.descricao)};
+        });
+      }
     }catch(e){
       body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--er)">Erro ao carregar pacotes.</div><div style="font-size:11px;color:var(--dl);padding:8px 16px;word-break:break-all;">${e.message||e}</div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button><button class="orc-btn-next" onclick="_orcLoadPacotes()">Tentar novamente</button></div></div>`;
       return;
