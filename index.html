@@ -320,7 +320,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <div id="ll-dots"></div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-l</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-m</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3037,9 +3037,25 @@ const ORC_ITEM_INFO=[
   {k:'Staff Adicional',       d:'Staff adicional além dos inclusos no pacote · por diária',                                           img:null},
 ];
 function _orcNorm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
+// Token-based matching between inventory description and price-table item description
+const _ORC_STOP=new Set(['de','da','do','com','e','o','a','os','as','em','para','no','na','pe','pes','x','diaria','diarias','inclusa','inclusas','adicional','alem','pacote']);
+function _orcCoreTokens(s){
+  return _orcNorm(s)
+    .replace(/\([^)]*\)/g,' ')          // remove parentheticals like (casal king)
+    .replace(/[^a-z0-9 ]/g,' ')
+    .split(/\s+/)
+    .filter(t=>t.length&&!_ORC_STOP.has(t));
+}
+function _orcMatchInv(pkgDesc){
+  const pkgTokens=new Set(_orcCoreTokens(pkgDesc));
+  return (_orc._invOrc||[]).find(inv=>{
+    const invTokens=_orcCoreTokens(inv.descricao);
+    if(!invTokens.length) return false;
+    return invTokens.every(t=>pkgTokens.has(t));
+  })||null;
+}
 function _orcItemInfo(desc){
-  // First try DB inventario (exibir_orcamento=true)
-  const inv=(_orc._invOrc||[]).find(e=>_orcNorm(desc).includes(_orcNorm(e.descricao))||_orcNorm(e.descricao).includes(_orcNorm(desc)));
+  const inv=_orcMatchInv(desc);
   if(inv) return {k:inv.descricao, d:inv.descricao_orc||'', img:inv.imagem||null};
   return null;
 }
@@ -3226,7 +3242,7 @@ function _orcHTML2(){
   };
   // Store all items for group sync (only those enabled in inventario)
   const _invEnabled=(_orc._invOrc||[]);
-  const _orcItemEnabled=(desc)=>!_invEnabled.length||_invEnabled.some(e=>_orcNorm(desc).includes(_orcNorm(e.descricao))||_orcNorm(e.descricao).includes(_orcNorm(desc)));
+  const _orcItemEnabled=(desc)=>!_invEnabled.length||!!_orcMatchInv(desc);
   _orc._allGroupItems=allGrupos.flatMap(g=>(g.pkgItens||[]).filter(i=>i.grupo_id===g.id&&_orcItemEnabled(i.descricao||'')));
   let itemsHtml='';
   allGrupos.forEach(g=>{
