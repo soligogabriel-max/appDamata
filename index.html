@@ -3034,7 +3034,12 @@ const ORC_ITEM_INFO=[
   {k:'Staff Adicional',       d:'Staff adicional além dos inclusos no pacote · por diária',                                           img:null},
 ];
 function _orcNorm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
-function _orcItemInfo(desc){return ORC_ITEM_INFO.find(e=>_orcNorm(desc).includes(_orcNorm(e.k)))||null;}
+function _orcItemInfo(desc){
+  // First try DB inventario (exibir_orcamento=true)
+  const inv=(_orc._invOrc||[]).find(e=>_orcNorm(desc).includes(_orcNorm(e.descricao))||_orcNorm(e.descricao).includes(_orcNorm(desc)));
+  if(inv) return {k:inv.descricao, d:inv.descricao_orc||'', img:inv.imagem||null};
+  return null;
+}
 
 // Grupos de seleção obrigatória
 const ORC_GROUP_FLAM=/casa flamboyant|loft flamboyant|suite flamboyant|su[i|í]te flamboyant/i;
@@ -3149,8 +3154,9 @@ function _orcNext1(){
 async function _orcLoadPacotes(){
   const body=document.getElementById("orc-wizard-body");
   body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Carregando pacotes…</div></div>`;
-  if(!_orc._pacotes.length){
-    try{
+  try{
+    // Load packages + items
+    if(!_orc._pacotes.length){
       const tabelas=await sbFetch("tabelas_preco?select=id,nome&order=id.asc")||[];
       if(tabelas.length){
         const ids=tabelas.map(t=>t.id).join(",");
@@ -3164,10 +3170,13 @@ async function _orcLoadPacotes(){
           itens:itens.filter(i=>i.tabela_id===t.id)
         }));
       }
-    }catch(e){
-      body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--er)">Erro ao carregar pacotes.</div><div style="font-size:11px;color:var(--dl);padding:8px 16px;word-break:break-all;">${e.message||e}</div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button><button class="orc-btn-next" onclick="_orcLoadPacotes()">Tentar novamente</button></div></div>`;
-      return;
     }
+    // Always reload inventario items for orçamento
+    const invOrc=await sbFetch("inventario?exibir_orcamento=eq.true&select=cod,descricao,imagem,descricao_orc&order=descricao.asc")||[];
+    _orc._invOrc=invOrc;
+  }catch(e){
+    body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--er)">Erro ao carregar pacotes.</div><div style="font-size:11px;color:var(--dl);padding:8px 16px;word-break:break-all;">${e.message||e}</div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button><button class="orc-btn-next" onclick="_orcLoadPacotes()">Tentar novamente</button></div></div>`;
+    return;
   }
   body.innerHTML=_orcHTML2();
 }
@@ -3212,11 +3221,13 @@ function _orcHTML2(){
       ${imgUrl?`<div style="position:relative;flex-shrink:0;width:80px;height:60px;" class="orc-img-wrap"><img src="${imgUrl}" onerror="this.parentElement.style.display='none'" style="width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-in;transition:transform .2s;display:block;" onmouseenter="this.style.cssText='width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-out;display:block;position:absolute;width:240px;height:180px;z-index:99;box-shadow:0 8px 32px rgba(0,0,0,.3);border-radius:10px;top:0;right:0;'" onmouseleave="this.style.cssText='width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-in;display:block;'"></div>`:''}<input type="number" id="orc-qt-${i.id}" value="${qty}" min="1" style="width:44px;padding:4px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:center;background:var(--bg);flex-shrink:0;margin-top:3px">
     </label>`;
   };
-  // Store all items for group sync
-  _orc._allGroupItems=allGrupos.flatMap(g=>(g.pkgItens||[]).filter(i=>i.grupo_id===g.id));
+  // Store all items for group sync (only those enabled in inventario)
+  const _invEnabled=(_orc._invOrc||[]);
+  const _orcItemEnabled=(desc)=>!_invEnabled.length||_invEnabled.some(e=>_orcNorm(desc).includes(_orcNorm(e.descricao))||_orcNorm(e.descricao).includes(_orcNorm(desc)));
+  _orc._allGroupItems=allGrupos.flatMap(g=>(g.pkgItens||[]).filter(i=>i.grupo_id===g.id&&_orcItemEnabled(i.descricao||'')));
   let itemsHtml='';
   allGrupos.forEach(g=>{
-    const gItens=(g.pkgItens||[]).filter(i=>i.grupo_id===g.id);
+    const gItens=(g.pkgItens||[]).filter(i=>i.grupo_id===g.id&&_orcItemEnabled(i.descricao||''));
     if(!gItens.length) return;
     const isSelGrp=!hasPrev&&g.id===_orc.pacote_grupo_id;
     itemsHtml+=`<div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;padding:14px 0 4px">${g.nome}</div>`;
@@ -3986,11 +3997,14 @@ const CRUD_CFG = {
   inventario: {
     title:"Item do Inventário", pk:"cod",
     fields:[
-      {n:"cod",             l:"Código",          t:"text", req:true},
-      {n:"descricao",       l:"Descrição",       t:"text", req:true},
-      {n:"quantidade_max",  l:"Qtd. Máxima",     t:"number"},
-      {n:"valor_reposicao", l:"Valor Reposição", t:"decimal"},
-      {n:"obs",             l:"Observação",      t:"text"},
+      {n:"cod",              l:"Código",                    t:"text",    req:true},
+      {n:"descricao",        l:"Descrição",                 t:"text",    req:true},
+      {n:"quantidade_max",   l:"Qtd. Máxima",               t:"number"},
+      {n:"valor_reposicao",  l:"Valor Reposição",           t:"decimal"},
+      {n:"obs",              l:"Observação",                t:"text"},
+      {n:"exibir_orcamento", l:"Exibir no Orçamento",      t:"boolean"},
+      {n:"imagem",           l:"Imagem (nome do arquivo)", t:"text"},
+      {n:"descricao_orc",    l:"Descrição p/ Orçamento",  t:"text"},
     ]
   },
   extrato_bancario: {
@@ -4094,6 +4108,8 @@ function _buildCrudForm(fields, rec) {
       inp = `<input class="inp inp-inline" type="number" id="fld-${f.n}" value="${val!==""?val:""}" style="margin-bottom:0;"/>`;
     } else if(f.t==="decimal") {
       inp = `<input class="inp inp-inline" type="number" step="0.01" id="fld-${f.n}" value="${val!==""?val:""}" style="margin-bottom:0;"/>`;
+    } else if(f.t==="boolean") {
+      inp = `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="fld-${f.n}" ${val===true||val==="true"?"checked":""} style="width:16px;height:16px;accent-color:var(--a);"/><span style="font-size:13px;color:var(--dm)">${f.l}</span></label>`;
     } else {
       inp = `<input class="inp inp-inline" type="text" id="fld-${f.n}" value="${_esc(String(val))}" style="margin-bottom:0;"/>`;
     }
@@ -4187,6 +4203,7 @@ function _getCrudData() {
     if(v==="" || v===null) { if(!f.nullable && f.t!=="text") data[f.n]=null; else data[f.n]=null; }
     else if(f.t==="number") data[f.n] = parseInt(v)||null;
     else if(f.t==="decimal") data[f.n] = parseFloat(v)||null;
+    else if(f.t==="boolean") data[f.n] = document.getElementById("fld-"+f.n)?.checked||false;
     else data[f.n] = v||null;
   }
   return data;
