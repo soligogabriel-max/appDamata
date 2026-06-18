@@ -320,7 +320,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <div id="ll-dots"></div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-q</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-r</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -434,7 +434,6 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <svg width="36" height="36" style="filter:brightness(0) invert(1)"><use href="#logo-sym-lt"/></svg>
     <div>
       <div style="color:#fff;font-weight:700;letter-spacing:3px;font-size:14px">DAMATA</div>
-      <div style="color:rgba(255,255,255,.75);font-size:10px;letter-spacing:1px">ESPAÇO DE EVENTOS</div>
     </div>
     <button onclick="showSc('login')" style="margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">← Voltar</button>
   </div>
@@ -3287,11 +3286,18 @@ function _orcTogglePkg(id){
   const pk=(_orc._uPkgs||[]).find(p=>p.id===id);
   if(!pk) return;
   const turnOn=_orc._activePkg!==id;
+  // Capacidade: salão Bromélias comporta até 100 convidados
+  if(turnOn && /brom[eé]/i.test(_orcNorm(pk.nome)) && (parseInt(_orc.num_convidados)||0)>100){
+    const e=document.getElementById("orc-err2");
+    if(e){e.style.display="block";e.textContent="Número de convidados excede o limite do salão Bromélias (máx. 100).";}
+    return;
+  }
   // Clear any previously active package's items first
   if(_orc._activePkg!=null){
     const prev=(_orc._uPkgs||[]).find(p=>p.id===_orc._activePkg);
     if(prev) prev.cods.forEach(c=>{const ck=document.getElementById('orc-ck-'+c);if(ck)ck.checked=false;});
   }
+  const e0=document.getElementById("orc-err2"); if(e0) e0.style.display="none";
   _orc._activePkg=turnOn?id:null;
   pk.cods.forEach(c=>{const ck=document.getElementById('orc-ck-'+c);if(ck)ck.checked=turnOn;});
   document.querySelectorAll('[id^="orc-pkgbtn-"]').forEach(b=>{b.style.background='#fff';b.style.color='var(--dk)';b.style.borderColor='var(--br)';});
@@ -3302,6 +3308,13 @@ function _orcTogglePkg(id){
 function _orcItemToggle(cod){
   const inv=_orc._invByCod[cod];
   if(!inv) return;
+  // Capacidade: não permite o salão Bromélias acima de 100 convidados
+  if(/espaco bromel/i.test(_orcNorm(inv.descricao||'')) && (parseInt(_orc.num_convidados)||0)>100){
+    const ck0=document.getElementById('orc-ck-'+cod); if(ck0) ck0.checked=false;
+    const e=document.getElementById("orc-err2");
+    if(e){e.style.display="block";e.textContent="Número de convidados excede o limite do salão Bromélias (máx. 100).";}
+    return;
+  }
   const grp=_orcGetGroup(inv.descricao||'');
   if(!grp) return;
   const checked=document.getElementById('orc-ck-'+cod)?.checked;
@@ -3526,7 +3539,7 @@ function _orcAbrirPDF(){
   .footer{margin-top:24px;font-size:11px;color:#888;border-top:1px solid #eee;padding-top:12px}
   @media print{body{padding:20px}}
 </style></head><body>
-<h1>Orçamento – Fazenda Damata Espaço de Eventos</h1>
+<h1>Orçamento – Fazenda Damata</h1>
 <div class="sub">Emitido em ${new Date().toLocaleDateString("pt-BR")} · Válido até ${validade.toLocaleDateString("pt-BR")}</div>
 <div class="info">
   <div><span>Contratante</span>${_orc.nome_contratante}</div>
@@ -3547,7 +3560,7 @@ function _orcAbrirPDF(){
     <tr class="total-row"><td>Total</td><td style="text-align:right">${fmt(_orc.valor_total)}</td></tr>
   </tbody>
 </table>
-<div class="footer">Fazenda Damata Espaço de Eventos · fazendadamata.com · (19) 99638-3386<br>Este orçamento é válido por 7 dias a partir da data de emissão. Os valores poderão ser reajustados após o prazo.</div>
+<div class="footer">Fazenda Damata · fazendadamata.com · (19) 99638-3386<br>Este orçamento é válido por 7 dias a partir da data de emissão. Os valores poderão ser reajustados após o prazo.</div>
 <script>window.onload=function(){window.print();}<\/script>
 </body></html>`;
   const w=window.open('','_blank','width=750,height=900');
