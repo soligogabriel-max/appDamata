@@ -320,7 +320,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <div id="ll-dots"></div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-n</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-o</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -4554,7 +4554,7 @@ function _pmAddItem(it={}) {
         ${opts}
       </select>
     </td>
-    <td style="display:none;" class="pm-descr">${it.descricao||""}</td>
+    <td style="display:none;" class="pm-descr">${(_pmInvItems.find(x=>x.cod===it.cod_item)||{}).descricao||it.descricao||""}</td>
     <td><input class="inp pm-qtd" type="number" step="1" min="0" style="margin:0;width:70px;text-align:right;" value="${it.quantidade||""}" placeholder="0" oninput="_pmCalcSub(this)"/></td>
     <td><input class="inp pm-vun" type="number" step="0.01" min="0" style="margin:0;width:100px;text-align:right;" value="${it.valor_unitario!=null?it.valor_unitario:""}" placeholder="0,00" oninput="_pmCalcSub(this)"/></td>
     <td class="pm-sub" style="text-align:right;font-weight:700;white-space:nowrap;">${sub}</td>
@@ -4945,7 +4945,7 @@ function _tpMakeItemRow(it={}, tbody) {
     <td style="min-width:180px;"><select class="inp tp-sel-cod" style="margin:0;width:100%;" onchange="_tpSelItem(this)">
       <option value="">— Selecione —</option>${_tpItemOpts(it.cod_item||"")}
     </select></td>
-    <td class="tp-descr" style="font-size:12px;color:var(--dm);">${it.descricao||""}</td>
+    <td class="tp-descr" style="font-size:12px;color:var(--dm);">${(_tpInvItems.find(x=>x.cod===it.cod_item)||{}).descricao||it.descricao||""}</td>
     <td><input class="inp tp-vun" type="number" step="0.01" min="0" placeholder="0,00" value="${vun}" style="margin:0;width:110px;text-align:right;"/></td>
     <td><button class="act-btn" onclick="this.closest('tr').remove();_tpGrupoRecalc(this)">🗑</button></td>`;
   tbody.appendChild(tr);

@@ -203,10 +203,25 @@ function prefillFromContext(){
 }
 
 // ── Tabelas de preço ──
-var _tabelas=[],_grupos=[],_itens=[];
+var _tabelas=[],_grupos=[],_itens=[],_invDesc={};
+
+// Descrição vinda do inventário (fonte da verdade), pelo cod_item
+function descOf(it){
+  if(it&&it.cod_item&&_invDesc[it.cod_item])return _invDesc[it.cod_item];
+  return (it&&(it.descricao||it.cod_item))||"";
+}
+
+async function loadInventarioDesc(){
+  try{
+    var inv=await sbGet("inventario?select=cod,descricao&limit=1000");
+    _invDesc={};
+    (inv||[]).forEach(function(r){_invDesc[r.cod]=r.descricao;});
+  }catch(e){/* fallback usa descricao salva */}
+}
 
 async function loadTabelasPreco(){
   try{
+    await loadInventarioDesc();
     _tabelas=await sbGet("tabelas_preco?deleted_at=is.null&order=id.desc&limit=50");
     var sel=g("o-tabela");
     sel.innerHTML='<option value="">— Selecione a tabela de preços —</option>';
@@ -245,7 +260,7 @@ function renderItens(grupos,itens){
       var sub=gItens.reduce(function(s,it){return s+(it.valor_unitario||0);},0);
       var total=Math.max(0,sub-(gr.desconto||0));
       var lista=gItens.map(function(it){
-        return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;color:#94a3b8;"><span style="color:#475569;">›</span>'+(it.descricao||it.cod_item||"")+'</div>';
+        return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;color:#94a3b8;"><span style="color:#475569;">›</span>'+descOf(it)+'</div>';
       }).join("");
       html+='<div class="pkg-box" data-grupo="'+gr.id+'" data-total="'+total+'">'+
         '<div class="pkg-hdr">'+
@@ -268,7 +283,7 @@ function renderItens(grupos,itens){
       html+='<div class="cb" id="lb-av-'+it.id+'" style="align-items:center;">'+
         '<input type="checkbox" id="av-'+it.id+'" data-vun="'+(it.valor_unitario||0)+'" onchange="recalcTotal()">'+
         '<div style="display:flex;justify-content:space-between;align-items:center;width:100%;gap:10px;">'+
-          '<span style="flex:1;">'+(it.descricao||it.cod_item||"")+'</span>'+
+          '<span style="flex:1;">'+descOf(it)+'</span>'+
           '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">'+
             '<span style="color:#64748b;font-size:11px;">Qtd:</span>'+
             '<input type="number" id="qtd-av-'+it.id+'" value="1" min="1" style="width:52px;padding:4px 6px;border:1px solid #334155;border-radius:6px;background:#0f172a;color:#f1f5f9;font-size:12px;text-align:center;" oninput="recalcTotal()">'+
@@ -326,7 +341,7 @@ function collectItens(){
     if(!cb||!cb.checked)return;
     var gr=_grupos.find(function(x){return x.id===gid;});
     _itens.filter(function(it){return it.grupo_id===gid;}).forEach(function(it){
-      itens.push({cod:it.cod_item,descricao:it.descricao,quantidade:1,valor_unitario:it.valor_unitario||0});
+      itens.push({cod:it.cod_item,descricao:descOf(it),quantidade:1,valor_unitario:it.valor_unitario||0});
     });
     document.querySelectorAll("[id^='xi-']").forEach(function(ed){
       if(ed.dataset.grupoId!=gid)return;
@@ -343,7 +358,7 @@ function collectItens(){
     if(it){
       var qtdEl=document.getElementById("qtd-"+cb.id);
       var qtd=qtdEl?parseInt(qtdEl.value||1):1;
-      itens.push({cod:it.cod_item,descricao:it.descricao,quantidade:qtd,valor_unitario:it.valor_unitario||0});
+      itens.push({cod:it.cod_item,descricao:descOf(it),quantidade:qtd,valor_unitario:it.valor_unitario||0});
     }
   });
   return itens;
