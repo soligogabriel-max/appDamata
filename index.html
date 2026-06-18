@@ -3030,7 +3030,7 @@ function _orcHTML1(){
     <label class="lbl">Data do evento *</label>
     <input type="date" id="orc-data" class="inp" value="${_orc.data_evento}" min="${new Date().toISOString().slice(0,10)}"/>
     <label class="lbl">Número de convidados *</label>
-    <input type="number" id="orc-conv" class="inp" value="${_orc.num_convidados}" placeholder="ex: 80" min="1" max="110"/>
+    <input type="number" id="orc-conv" class="inp" value="${_orc.num_convidados}" placeholder="ex: 80" min="1" max="450"/>
     <label class="lbl">Nome da noiva / aniversariante</label>
     <input type="text" id="orc-noiva" class="inp" value="${_orc.nome_noiva}" placeholder="Primeiro nome"/>
     <label class="lbl">Nome do noivo</label>
@@ -3056,7 +3056,7 @@ function _orcNext1(){
   const wpp=document.getElementById("orc-wpp").value.trim();
   const err=document.getElementById("orc-err1");
   if(!tipo||!data||!conv||!cont||!wpp){err.style.display="block";err.textContent="Preencha os campos obrigatórios (*)";return;}
-  if(conv>110){err.style.display="block";err.textContent="Capacidade máxima: 110 convidados. Entre em contato para eventos maiores.";return;}
+  if(conv>450){err.style.display="block";err.textContent="Capacidade máxima: 450 convidados (Tumbergia). Entre em contato para eventos maiores.";return;}
   _orc.tipo_evento=tipo; _orc.data_evento=data; _orc.num_convidados=conv;
   _orc.nome_noiva=document.getElementById("orc-noiva").value.trim();
   _orc.nome_noivo=document.getElementById("orc-noivo").value.trim();
