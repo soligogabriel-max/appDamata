@@ -3078,7 +3078,7 @@ async function _orcLoadPacotes(){
         _orc._pacotes=tabelas.map(t=>{
           const tItens=itens.filter(i=>i.tabela_id===t.id);
           const total=tItens.reduce((s,i)=>s+(i.valor_unitario||0),0);
-          return {...t,_total:total,_itens:tItens.map(i=>i.descricao)};
+          return {...t,cod:String(t.id),_total:total,_itens:tItens.map(i=>i.descricao)};
         });
       }
     }catch(e){
