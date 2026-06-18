@@ -3001,12 +3001,10 @@ async function orcSetStatus(id,status){
 
 /* ── Orçamento Wizard ─────────────────────────────────────── */
 const ORC_TIPOS=["Casamento","Aniversário","Debutante","Corporativo","Batizado","Confraternização","Outro"];
-let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null};
-let _orcTabIdx=0;
+let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null};
 
 function abrirOrcamento(){
-  _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null};
-  _orcTabIdx=0;
+  _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null};
   showSc("orcamento");
   _orcStep();
 }
@@ -3095,15 +3093,16 @@ async function _orcLoadPacotes(){
 }
 
 function _orcHTML2(){
-  const pkgs=_orc._pacotes;
-  if(!pkgs.length) return `<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Nenhum pacote cadastrado ainda.</div></div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button></div>`;
-  if(!_orc.pacote_cod) _orc.pacote_cod=String(pkgs[0].id);
-  const cards=pkgs.map(p=>{
-    const sel=String(p.id)===_orc.pacote_cod;
-    return `<div onclick="_orcSelPkg('${String(p.id)}','${p.nome.replace(/'/g,"&#39;")}')" style="padding:16px 20px;border-radius:12px;border:2px solid ${sel?'var(--a)':'var(--br)'};background:${sel?'rgba(139,90,43,.06)':'#fff'};cursor:pointer;transition:all .2s;margin-bottom:12px;">
+  // Flatten all groups across all tables as the selectable packages
+  const allGrupos=_orc._pacotes.flatMap(p=>p.grupos.map(g=>({...g,tabela_id:p.id})));
+  if(!allGrupos.length) return `<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Nenhum pacote cadastrado ainda.</div></div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button></div>`;
+  if(!_orc.pacote_grupo_id) _orc.pacote_grupo_id=allGrupos[0].id;
+  const cards=allGrupos.map(g=>{
+    const sel=g.id===_orc.pacote_grupo_id;
+    return `<div onclick="_orcSelPkg(${g.id},'${g.nome.replace(/'/g,"&#39;")}',${g.tabela_id})" style="padding:16px 20px;border-radius:12px;border:2px solid ${sel?'var(--a)':'var(--br)'};background:${sel?'rgba(139,90,43,.06)':'#fff'};cursor:pointer;transition:all .2s;margin-bottom:12px;">
       <div style="display:flex;align-items:center;gap:12px;">
         <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${sel?'var(--a)':'var(--br)'};background:${sel?'var(--a)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">${sel?'<div style="width:8px;height:8px;border-radius:50%;background:#fff"></div>':''}</div>
-        <span style="font-size:15px;font-weight:600;color:var(--dk)">${p.nome}</span>
+        <span style="font-size:15px;font-weight:600;color:var(--dk)">${g.nome}</span>
       </div>
     </div>`;
   }).join("");
@@ -3119,16 +3118,15 @@ function _orcHTML2(){
   </div>`;
 }
 
-function _orcSelPkg(cod,nome){
-  _orc.pacote_cod=cod;
+function _orcSelPkg(grupoId,nome,tabelaId){
+  _orc.pacote_grupo_id=grupoId;
   _orc.pacote_nome=nome;
+  _orc.pacote_cod=String(tabelaId);
   document.getElementById("orc-wizard-body").innerHTML=_orcHTML2();
 }
 
 function _orcNext2(){
-  if(!_orc.pacote_cod){const e=document.getElementById("orc-err2");if(e){e.style.display="block";e.textContent="Selecione um pacote.";}return;}
-  const pkg=_orc._pacotes.find(p=>String(p.id)===_orc.pacote_cod);
-  if(pkg) _orc.pacote_nome=pkg.nome;
+  if(!_orc.pacote_grupo_id){const e=document.getElementById("orc-err2");if(e){e.style.display="block";e.textContent="Selecione um pacote.";}return;}
   _orc.step=3;_orcStep();
 }
 
@@ -3141,11 +3139,15 @@ function _orcHTML3(){
   if(!pkg) return `<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Pacote não encontrado.</div></div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=2;_orcStep()">← Voltar</button></div>`;
   const grupos=pkg.grupos||[];
   const itens=pkg.itens||[];
+  // If coming back, restore previous selection; otherwise pre-check items of selected group
+  const hasPrev=(_orc._selectedItems||[]).length>0;
   const prevQty={};
   const prevSel=new Set();
-  (_orc._selectedItems||[]).forEach(i=>{prevSel.add(i.id);prevQty[i.id]=i.qty;});
-  const itemRow=i=>{
-    const ck=prevSel.has(i.id)?'checked':'';
+  if(hasPrev){
+    (_orc._selectedItems).forEach(i=>{prevSel.add(i.id);prevQty[i.id]=i.qty;});
+  }
+  const itemRow=(i,defaultChecked)=>{
+    const ck=(hasPrev?prevSel.has(i.id):defaultChecked)?'checked':'';
     const qty=prevQty[i.id]||1;
     return `<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--br);cursor:pointer;">
       <input type="checkbox" id="orc-ck-${i.id}" data-vun="${i.valor_unitario||0}" ${ck} style="width:16px;height:16px;accent-color:var(--a);flex-shrink:0">
@@ -3157,22 +3159,23 @@ function _orcHTML3(){
   grupos.forEach(g=>{
     const gItens=itens.filter(i=>i.grupo_id===g.id);
     if(!gItens.length) return;
+    const isSelectedGrp=g.id===_orc.pacote_grupo_id;
     html+=`<div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;padding:12px 0 4px">${g.nome}</div>`;
-    gItens.forEach(i=>{html+=itemRow(i);});
+    gItens.forEach(i=>{html+=itemRow(i,isSelectedGrp);});
   });
   const avulsos=itens.filter(i=>!i.grupo_id);
   if(avulsos.length){
     if(grupos.length) html+=`<div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;padding:12px 0 4px">Itens avulsos</div>`;
-    avulsos.forEach(i=>{html+=itemRow(i);});
+    avulsos.forEach(i=>{html+=itemRow(i,false);});
   }
   return `<div class="orc-card">
     <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:4px;">Selecione os itens</div>
-    <div style="font-size:13px;color:var(--dl);margin-bottom:18px;">Pacote: <strong>${pkg.nome}</strong></div>
+    <div style="font-size:13px;color:var(--dl);margin-bottom:18px;">Pacote: <strong>${_orc.pacote_nome}</strong></div>
     ${html||`<div style="padding:20px;text-align:center;color:var(--dl)">Nenhum item cadastrado.</div>`}
     <div id="orc-err3" class="err" style="margin-top:10px"></div>
   </div>
   <div class="orc-nav">
-    <button class="orc-btn-back" onclick="_orc.step=2;_orcStep()">← Voltar</button>
+    <button class="orc-btn-back" onclick="_orc._selectedItems=[];_orc.step=2;_orcStep()">← Voltar</button>
     <button class="orc-btn-next" onclick="_orcNext3()">Ver resumo →</button>
   </div>`;
 }
@@ -3209,7 +3212,6 @@ function _orcNext3(){
   _orc._subtotal=subtotal;
   _orc._discount=bestDiscount;
   _orc._discountPkg=bestGrupoNome;
-  _orc.pacote_nome=pkg.nome;
   _orc.pacote_valor=subtotal-bestDiscount;
   _orc.valor_total=_orc.pacote_valor;
   _orc.pacote_itens_desc=selectedItems.map(i=>i.descricao+(i.qty>1?' × '+i.qty:'')).join(", ");
