@@ -3001,11 +3001,11 @@ async function orcSetStatus(id,status){
 
 /* ── Orçamento Wizard ─────────────────────────────────────── */
 const ORC_TIPOS=["Casamento","Aniversário","Debutante","Corporativo","Batizado","Confraternização","Outro"];
-let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0};
+let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null};
 let _orcTabIdx=0;
 
 function abrirOrcamento(){
-  _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0};
+  _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null};
   _orcTabIdx=0;
   showSc("orcamento");
   _orcStep();
@@ -3103,11 +3103,7 @@ function _orcHTML2(){
     <div style="font-size:13px;color:var(--dl);margin-bottom:14px;">Salão: <strong>${_orc.salao}</strong> · ${_orc.num_convidados} convidados</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">${tabs}</div>
     <div id="orc-items-wrap">${_orcPkgItemsHtml(pkgs[_orcTabIdx])}</div>
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-top:2px solid var(--br);margin-top:10px;">
-      <span style="font-size:14px;font-weight:700;color:var(--dk)">Total estimado</span>
-      <span id="orc-total2" style="font-size:22px;font-weight:700;color:var(--a)">R$ 0,00</span>
-    </div>
-    <div id="orc-err2" class="err"></div>
+    <div id="orc-err2" class="err" style="margin-top:10px"></div>
   </div>
   <div class="orc-nav">
     <button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button>
@@ -3124,7 +3120,6 @@ function _orcPkgItemsHtml(pkg){
     <input type="checkbox" id="orc-ck-${i.id}" data-vun="${i.valor_unitario||0}" onchange="_orcRecalc2()" style="width:16px;height:16px;accent-color:var(--a);flex-shrink:0">
     <span style="flex:1;font-size:13px;color:var(--dk)">${i.descricao||''}</span>
     <input type="number" id="orc-qt-${i.id}" value="1" min="1" style="width:48px;padding:4px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:center;background:var(--bg)" oninput="_orcRecalc2()">
-    <span style="font-size:12px;color:var(--dl);min-width:76px;text-align:right">R$ ${(i.valor_unitario||0).toLocaleString("pt-BR",{minimumFractionDigits:2})}</span>
   </label>`;
   grupos.forEach(g=>{
     const gItens=itens.filter(i=>i.grupo_id===g.id);
@@ -3169,19 +3164,38 @@ function _orcNext2(){
   const checked=Array.from(document.querySelectorAll('[id^="orc-ck-"]:checked'));
   const e=document.getElementById("orc-err2");
   if(!checked.length){e.style.display="block";e.textContent="Selecione ao menos um item para continuar.";return;}
-  const pkg=_orc._pacotes[_orcTabIdx];
-  let total=0; const descs=[];
-  checked.forEach(ck=>{
-    const id=ck.id.replace("orc-ck-","");
-    const qt=parseFloat(document.getElementById("orc-qt-"+id)?.value||1);
-    total+=parseFloat(ck.dataset.vun||0)*qt;
-    const item=pkg.itens.find(i=>String(i.id)===id);
-    if(item) descs.push((item.descricao||'')+(qt>1?' × '+qt:''));
+  // Coleta itens selecionados de todos os pacotes (tabs)
+  const selectedById={};
+  _orc._pacotes.forEach(p=>{
+    p.itens.forEach(i=>{
+      const ck=document.getElementById("orc-ck-"+i.id);
+      if(ck&&ck.checked){
+        const qt=parseFloat(document.getElementById("orc-qt-"+i.id)?.value||1);
+        selectedById[i.id]={...i,qty:qt,subtotal:(i.valor_unitario||0)*qt};
+      }
+    });
   });
-  _orc.pacote_cod=String(pkg.id);
-  _orc.pacote_nome=pkg.nome;
-  _orc.pacote_valor=total;
-  _orc.pacote_itens_desc=descs.join(", ");
+  const selectedItems=Object.values(selectedById);
+  const subtotal=selectedItems.reduce((s,i)=>s+i.subtotal,0);
+  // Detecta melhor pacote coincidente
+  const selectedIds=new Set(selectedItems.map(i=>i.id));
+  let bestPkg=null,bestDiscount=0;
+  _orc._pacotes.forEach(p=>{
+    if(!p.itens.length) return;
+    const allMatch=p.itens.every(i=>selectedIds.has(i.id));
+    if(allMatch){
+      const disc=p.grupos.reduce((s,g)=>s+(g.desconto||0),0);
+      if(disc>bestDiscount){bestDiscount=disc;bestPkg=p;}
+    }
+  });
+  _orc._selectedItems=selectedItems;
+  _orc._subtotal=subtotal;
+  _orc._discount=bestDiscount;
+  _orc._discountPkg=bestPkg?bestPkg.nome:null;
+  _orc.pacote_cod=bestPkg?String(bestPkg.id):String(_orc._pacotes[_orcTabIdx].id);
+  _orc.pacote_nome=bestPkg?bestPkg.nome:_orc._pacotes[_orcTabIdx].nome;
+  _orc.pacote_valor=subtotal-bestDiscount;
+  _orc.pacote_itens_desc=selectedItems.map(i=>i.descricao+(i.qty>1?' × '+i.qty:'')).join(", ");
   _orc.step=3; _orcStep();
 }
 
@@ -3227,25 +3241,49 @@ function _orcQty(cod,delta){
 }
 
 function _orcHTML4(){
-  const extrasDesc=Object.entries(_orc.extras).map(([cod,qty])=>{
-    const it=_orc._invItems.find(x=>x.cod===cod);
-    return it?`${it.descricao} × ${qty}`:"";
-  }).filter(Boolean).join(", ")||"Nenhum";
   _orc.valor_total=_orc.pacote_valor;
   const validade=new Date(); validade.setDate(validade.getDate()+7);
   const valStr=validade.toLocaleDateString("pt-BR");
   const nomes=[_orc.nome_noiva,_orc.nome_noivo].filter(Boolean).join(" e ")||_orc.nome_contratante;
+  const fmt=v=>"R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:2});
+  // Linhas de itens selecionados
+  const itemLines=(_orc._selectedItems||[]).map(i=>`
+    <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid var(--br)">
+      <span style="color:var(--dk)">${i.descricao}${i.qty>1?' × '+i.qty:''}</span>
+      <span style="color:var(--dm);white-space:nowrap;margin-left:12px">${fmt(i.subtotal)}</span>
+    </div>`).join("");
+  // Extras do inventário
+  const extrasLines=Object.entries(_orc.extras).map(([cod,qty])=>{
+    const it=_orc._invItems.find(x=>x.cod===cod);
+    return it?`<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid var(--br)"><span style="color:var(--dk)">${it.descricao} × ${qty}</span><span style="color:var(--dl)">—</span></div>`:"";
+  }).filter(Boolean).join("");
+  const discountLine=_orc._discount>0?`
+    <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;border-bottom:1px solid var(--br)">
+      <span style="color:var(--ok);font-weight:600">Desconto — ${_orc._discountPkg}</span>
+      <span style="color:var(--ok);font-weight:600">− ${fmt(_orc._discount)}</span>
+    </div>`:"";
+  const subtotalLine=_orc._discount>0?`
+    <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid var(--br)">
+      <span style="color:var(--dl)">Subtotal</span>
+      <span style="color:var(--dl)">${fmt(_orc._subtotal)}</span>
+    </div>`:"";
   return `<div class="orc-card">
     <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:20px;">Resumo do orçamento</div>
-    <div style="display:flex;flex-direction:column;gap:10px;font-size:14px;">
-      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Evento</span><span style="font-weight:600">${_orc.tipo_evento}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Data</span><span style="font-weight:600">${_orc.data_evento.split("-").reverse().join("/")}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Convidados</span><span style="font-weight:600">${_orc.num_convidados}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Salão</span><span style="font-weight:600">${_orc.salao}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Nome(s)</span><span style="font-weight:600">${nomes}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Pacote</span><span style="font-weight:600">${_orc.pacote_nome}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Extras</span><span style="font-weight:600;text-align:right;max-width:60%">${extrasDesc}</span></div>
-      <div style="display:flex;justify-content:space-between;padding:14px 0;margin-top:4px;"><span style="font-size:16px;font-weight:700;color:var(--dk)">Total</span><span style="font-size:22px;font-weight:700;color:var(--a)">R$ ${_orc.valor_total.toLocaleString("pt-BR",{minimumFractionDigits:2})}</span></div>
+    <div style="display:flex;flex-direction:column;gap:2px;font-size:14px;">
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Evento</span><span style="font-weight:600">${_orc.tipo_evento}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Data</span><span style="font-weight:600">${_orc.data_evento.split("-").reverse().join("/")}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Convidados</span><span style="font-weight:600">${_orc.num_convidados}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Salão</span><span style="font-weight:600">${_orc.salao}</span></div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:2px solid var(--br);margin-bottom:6px"><span style="color:var(--dl)">Nome(s)</span><span style="font-weight:600">${nomes}</span></div>
+      <div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;padding:6px 0">Itens selecionados</div>
+      ${itemLines}
+      ${extrasLines}
+      ${subtotalLine}
+      ${discountLine}
+      <div style="display:flex;justify-content:space-between;padding:14px 0;margin-top:6px;">
+        <span style="font-size:16px;font-weight:700;color:var(--dk)">Total</span>
+        <span style="font-size:22px;font-weight:700;color:var(--a)">${fmt(_orc.valor_total)}</span>
+      </div>
     </div>
     <div style="background:#f5f6f7;border-radius:10px;padding:12px 16px;font-size:12px;color:var(--dl);margin-top:8px;">
       ⏱ Este orçamento tem validade até <strong>${valStr}</strong>. Após isso, os valores poderão ser reajustados.
