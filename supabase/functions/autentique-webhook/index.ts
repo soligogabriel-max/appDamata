@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     null;
 
   // Considera assinado quando o evento indica conclusão/assinatura
-  const assinado = /sign|assinad|finaliz|complete/.test(event) || !!pdfUrl;
+  const assinado = /sign|assinad|finaliz|finish|complete|conclu/.test(event) || !!pdfUrl;
 
   if (docId) {
     try {
