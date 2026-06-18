@@ -3019,7 +3019,7 @@ function _orcStep(){
   const body=document.getElementById("orc-wizard-body");
   if(_orc.step===1) body.innerHTML=_orcHTML1();
   else if(_orc.step===2) _orcLoadPacotes();
-  else if(_orc.step===3) _orcLoadExtras();
+  else if(_orc.step===3) _orcLoadItens();
   else if(_orc.step===4) body.innerHTML=_orcHTML4();
 }
 
@@ -3077,7 +3077,7 @@ async function _orcLoadPacotes(){
       if(tabelas.length){
         const ids=tabelas.map(t=>t.id).join(",");
         const [grupos,itens]=await Promise.all([
-          sbFetch("tabelas_preco_grupos?tabela_id=in.("+ids+")&select=id,tabela_id,nome,ordem&order=tabela_id.asc,ordem.asc,id.asc")||[],
+          sbFetch("tabelas_preco_grupos?tabela_id=in.("+ids+")&select=id,tabela_id,nome,desconto,ordem&order=tabela_id.asc,ordem.asc,id.asc")||[],
           sbFetch("tabelas_preco_itens?tabela_id=in.("+ids+")&select=id,tabela_id,grupo_id,descricao,valor_unitario&order=id.asc")||[]
         ]);
         _orc._pacotes=tabelas.map(t=>({
@@ -3097,12 +3097,20 @@ async function _orcLoadPacotes(){
 function _orcHTML2(){
   const pkgs=_orc._pacotes;
   if(!pkgs.length) return `<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Nenhum pacote cadastrado ainda.</div></div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button></div>`;
-  const tabs=pkgs.map((p,i)=>`<button id="orc-tab-${i}" onclick="_orcSelectTab(${i})" style="padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;transition:all .2s;background:${i===_orcTabIdx?'var(--a)':'transparent'};color:${i===_orcTabIdx?'#fff':'var(--dm)'};border:1.5px solid ${i===_orcTabIdx?'var(--a)':'var(--br)'}">${p.nome}</button>`).join("");
+  if(!_orc.pacote_cod) _orc.pacote_cod=String(pkgs[0].id);
+  const cards=pkgs.map(p=>{
+    const sel=String(p.id)===_orc.pacote_cod;
+    return `<div onclick="_orcSelPkg('${String(p.id)}','${p.nome.replace(/'/g,"&#39;")}')" style="padding:16px 20px;border-radius:12px;border:2px solid ${sel?'var(--a)':'var(--br)'};background:${sel?'rgba(139,90,43,.06)':'#fff'};cursor:pointer;transition:all .2s;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:20px;height:20px;border-radius:50%;border:2px solid ${sel?'var(--a)':'var(--br)'};background:${sel?'var(--a)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">${sel?'<div style="width:8px;height:8px;border-radius:50%;background:#fff"></div>':''}</div>
+        <span style="font-size:15px;font-weight:600;color:var(--dk)">${p.nome}</span>
+      </div>
+    </div>`;
+  }).join("");
   return `<div class="orc-card">
-    <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:4px;">Monte seu orçamento</div>
-    <div style="font-size:13px;color:var(--dl);margin-bottom:14px;">Salão: <strong>${_orc.salao}</strong> · ${_orc.num_convidados} convidados</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">${tabs}</div>
-    <div id="orc-items-wrap">${_orcPkgItemsHtml(pkgs[_orcTabIdx])}</div>
+    <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:4px;">Escolha o pacote</div>
+    <div style="font-size:13px;color:var(--dl);margin-bottom:18px;">Salão: <strong>${_orc.salao}</strong> · ${_orc.num_convidados} convidados</div>
+    ${cards}
     <div id="orc-err2" class="err" style="margin-top:10px"></div>
   </div>
   <div class="orc-nav">
@@ -3111,16 +3119,41 @@ function _orcHTML2(){
   </div>`;
 }
 
-function _orcPkgItemsHtml(pkg){
-  if(!pkg) return '';
-  let html='';
+function _orcSelPkg(cod,nome){
+  _orc.pacote_cod=cod;
+  _orc.pacote_nome=nome;
+  document.getElementById("orc-wizard-body").innerHTML=_orcHTML2();
+}
+
+function _orcNext2(){
+  if(!_orc.pacote_cod){const e=document.getElementById("orc-err2");if(e){e.style.display="block";e.textContent="Selecione um pacote.";}return;}
+  const pkg=_orc._pacotes.find(p=>String(p.id)===_orc.pacote_cod);
+  if(pkg) _orc.pacote_nome=pkg.nome;
+  _orc.step=3;_orcStep();
+}
+
+function _orcLoadItens(){
+  document.getElementById("orc-wizard-body").innerHTML=_orcHTML3();
+}
+
+function _orcHTML3(){
+  const pkg=_orc._pacotes.find(p=>String(p.id)===_orc.pacote_cod);
+  if(!pkg) return `<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Pacote não encontrado.</div></div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=2;_orcStep()">← Voltar</button></div>`;
   const grupos=pkg.grupos||[];
   const itens=pkg.itens||[];
-  const itemRow=i=>`<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--br);cursor:pointer;">
-    <input type="checkbox" id="orc-ck-${i.id}" data-vun="${i.valor_unitario||0}" onchange="_orcRecalc2()" style="width:16px;height:16px;accent-color:var(--a);flex-shrink:0">
-    <span style="flex:1;font-size:13px;color:var(--dk)">${i.descricao||''}</span>
-    <input type="number" id="orc-qt-${i.id}" value="1" min="1" style="width:48px;padding:4px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:center;background:var(--bg)" oninput="_orcRecalc2()">
-  </label>`;
+  const prevQty={};
+  const prevSel=new Set();
+  (_orc._selectedItems||[]).forEach(i=>{prevSel.add(i.id);prevQty[i.id]=i.qty;});
+  const itemRow=i=>{
+    const ck=prevSel.has(i.id)?'checked':'';
+    const qty=prevQty[i.id]||1;
+    return `<label style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--br);cursor:pointer;">
+      <input type="checkbox" id="orc-ck-${i.id}" data-vun="${i.valor_unitario||0}" ${ck} style="width:16px;height:16px;accent-color:var(--a);flex-shrink:0">
+      <span style="flex:1;font-size:13px;color:var(--dk)">${i.descricao||''}</span>
+      <input type="number" id="orc-qt-${i.id}" value="${qty}" min="1" style="width:48px;padding:4px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:center;background:var(--bg)">
+    </label>`;
+  };
+  let html='';
   grupos.forEach(g=>{
     const gItens=itens.filter(i=>i.grupo_id===g.id);
     if(!gItens.length) return;
@@ -3132,112 +3165,55 @@ function _orcPkgItemsHtml(pkg){
     if(grupos.length) html+=`<div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;padding:12px 0 4px">Itens avulsos</div>`;
     avulsos.forEach(i=>{html+=itemRow(i);});
   }
-  return html||`<div style="padding:20px;text-align:center;color:var(--dl)">Nenhum item neste pacote.</div>`;
+  return `<div class="orc-card">
+    <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:4px;">Selecione os itens</div>
+    <div style="font-size:13px;color:var(--dl);margin-bottom:18px;">Pacote: <strong>${pkg.nome}</strong></div>
+    ${html||`<div style="padding:20px;text-align:center;color:var(--dl)">Nenhum item cadastrado.</div>`}
+    <div id="orc-err3" class="err" style="margin-top:10px"></div>
+  </div>
+  <div class="orc-nav">
+    <button class="orc-btn-back" onclick="_orc.step=2;_orcStep()">← Voltar</button>
+    <button class="orc-btn-next" onclick="_orcNext3()">Ver resumo →</button>
+  </div>`;
 }
 
-function _orcSelectTab(idx){
-  _orcTabIdx=idx;
-  _orc._pacotes.forEach((_,i)=>{
-    const b=document.getElementById("orc-tab-"+i);
-    if(!b) return;
-    b.style.background=i===idx?'var(--a)':'transparent';
-    b.style.color=i===idx?'#fff':'var(--dm)';
-    b.style.borderColor=i===idx?'var(--a)':'var(--br)';
-  });
-  document.getElementById("orc-items-wrap").innerHTML=_orcPkgItemsHtml(_orc._pacotes[idx]);
-  _orcRecalc2();
-}
-
-function _orcRecalc2(){
-  let total=0;
-  document.querySelectorAll('[id^="orc-ck-"]').forEach(ck=>{
-    if(!ck.checked) return;
-    const id=ck.id.replace("orc-ck-","");
-    const qt=parseFloat(document.getElementById("orc-qt-"+id)?.value||1);
-    total+=parseFloat(ck.dataset.vun||0)*qt;
-  });
-  const el=document.getElementById("orc-total2");
-  if(el) el.textContent="R$ "+total.toLocaleString("pt-BR",{minimumFractionDigits:2});
-}
-
-function _orcNext2(){
+function _orcNext3(){
+  const pkg=_orc._pacotes.find(p=>String(p.id)===_orc.pacote_cod);
+  const e=document.getElementById("orc-err3");
+  if(!pkg){if(e){e.style.display="block";e.textContent="Pacote não encontrado.";}return;}
   const checked=Array.from(document.querySelectorAll('[id^="orc-ck-"]:checked'));
-  const e=document.getElementById("orc-err2");
-  if(!checked.length){e.style.display="block";e.textContent="Selecione ao menos um item para continuar.";return;}
-  // Coleta itens selecionados de todos os pacotes (tabs)
-  const selectedById={};
-  _orc._pacotes.forEach(p=>{
-    p.itens.forEach(i=>{
-      const ck=document.getElementById("orc-ck-"+i.id);
-      if(ck&&ck.checked){
-        const qt=parseFloat(document.getElementById("orc-qt-"+i.id)?.value||1);
-        selectedById[i.id]={...i,qty:qt,subtotal:(i.valor_unitario||0)*qt};
-      }
-    });
+  if(!checked.length){if(e){e.style.display="block";e.textContent="Selecione ao menos um item.";}return;}
+  const selectedItems=[];
+  let subtotal=0;
+  checked.forEach(ck=>{
+    const id=parseInt(ck.id.replace("orc-ck-",""));
+    const item=pkg.itens.find(i=>i.id===id);
+    if(!item) return;
+    const qty=parseFloat(document.getElementById("orc-qt-"+id)?.value||1);
+    const sub=(item.valor_unitario||0)*qty;
+    selectedItems.push({...item,qty,subtotal:sub});
+    subtotal+=sub;
   });
-  const selectedItems=Object.values(selectedById);
-  const subtotal=selectedItems.reduce((s,i)=>s+i.subtotal,0);
-  // Detecta melhor pacote coincidente
   const selectedIds=new Set(selectedItems.map(i=>i.id));
-  let bestPkg=null,bestDiscount=0;
-  _orc._pacotes.forEach(p=>{
-    if(!p.itens.length) return;
-    const allMatch=p.itens.every(i=>selectedIds.has(i.id));
+  let bestDiscount=0,bestGrupoNome=null;
+  (pkg.grupos||[]).forEach(g=>{
+    const gItens=pkg.itens.filter(i=>i.grupo_id===g.id);
+    if(!gItens.length) return;
+    const allMatch=gItens.every(i=>selectedIds.has(i.id));
     if(allMatch){
-      const disc=p.grupos.reduce((s,g)=>s+(g.desconto||0),0);
-      if(disc>bestDiscount){bestDiscount=disc;bestPkg=p;}
+      const disc=parseFloat(g.desconto||0);
+      if(disc>bestDiscount){bestDiscount=disc;bestGrupoNome=g.nome;}
     }
   });
   _orc._selectedItems=selectedItems;
   _orc._subtotal=subtotal;
   _orc._discount=bestDiscount;
-  _orc._discountPkg=bestPkg?bestPkg.nome:null;
-  _orc.pacote_cod=bestPkg?String(bestPkg.id):String(_orc._pacotes[_orcTabIdx].id);
-  _orc.pacote_nome=bestPkg?bestPkg.nome:_orc._pacotes[_orcTabIdx].nome;
+  _orc._discountPkg=bestGrupoNome;
+  _orc.pacote_nome=pkg.nome;
   _orc.pacote_valor=subtotal-bestDiscount;
+  _orc.valor_total=_orc.pacote_valor;
   _orc.pacote_itens_desc=selectedItems.map(i=>i.descricao+(i.qty>1?' × '+i.qty:'')).join(", ");
-  _orc.step=3; _orcStep();
-}
-
-async function _orcLoadExtras(){
-  const body=document.getElementById("orc-wizard-body");
-  body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Carregando itens…</div></div>`;
-  if(!_orc._invItems.length){
-    const items=await sbFetch("inventario?order=descricao.asc&select=cod,descricao")||[];
-    _orc._invItems=items;
-  }
-  body.innerHTML=_orcHTML3();
-}
-
-function _orcHTML3(){
-  const rows=_orc._invItems.map(it=>{
-    const qty=_orc.extras[it.cod]||0;
-    return `<div class="orc-extra-row">
-      <div style="flex:1;font-size:13px;font-weight:600;color:var(--dk)">${it.descricao}</div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <button onclick="_orcQty('${it.cod}',-1)" style="width:28px;height:28px;border:1px solid var(--br);border-radius:6px;background:#fff;font-size:16px;cursor:pointer;line-height:1">−</button>
-        <span id="orc-qty-${it.cod}" style="min-width:24px;text-align:center;font-weight:700">${qty}</span>
-        <button onclick="_orcQty('${it.cod}',1)" style="width:28px;height:28px;border:1px solid var(--br);border-radius:6px;background:#fff;font-size:16px;cursor:pointer;line-height:1">+</button>
-      </div>
-    </div>`;
-  }).join("");
-  return `<div class="orc-card">
-    <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:4px;">Itens adicionais</div>
-    <div style="font-size:13px;color:var(--dl);margin-bottom:18px;">Opcional — adicione itens além do pacote selecionado</div>
-    ${rows||`<div style="text-align:center;color:var(--dl);padding:20px">Nenhum item cadastrado.</div>`}
-  </div>
-  <div class="orc-nav">
-    <button class="orc-btn-back" onclick="_orc.step=2;_orcStep()">← Voltar</button>
-    <button class="orc-btn-next" onclick="_orc.step=4;_orcStep()">Ver resumo →</button>
-  </div>`;
-}
-
-function _orcQty(cod,delta){
-  const cur=_orc.extras[cod]||0;
-  const nv=Math.max(0,cur+delta);
-  if(nv===0) delete _orc.extras[cod]; else _orc.extras[cod]=nv;
-  const el=document.getElementById("orc-qty-"+cod);
-  if(el) el.textContent=nv;
+  _orc.step=4;_orcStep();
 }
 
 function _orcHTML4(){
