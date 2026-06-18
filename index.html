@@ -317,7 +317,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <div id="ll-dots"></div>
       </div>
     </div>
-    <div style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-i</div>
+    <div style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-j</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3566,17 +3566,30 @@ async function renderInventario() {
     const rows = busca ? _inventario.filter(r=>(r.descricao||"").toLowerCase().includes(busca)) : _inventario;
     if(!rows.length){ wr.innerHTML='<div class="empty"><div class="eicon">📦</div>Nenhum item encontrado.</div>'; return; }
     wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
-      <thead><tr><th>Código</th><th>Descrição</th><th>Qtd Máx</th><th>Valor Reposição</th><th>Obs</th><th></th></tr></thead>
+      <thead><tr><th>Código</th><th>Descrição</th><th>Qtd Máx</th><th>Valor Reposição</th><th style="text-align:center;">Orçamento</th><th>Obs</th><th></th></tr></thead>
       <tbody>${rows.map(r=>{const rj=_esc(JSON.stringify(r));return`<tr>
         <td style="font-weight:700;color:var(--dl);">${r.cod}</td>
         <td style="font-weight:600;">${r.descricao||"—"}</td>
         <td style="text-align:center;">${r.quantidade_max??"—"}</td>
         <td>${r.valor_reposicao!=null?fmt(r.valor_reposicao):"—"}</td>
+        <td style="text-align:center;"><input type="checkbox" ${r.exibir_orcamento?"checked":""} title="Exibir no orçamento" onchange='toggleInvOrcamento("${_esc(r.cod)}",this.checked,this)' style="width:17px;height:17px;accent-color:var(--a);cursor:pointer;"></td>
         <td style="color:var(--dl);font-size:11px;">${r.obs||""}</td>
         <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openCrud("inventario",JSON.parse(this.dataset.r),()=>{_inventario=null;renderInventario()})' data-r="${rj}">✏️</button></div></td>
       </tr>`}).join("")}</tbody>
     </table></div>`;
   } catch(e){ wr.innerHTML='<div class="empty"><div class="eicon">⚠️</div>Erro: '+e.message+'</div>'; }
+}
+async function toggleInvOrcamento(cod, val, el){
+  if(el) el.disabled=true;
+  try{
+    await sbFetch(`inventario?cod=eq.${encodeURIComponent(cod)}`,{method:"PATCH",body:{exibir_orcamento:val}});
+    const it=(_inventario||[]).find(x=>x.cod===cod);
+    if(it) it.exibir_orcamento=val;
+    if(typeof toast==="function") toast(val?"✓ Item exibido no orçamento":"Item removido do orçamento");
+  }catch(e){
+    if(el) el.checked=!val;
+    if(typeof toast==="function") toast("Erro ao salvar: "+(e.message||e));
+  }finally{ if(el) el.disabled=false; }
 }
 
 // ══════════════════════════════════════════
