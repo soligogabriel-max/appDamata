@@ -2940,6 +2940,10 @@ window.addEventListener("load", async()=>{
     showSc("login");
   }
   loadLandingCarousel();
+  // URL direta: fazendadamata.com/?orcamento
+  if(window.location.search.includes("orcamento") || window.location.hash==="#orcamento"){
+    setTimeout(()=>abrirOrcamento(), 800);
+  }
   setTimeout(()=>loading.classList.add("hide"),600);
   setTimeout(()=>loading.remove(),1100);
 });
