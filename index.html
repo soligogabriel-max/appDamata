@@ -3474,16 +3474,10 @@ function _orcAbrirPDF(){
 /* ── Landing Carousel ─────────────────────────────────────── */
 let _llTimer=null, _llIdx=0;
 async function loadLandingCarousel(){
-  const res=await sbFetch("app_config?chave=eq.fotos_landing&select=valor");
-  const urls=(res&&res[0]&&Array.isArray(res[0].valor))?res[0].valor.filter(u=>u):[];
+  const urls=['./landingpage1.jpg','./landingpage2.jpg','./landingpage3.jpg','./landingpage4.jpg'];
   const wrap=document.getElementById("ll-carousel-wrap");
   const dots=document.getElementById("ll-dots");
   const noPhoto=document.getElementById("ll-no-photo");
-  if(!urls.length){
-    // fallback: fotos locais
-    const fallback=['landingpage1.jpg','landingpage2.jpg','landingpage3.jpg','landingpage4.jpg'];
-    fallback.forEach((f,i)=>urls.push('./'+f));
-  }
   if(noPhoto) noPhoto.remove();
   wrap.innerHTML="";
   dots.innerHTML="";
