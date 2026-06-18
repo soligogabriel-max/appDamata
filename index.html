@@ -320,7 +320,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <div id="ll-dots"></div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-m</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-n</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3054,11 +3054,20 @@ function _orcMatchInv(pkgDesc){
     return invTokens.every(t=>pkgTokens.has(t));
   })||null;
 }
-function _orcItemInfo(desc){
-  const inv=_orcMatchInv(desc);
+// Inventory record for a price item, by cod_item (exact relation)
+function _orcInvOf(item){
+  if(!item) return null;
+  const cod=typeof item==="object"?item.cod_item:item;
+  if(cod==null) return null;
+  return (_orc._invByCod||{})[cod]||null;
+}
+function _orcItemInfo(item){
+  const inv=_orcInvOf(item);
   if(inv) return {k:inv.descricao, d:inv.descricao_orc||'', img:inv.imagem||null};
   return null;
 }
+// Display description: inventory is source of truth (by cod_item), fallback to stored descricao
+function _orcDesc(i){const inv=_orcInvOf(i);return inv?inv.descricao:(i.descricao||'');}
 
 // Grupos de seleção obrigatória
 const ORC_GROUP_FLAM=/casa flamboyant|loft flamboyant|suite flamboyant|su[i|í]te flamboyant/i;
@@ -3181,7 +3190,7 @@ async function _orcLoadPacotes(){
         const ids=tabelas.map(t=>t.id).join(",");
         const [grupos,itens]=await Promise.all([
           sbFetch("tabelas_preco_grupos?tabela_id=in.("+ids+")&select=id,tabela_id,nome,desconto,ordem&order=tabela_id.asc,ordem.asc,id.asc")||[],
-          sbFetch("tabelas_preco_itens?tabela_id=in.("+ids+")&select=id,tabela_id,grupo_id,descricao,valor_unitario&order=id.asc")||[]
+          sbFetch("tabelas_preco_itens?tabela_id=in.("+ids+")&select=id,tabela_id,grupo_id,cod_item,descricao,valor_unitario&order=id.asc")||[]
         ]);
         _orc._pacotes=tabelas.map(t=>({
           id:t.id,cod:String(t.id),nome:t.nome,
@@ -3193,6 +3202,8 @@ async function _orcLoadPacotes(){
     // Always reload inventario items for orçamento
     const invOrc=await sbFetch("inventario?exibir_orcamento=eq.true&select=cod,descricao,imagem,descricao_orc&order=descricao.asc")||[];
     _orc._invOrc=invOrc;
+    _orc._invByCod={};
+    invOrc.forEach(r=>{_orc._invByCod[r.cod]=r;});
   }catch(e){
     body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--er)">Erro ao carregar pacotes.</div><div style="font-size:11px;color:var(--dl);padding:8px 16px;word-break:break-all;">${e.message||e}</div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button><button class="orc-btn-next" onclick="_orcLoadPacotes()">Tentar novamente</button></div></div>`;
     return;
@@ -3227,36 +3238,38 @@ function _orcHTML2(){
   (_orc._selectedItems||[]).forEach(i=>{prevSel.add(i.id);prevQty[i.id]=i.qty;});
   const hasPrev=prevSel.size>0;
   const itemRow=(i,defaultCk)=>{
-    const info=_orcItemInfo(i.descricao||'');
+    const inv=_orcInvOf(i);
+    const info=inv?{k:inv.descricao,d:inv.descricao_orc||'',img:inv.imagem||null}:null;
+    const label=inv?inv.descricao:(i.descricao||'');
     const ck=(hasPrev?prevSel.has(i.id):defaultCk)?'checked':'';
     const qty=prevQty[i.id]||1;
     const imgUrl=info?.img?`./${info.img}`:null;
     return `<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--br);cursor:pointer;">
       <input type="checkbox" id="orc-ck-${i.id}" data-vun="${i.valor_unitario||0}" ${ck} style="width:16px;height:16px;accent-color:var(--a);flex-shrink:0;margin-top:3px" onchange="_orcGroupSync(${i.id},this.checked)">
       <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;color:var(--dk)">${i.descricao||''}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--dk)">${label}</div>
         ${info?.d?`<div style="font-size:11px;color:var(--dl);margin-top:2px;line-height:1.4">${info.d}</div>`:''}
       </div>
       ${imgUrl?`<div style="position:relative;flex-shrink:0;width:80px;height:60px;" class="orc-img-wrap"><img src="${imgUrl}" onerror="this.parentElement.style.display='none'" style="width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-in;transition:transform .2s;display:block;" onmouseenter="this.style.cssText='width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-out;display:block;position:absolute;width:240px;height:180px;z-index:99;box-shadow:0 8px 32px rgba(0,0,0,.3);border-radius:10px;top:0;right:0;'" onmouseleave="this.style.cssText='width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-in;display:block;'"></div>`:''}<input type="number" id="orc-qt-${i.id}" value="${qty}" min="1" style="width:44px;padding:4px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:center;background:var(--bg);flex-shrink:0;margin-top:3px">
     </label>`;
   };
-  // Store all items for group sync (only those enabled in inventario)
+  // Store all items for group sync (only those enabled in inventario, matched by cod_item)
   const _invEnabled=(_orc._invOrc||[]);
-  const _orcItemEnabled=(desc)=>!_invEnabled.length||!!_orcMatchInv(desc);
-  _orc._allGroupItems=allGrupos.flatMap(g=>(g.pkgItens||[]).filter(i=>i.grupo_id===g.id&&_orcItemEnabled(i.descricao||'')));
+  const _orcItemEnabled=(i)=>!_invEnabled.length||!!_orcInvOf(i);
+  _orc._allGroupItems=allGrupos.flatMap(g=>(g.pkgItens||[]).filter(i=>i.grupo_id===g.id&&_orcItemEnabled(i)));
   let itemsHtml='';
   allGrupos.forEach(g=>{
-    const gItens=(g.pkgItens||[]).filter(i=>i.grupo_id===g.id&&_orcItemEnabled(i.descricao||''));
+    const gItens=(g.pkgItens||[]).filter(i=>i.grupo_id===g.id&&_orcItemEnabled(i));
     if(!gItens.length) return;
     const isSelGrp=!hasPrev&&g.id===_orc.pacote_grupo_id;
     itemsHtml+=`<div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;padding:14px 0 4px">${g.nome}</div>`;
     gItens.forEach(i=>{itemsHtml+=itemRow(i,isSelGrp);});
   });
-  // Items without a group — aggregate from ALL price tables, dedup by description, filter by inventario flag
+  // Items without a group — aggregate from ALL price tables, dedup by cod_item, filter by inventario flag
   const seenAvulso=new Set();
   const avulsos=_orc._pacotes.flatMap(p=>(p.itens||[]).filter(i=>!i.grupo_id)).filter(i=>{
-    if(!_orcItemEnabled(i.descricao||'')) return false;
-    const key=_orcNorm(i.descricao||'');
+    if(!_orcItemEnabled(i)) return false;
+    const key=i.cod_item||_orcNorm(i.descricao||'');
     if(seenAvulso.has(key)) return false;
     seenAvulso.add(key);
     return true;
@@ -3335,7 +3348,7 @@ function _orcNext2(){
   _orc._discountPkg=bestGrupoNome;
   _orc.pacote_valor=subtotal-bestDiscount;
   _orc.valor_total=_orc.pacote_valor;
-  _orc.pacote_itens_desc=selectedItems.map(i=>i.descricao+(i.qty>1?' × '+i.qty:'')).join(", ");
+  _orc.pacote_itens_desc=selectedItems.map(i=>_orcDesc(i)+(i.qty>1?' × '+i.qty:'')).join(", ");
   _orc.step=3;_orcStep();
 }
 
@@ -3419,7 +3432,7 @@ function _orcNext3(){
   _orc._discountPkg=bestGrupoNome;
   _orc.pacote_valor=subtotal-bestDiscount;
   _orc.valor_total=_orc.pacote_valor;
-  _orc.pacote_itens_desc=selectedItems.map(i=>i.descricao+(i.qty>1?' × '+i.qty:'')).join(", ");
+  _orc.pacote_itens_desc=selectedItems.map(i=>_orcDesc(i)+(i.qty>1?' × '+i.qty:'')).join(", ");
   _orc.step=4;_orcStep();
 }
 
@@ -3432,7 +3445,7 @@ function _orcHTML4(){
   // Linhas de itens selecionados
   const itemLines=(_orc._selectedItems||[]).map(i=>`
     <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid var(--br)">
-      <span style="color:var(--dk)">${i.descricao}${i.qty>1?' × '+i.qty:''}</span>
+      <span style="color:var(--dk)">${_orcDesc(i)}${i.qty>1?' × '+i.qty:''}</span>
       <span style="color:var(--dm);white-space:nowrap;margin-left:12px">${fmt(i.subtotal)}</span>
     </div>`).join("");
   // Extras do inventário
@@ -3493,10 +3506,10 @@ function _orcAbrirPDF(){
   const fmt=v=>"R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:2});
   const nomes=[_orc.nome_noiva,_orc.nome_noivo].filter(Boolean).join(" e ")||_orc.nome_contratante;
   const validade=new Date(); validade.setDate(validade.getDate()+7);
-  const getDetalhe=desc=>{const d=_orcItemInfo(desc);return d?d.d:null;};
   const itemRows=(_orc._selectedItems||[]).map(i=>{
-    const det=getDetalhe(i.descricao);
-    return `<tr><td><div style="font-weight:600">${i.descricao}${i.qty>1?' × '+i.qty:''}</div>${det?`<div style="font-size:11px;color:#777;margin-top:3px">${det}</div>`:''}</td><td style="text-align:right;vertical-align:top;white-space:nowrap;padding-left:16px">${fmt(i.subtotal)}</td></tr>`;
+    const info=_orcItemInfo(i);
+    const det=info?info.d:null;
+    return `<tr><td><div style="font-weight:600">${_orcDesc(i)}${i.qty>1?' × '+i.qty:''}</div>${det?`<div style="font-size:11px;color:#777;margin-top:3px">${det}</div>`:''}</td><td style="text-align:right;vertical-align:top;white-space:nowrap;padding-left:16px">${fmt(i.subtotal)}</td></tr>`;
   }).join("");
   const subtotalRow=_orc._discount>0?`<tr style="color:#888"><td>Subtotal</td><td style="text-align:right">${fmt(_orc._subtotal)}</td></tr>`:"";
   const discRow=_orc._discount>0?`<tr style="color:#2a7a2a;font-weight:600"><td>Desconto — ${_orc._discountPkg}</td><td style="text-align:right">− ${fmt(_orc._discount)}</td></tr>`:"";
