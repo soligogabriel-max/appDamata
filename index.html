@@ -333,7 +333,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-aa</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.18-ab</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -461,6 +461,17 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   <!-- Step content -->
   <div style="flex:1;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;">
     <div id="orc-wizard-body" style="width:100%;max-width:620px;"></div>
+  </div>
+</div>
+
+<!-- COMPLETAR CONTRATO (cliente) -->
+<div id="sc-completar" class="screen" style="background:#f5f4f0;flex-direction:column;align-items:stretch;min-height:100vh;">
+  <div style="background:var(--a);padding:14px 24px;display:flex;align-items:center;gap:12px;">
+    <svg width="36" height="36" style="filter:brightness(0) invert(1)"><use href="#logo-sym-lt"/></svg>
+    <div style="color:#fff;font-weight:700;letter-spacing:3px;font-size:14px">DAMATA</div>
+  </div>
+  <div style="flex:1;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;">
+    <div id="cc-body" style="width:100%;max-width:560px;"></div>
   </div>
 </div>
 
@@ -3007,6 +3018,9 @@ window.addEventListener("load", async()=>{
   if(window.location.search.includes("orcamento") || window.location.hash==="#orcamento"){
     setTimeout(()=>abrirOrcamento(), 800);
   }
+  // URL direta: fazendadamata.com/?contrato=CODIGO  (cliente completa os dados)
+  const _qsContrato=new URLSearchParams(window.location.search).get("contrato");
+  if(_qsContrato){ setTimeout(()=>abrirCompletarContrato(_qsContrato), 600); }
   setTimeout(()=>loading.classList.add("hide"),600);
   setTimeout(()=>loading.remove(),1100);
 });
@@ -3083,6 +3097,64 @@ async function efetivarOrcamento(id){
     setTimeout(send,300);
   }
   toast&&toast("Orçamento efetivado — revise e salve o contrato.");
+}
+
+/* ── Completar Contrato (cliente, público) ────────────────── */
+let _ccEvt=null;
+async function abrirCompletarContrato(cod){
+  showSc("completar");
+  const body=document.getElementById("cc-body");
+  body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:24px;color:var(--dl)">Carregando contrato…</div></div>`;
+  try{
+    const rows=await sbFetch(`agenda?cod=eq.${encodeURIComponent(cod)}&select=cod,nome_evento,tipo_evento,data_evento,valor_locacao,cliente_json,assinatura_status`);
+    const ev=rows&&rows[0];
+    if(!ev){ body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:30px;color:var(--er)">Contrato não encontrado. Confira o link.</div></div>`; return; }
+    _ccEvt=ev;
+    _ccRenderForm(ev);
+  }catch(e){
+    body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:30px;color:var(--er)">Erro ao carregar o contrato.</div></div>`;
+  }
+}
+function _ccRenderForm(ev){
+  const c=ev.cliente_json||{};
+  document.getElementById("cc-body").innerHTML=`<div class="orc-card">
+    <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:6px;">Complete seus dados</div>
+    <div style="font-size:13px;color:var(--dl);margin-bottom:18px;">Contrato <strong>${ev.cod}</strong> — ${_esc(ev.nome_evento||ev.tipo_evento||'')}${ev.data_evento?(' · '+ev.data_evento.split('-').reverse().join('/')):''}</div>
+    <label class="lbl">Nome completo *</label><input id="cc-nome" class="inp" value="${_esc(c.nome||'')}"/>
+    <label class="lbl">CPF *</label><input id="cc-cpf" class="inp" value="${_esc(c.cpf||'')}" placeholder="000.000.000-00"/>
+    <label class="lbl">RG</label><input id="cc-rg" class="inp" value="${_esc(c.rg||'')}"/>
+    <label class="lbl">Endereço completo *</label><input id="cc-end" class="inp" value="${_esc(c.endereco||'')}" placeholder="Rua, nº, bairro, cidade/UF, CEP"/>
+    <label class="lbl">WhatsApp *</label><input id="cc-wpp" class="inp" value="${_esc(c.whatsapp||'')}" placeholder="(34) 99999-9999"/>
+    <label class="lbl">E-mail</label><input id="cc-email" class="inp" value="${_esc(c.email||'')}"/>
+    <div id="cc-err" class="err"></div>
+    <button class="orc-btn-next" style="width:100%;margin-top:8px" id="cc-btn" onclick="_ccSalvar()">Enviar e assinar por WhatsApp</button>
+    <div style="font-size:11px;color:var(--dl);margin-top:10px;text-align:center">Ao enviar, você receberá o contrato para assinatura no WhatsApp informado.</div>
+  </div>`;
+}
+async function _ccSalvar(){
+  const c={
+    nome:document.getElementById("cc-nome").value.trim(),
+    cpf:document.getElementById("cc-cpf").value.trim(),
+    rg:document.getElementById("cc-rg").value.trim(),
+    endereco:document.getElementById("cc-end").value.trim(),
+    whatsapp:document.getElementById("cc-wpp").value.trim(),
+    email:document.getElementById("cc-email").value.trim()
+  };
+  const err=document.getElementById("cc-err");
+  if(!c.nome||!c.cpf||!c.endereco||!c.whatsapp){err.style.display="block";err.textContent="Preencha os campos obrigatórios (*)";return;}
+  const btn=document.getElementById("cc-btn"); btn.disabled=true; btn.textContent="Enviando…";
+  try{
+    await sbFetch(`agenda?cod=eq.${encodeURIComponent(_ccEvt.cod)}`,{method:"PATCH",body:{cliente_json:c,assinatura_status:"dados_preenchidos"}});
+    // Fase B: aqui a Edge Function enviará o contrato ao Autentique p/ assinatura por WhatsApp
+    document.getElementById("cc-body").innerHTML=`<div class="orc-card" style="text-align:center;padding:40px 24px;">
+      <div style="font-size:48px;margin-bottom:16px">✅</div>
+      <div style="font-family:'DM Serif Display',serif;font-size:22px;color:var(--dk);margin-bottom:12px">Dados recebidos!</div>
+      <div style="font-size:14px;color:var(--dm);line-height:1.6">Em instantes você receberá o contrato para assinatura no WhatsApp <strong>${_esc(c.whatsapp)}</strong>.</div>
+    </div>`;
+  }catch(e){
+    err.style.display="block"; err.textContent="Erro ao enviar. Tente novamente.";
+    btn.disabled=false; btn.textContent="Enviar e assinar por WhatsApp";
+  }
 }
 
 /* ── Orçamento Wizard ─────────────────────────────────────── */
