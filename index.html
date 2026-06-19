@@ -595,6 +595,9 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <div class="sec-t" style="margin-bottom:0;">📄 Contratos</div>
           <button onclick="setTab('contratos');document.getElementById('contratos-gerador').style.display='block';document.getElementById('contratos-gerador').scrollIntoView({behavior:'smooth'})" style="background:var(--a);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;">+ Novo contrato</button>
         </div>
+        <div style="margin-bottom:12px;">
+          <input id="contratos-filtro" type="text" placeholder="Buscar por código, nome ou data…" oninput="filtrarContratos()" style="width:100%;max-width:400px;padding:8px 14px;border:1px solid var(--br);border-radius:8px;background:var(--s1);color:var(--dt);font-size:13px;outline:none;box-sizing:border-box;">
+        </div>
         <div id="contratos-list" style="overflow-x:auto;">
           <div style="color:var(--dl);padding:20px;text-align:center;font-size:13px;">Carregando…</div>
         </div>
@@ -4098,28 +4101,49 @@ function contratoStatusBadge(st) {
   return `<span style="background:${s.bg};color:${s.color};padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap;">${s.label}</span>`;
 }
 
+let _contratosRows = [];
+
+function _renderContratosTabela(rows) {
+  const el = document.getElementById("contratos-list");
+  if (!el) return;
+  if (!rows.length) { el.innerHTML = `<div style="color:var(--dl);padding:20px;text-align:center;font-size:13px;">Nenhum contrato encontrado.</div>`; return; }
+  const fmt = d => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : "—";
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="background:var(--s2);color:var(--dl);">
+      <th style="padding:8px 12px;text-align:left;font-weight:600;">Código</th>
+      <th style="padding:8px 12px;text-align:left;font-weight:600;">Evento</th>
+      <th style="padding:8px 12px;text-align:left;font-weight:600;">Data</th>
+      <th style="padding:8px 12px;text-align:left;font-weight:600;">Status do Contrato</th>
+    </tr></thead>
+    <tbody>${rows.map((r,i)=>`
+      <tr style="background:${i%2===0?'var(--s1)':'var(--s2)'};border-bottom:1px solid var(--br);">
+        <td style="padding:8px 12px;font-weight:700;color:var(--a);">${r.cod||"—"}</td>
+        <td style="padding:8px 12px;">${r.nome_evento||"—"}</td>
+        <td style="padding:8px 12px;white-space:nowrap;">${fmt(r.data_evento)}</td>
+        <td style="padding:8px 12px;">${contratoStatusBadge(r.contrato_ok ? "assinado" : (r.assinatura_status||null))}</td>
+      </tr>`).join("")}
+    </tbody></table>`;
+}
+
+function filtrarContratos() {
+  const q = (document.getElementById("contratos-filtro")?.value || "").toLowerCase().trim();
+  if (!q) { _renderContratosTabela(_contratosRows); return; }
+  const filtrado = _contratosRows.filter(r =>
+    (r.cod||"").toLowerCase().includes(q) ||
+    (r.nome_evento||"").toLowerCase().includes(q) ||
+    (r.data_evento||"").includes(q)
+  );
+  _renderContratosTabela(filtrado);
+}
+
 async function renderContratos() {
   const el = document.getElementById("contratos-list");
   if (!el) return;
+  el.innerHTML = `<div style="color:var(--dl);padding:20px;text-align:center;font-size:13px;">Carregando…</div>`;
   try {
-    const rows = await dbGet("agenda", "select=cod,nome_evento,data_evento,assinatura_status,assinatura_doc_id,contrato_ok&order=data_evento.desc.nullslast&limit=200");
-    if (!rows.length) { el.innerHTML = `<div style="color:var(--dl);padding:20px;text-align:center;font-size:13px;">Nenhum contrato encontrado.</div>`; return; }
-    const fmt = d => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : "—";
-    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
-      <thead><tr style="background:var(--s2);color:var(--dl);">
-        <th style="padding:8px 12px;text-align:left;font-weight:600;">Código</th>
-        <th style="padding:8px 12px;text-align:left;font-weight:600;">Evento</th>
-        <th style="padding:8px 12px;text-align:left;font-weight:600;">Data</th>
-        <th style="padding:8px 12px;text-align:left;font-weight:600;">Status do Contrato</th>
-      </tr></thead>
-      <tbody>${rows.map((r,i)=>`
-        <tr style="background:${i%2===0?'var(--s1)':'var(--s2)'};border-bottom:1px solid var(--br);">
-          <td style="padding:8px 12px;font-weight:700;color:var(--a);">${r.cod||"—"}</td>
-          <td style="padding:8px 12px;">${r.nome_evento||"—"}</td>
-          <td style="padding:8px 12px;white-space:nowrap;">${fmt(r.data_evento)}</td>
-          <td style="padding:8px 12px;">${contratoStatusBadge(r.contrato_ok ? "assinado" : (r.assinatura_status||null))}</td>
-        </tr>`).join("")}
-      </tbody></table>`;
+    _contratosRows = await dbGet("agenda", "select=cod,nome_evento,data_evento,assinatura_status,contrato_ok&order=cod.desc&limit=200");
+    const q = (document.getElementById("contratos-filtro")?.value || "").trim();
+    if (q) filtrarContratos(); else _renderContratosTabela(_contratosRows);
   } catch(e) {
     el.innerHTML = `<div style="color:var(--er);padding:20px;font-size:13px;">Erro ao carregar contratos.</div>`;
   }
