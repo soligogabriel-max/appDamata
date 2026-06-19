@@ -53,8 +53,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9}
       <div class="ir"><span class="ik">Período</span><span class="iv" id="s-period">—</span></div>
       <div class="ir"><span class="ik">Check-in / Check-out</span><span class="iv" id="s-times">—</span></div>
       <div class="ir"><span class="ik">Valor Total</span><span class="iv" id="s-total">—</span></div>
-      <div id="s-espacos-row" class="ir" style="display:none"><span class="ik">Espaços</span><span class="iv" id="s-espacos">—</span></div>
       <div id="s-acomod-row" class="ir" style="display:none"><span class="ik">Acomodações</span><span class="iv" id="s-acomod">—</span></div>
+      <div id="s-payments-wrap" style="display:none;margin-top:4px;">
+        <div class="ir"><span class="ik" style="font-weight:700;">Parcelas</span></div>
+        <table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:4px;">
+          <thead><tr style="background:#f1f5f9;"><th style="text-align:left;padding:4px 6px;">#</th><th style="text-align:left;padding:4px 6px;">Descrição</th><th style="text-align:left;padding:4px 6px;">Vencimento</th><th style="text-align:right;padding:4px 6px;">Valor</th></tr></thead>
+          <tbody id="s-payments-body"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -130,16 +136,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9}
       <tr><td style="font-weight:700;">Check-in / Check-out:</td><td id="c-times"></td></tr>
     </table>
 
-    <p class="cp"><strong>3. Dos Espaços Locados:</strong></p>
-    <table class="tb">
-      <tr><th>SIM</th><th>NÃO</th><th>Espaço</th></tr>
-      <tr><td id="esp-tumb-s" style="text-align:center;"></td><td id="esp-tumb-n" style="text-align:center;"></td><td><strong>SALÃO TUMBÚRGIA:</strong> Capacidade para até 600 pessoas acomodadas em mesas ou 1.200 em eventos informais; área coberta com 1.000m², ambiente climatizado com 3 unidades de climatizados evaporativo de 20.000m³/hora; parte do salão com estrutura metálica cristal; área reservada para buffet, banheiro e vestuário de serviço, um banheiro social feminino, um banheiro social masculino; infraestrutura de iluminação base e estacionamento para até 500 carros.</td></tr>
-      <tr><td id="esp-peroba-s" style="text-align:center;"></td><td id="esp-peroba-n" style="text-align:center;"></td><td><strong>PEROBA ROSA (coberto ou ao ar livre):</strong> Permite o uso do gramado entre o lago e a mata para cerimônias ao ar livre ou o cerimonial coberto, com capacidade para até 400 pessoas, com porta fixa de peroba rosa maciça.</td></tr>
-      <tr><td id="esp-brom-s" style="text-align:center;"></td><td id="esp-brom-n" style="text-align:center;"></td><td><strong>SALÃO BROMÉLIAS:</strong> Capacidade para até 180 pessoas, área coberta com 300m², área reservada para buffet, banheiro social feminino, banheiro social masculino; iluminação base com pontos de LED e estacionamento para 500 carros.</td></tr>
-      <tr><td id="esp-pisc-s" style="text-align:center;"></td><td id="esp-pisc-n" style="text-align:center;"></td><td><strong>PISCINA:</strong> raia de 25m² com bar e banheiro anexos.</td></tr>
-    </table>
-
-    <p class="cp"><strong>4. Das Acomodações:</strong></p>
+    <p class="cp"><strong>3. Das Acomodações:</strong></p>
     <table class="tb">
       <tr><th>SIM</th><th>NÃO</th><th>Acomodação</th></tr>
       <tr><td id="ac-loft-s" style="text-align:center;"></td><td id="ac-loft-n" style="text-align:center;"></td><td><strong>LOFT FLAMBOYANT:</strong> loft com cama king, banheiro, frigobar, ar-condicionado, e enxoval de cama e banho.</td></tr>
@@ -228,8 +225,6 @@ var ASSINAR_KEY=SB_ANON_KEY;
 function g(id){return document.getElementById(id);}
 function tx(id,v){var el=g(id);if(el)el.textContent=v||"";}
 
-var ESPACOS_KEYS=["tumburgia","perobaRosa","bromelias","piscina"];
-var ESPACOS_IDS =["tumb","peroba","brom","pisc"];
 var ACOMOD_KEYS=["loftFlamboyant","casaFlamboyant","sf1","sf2","sf3","sf4","sf5","sb1","sb2","sb3"];
 var ACOMOD_IDS =["loft","casa","sf1","sf2","sf3","sf4","sf5","sb1","sb2","sb3"];
 
@@ -271,14 +266,6 @@ function renderContract(){
   var hoje=new Date();
   var MESES_EXT=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
   tx("c-date-ext",hoje.getDate()+" de "+MESES_EXT[hoje.getMonth()]+" de "+hoje.getFullYear());
-
-  // Espaços
-  var esp=p.espacos||{};
-  ESPACOS_KEYS.forEach(function(k,i){
-    var v=!!esp[k];
-    tx("esp-"+ESPACOS_IDS[i]+"-s",v?"✔":"");
-    tx("esp-"+ESPACOS_IDS[i]+"-n",v?"":"✔");
-  });
 
   // Acomodações
   var ac=p.acomodacoes||{};
@@ -421,17 +408,23 @@ async function assinarWhatsApp(){
     var tot=p.total?parseFloat(p.total).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"—";
     tx("s-total",tot);
 
-    var espNames=[];
-    var ESP_LABELS={tumburgia:"Salão Tumbúrgia",perobaRosa:"Peroba Rosa",bromelias:"Salão Bromélias",piscina:"Piscina"};
-    if(p.espacos) Object.keys(p.espacos).forEach(function(k){if(p.espacos[k])espNames.push(ESP_LABELS[k]||k);});
-    if(espNames.length){tx("s-espacos",espNames.join(", "));g("s-espacos-row").style.display="flex";}
-
     var acNames=[];
     var AC_LABELS={loftFlamboyant:"Loft Flamboyant",casaFlamboyant:"Casa Flamboyant",sf1:"Suíte F1",sf2:"Suíte F2",sf3:"Suíte F3",sf4:"Suíte F4",sf5:"Suíte F5",sb1:"Suíte B1",sb2:"Suíte B2",sb3:"Suíte B3"};
     if(p.acomodacoes) Object.keys(p.acomodacoes).forEach(function(k){if(p.acomodacoes[k])acNames.push(AC_LABELS[k]||k);});
     if(acNames.length){tx("s-acomod",acNames.join(", "));g("s-acomod-row").style.display="flex";}
 
     if(p.nomeLocatario){var fn=g("f-name");if(fn)fn.value=p.nomeLocatario;}
+
+    // Parcelas
+    if(p.payments && p.payments.length){
+      var fd2=function(d){if(!d)return"";var pt=d.split("-");return pt.length<3?d:pt[2]+"/"+pt[1]+"/"+pt[0];};
+      var rows=p.payments.map(function(pay,i){
+        var val=pay.value?parseFloat(pay.value).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"—";
+        return "<tr style='border-bottom:1px solid #e2e8f0'><td style='padding:4px 6px'>"+(i+1)+"</td><td style='padding:4px 6px'>"+(pay.desc||("Parcela "+(i+1)))+"</td><td style='padding:4px 6px'>"+fd2(pay.date)+"</td><td style='padding:4px 6px;text-align:right'>"+val+"</td></tr>";
+      }).join("");
+      var pb=g("s-payments-body"); if(pb) pb.innerHTML=rows;
+      var pw=g("s-payments-wrap"); if(pw) pw.style.display="block";
+    }
   }
 })();
 </script>
