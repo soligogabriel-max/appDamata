@@ -1337,26 +1337,48 @@ function _applyNavForRole(role){
   } else if(role==="equipe"){
     adminGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     document.getElementById("t-pedidos-eq").style.display="";
+  } else if(role==="fornecedor"){
+    document.getElementById("tnav").style.display="none";
+    document.getElementById("t-pedidos-eq").style.display="none";
   }
 }
 
-function openSimModal(){
+async function openSimModal(){
   if(!isAdmin(getCU())) return;
   var r=prompt("Simular perfil:\n1 = Equipe\n2 = Fornecedor\n(ESC para cancelar)","1");
   if(r===null) return;
   var map={"1":"equipe","equipe":"equipe","2":"fornecedor","fornecedor":"fornecedor"};
   var picked=map[r.trim().toLowerCase()];
   if(!picked){alert("Perfil inválido.");return;}
+
+  var simEventIds=null;
+  if(picked==="fornecedor"){
+    try{
+      var fornList=await dbGet("app_users","role=eq.fornecedor&status=eq.approved&select=id,name,event_ids&order=name.asc&limit=200");
+      if(!fornList.length){alert("Nenhum fornecedor cadastrado.");return;}
+      var opts=fornList.map(function(u,i){return (i+1)+") "+u.name;}).join("\n");
+      var idx=prompt("Escolha o fornecedor para simular:\n"+opts,"1");
+      if(!idx)return;
+      var chosen=fornList[parseInt(idx)-1];
+      if(!chosen){alert("Opção inválida.");return;}
+      simEventIds=chosen.event_ids||[];
+      picked="fornecedor:"+chosen.name;
+    }catch(e){alert("Erro ao buscar fornecedores: "+e.message);return;}
+  }
+
   _simRole=picked;
   document.getElementById("sim-banner").style.display="";
-  document.getElementById("sim-banner-role").textContent=RL[picked]||picked;
+  document.getElementById("sim-banner-role").textContent=picked.startsWith("fornecedor:")?picked.split(":")[1]:(RL[picked]||picked);
   document.getElementById("tnav").style.display="flex";
   document.getElementById("btn-new-ev").style.display="none";
-  _applyNavForRole(picked);
-  // oculta botões admin no modal de evento
+  _applyNavForRole(picked.split(":")[0]);
   var adminBtns=document.getElementById("evd-admin-btns");
   if(adminBtns) adminBtns.style.display="none";
-  setTab("agenda");
+  if(picked.startsWith("fornecedor")){
+    renderCal(simEventIds);
+  } else {
+    setTab("agenda");
+  }
 }
 
 function exitSim(){
