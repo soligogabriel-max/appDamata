@@ -82,6 +82,7 @@ Deno.serve(async (req) => {
         email: signerEmail || null,
         action: "SIGN",
         delivery_method: "DELIVERY_METHOD_WHATSAPP",
+        auth: { selfie: true },
       },
       ...(witnessName && witnessPhone
         ? [{
@@ -90,6 +91,7 @@ Deno.serve(async (req) => {
             email: witnessEmail || null,
             action: "SIGN",
             delivery_method: "DELIVERY_METHOD_WHATSAPP",
+            auth: { selfie: true },
           }]
         : []),
       ...FAZENDA_SIGNERS,
