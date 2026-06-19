@@ -69,8 +69,8 @@ Deno.serve(async (req) => {
 
   // Signatários fixos da fazenda (assinam todo contrato, por WhatsApp)
   const FAZENDA_SIGNERS = [
-    { name: "Vitoria Bedutti Rodrigues", phone: "+5519994086658", email: "vbedutti@gmail.com", action: "SIGN", delivery_method: "DELIVERY_METHOD_WHATSAPP" },
-    { name: "Gabriel Jose Soligo", phone: "+5519991677827", email: "soligogabriel@gmail.com", action: "SIGN", delivery_method: "DELIVERY_METHOD_WHATSAPP" },
+    { name: "Vitoria Bedutti Rodrigues", phone: "+5519994086658", action: "SIGN", delivery_method: "DELIVERY_METHOD_WHATSAPP" },
+    { name: "Gabriel Jose Soligo", phone: "+5519991677827", action: "SIGN", delivery_method: "DELIVERY_METHOD_WHATSAPP" },
   ];
 
   const variables = {
@@ -79,7 +79,6 @@ Deno.serve(async (req) => {
       {
         name: signerName,
         phone: normalizePhone(signerPhone),
-        email: signerEmail || null,
         action: "SIGN",
         delivery_method: "DELIVERY_METHOD_WHATSAPP",
         auth: { selfie: true },
@@ -88,7 +87,6 @@ Deno.serve(async (req) => {
         ? [{
             name: witnessName,
             phone: normalizePhone(witnessPhone),
-            email: witnessEmail || null,
             action: "SIGN",
             delivery_method: "DELIVERY_METHOD_WHATSAPP",
             auth: { selfie: true },
