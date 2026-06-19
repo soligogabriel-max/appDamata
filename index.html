@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8"/>
@@ -333,7 +333,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.19f</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.19g</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -2813,7 +2813,7 @@ async function _matchEntradas(entradas){
   });
 }
 
-function _normalize(s){return(s||"").toLowerCase().normalize("NFD").replace(/[Ì€-Í¯]/g,"").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();}
+function _normalize(s){return(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();}
 
 function _suggestFornecedor(titulo,list){
   const t=_normalize(titulo);
@@ -3339,7 +3339,7 @@ const ORC_ITEM_INFO=[
   {k:'DiÃ¡ria Montagem',       d:'DiÃ¡ria para montagem ou desmontagem Â· dia anterior ou posterior ao evento',                          img:null},
   {k:'Staff Adicional',       d:'Staff adicional alÃ©m dos inclusos no pacote Â· por diÃ¡ria',                                           img:null},
 ];
-function _orcNorm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[Ì€-Í¯]/g,'');}
+function _orcNorm(s){return(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');}
 // Token-based matching between inventory description and price-table item description
 const _ORC_STOP=new Set(['de','da','do','com','e','o','a','os','as','em','para','no','na','pe','pes','x','diaria','diarias','inclusa','inclusas','adicional','alem','pacote']);
 function _orcCoreTokens(s){
