@@ -1003,6 +1003,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div class="ropt" onclick="_euPickRole('equipe',this)"><span class="ropt-i">👥</span><div><div class="ropt-l">Equipe</div><div class="ropt-d">Acessa a agenda completa</div></div></div>
     <div class="ropt" onclick="_euPickRole('fornecedor',this)"><span class="ropt-i">🤝</span><div><div class="ropt-l">Fornecedor</div><div class="ropt-d">Vê apenas eventos vinculados</div></div></div>
     <div class="ropt" onclick="_euPickRole('cliente',this)"><span class="ropt-i">💍</span><div><div class="ropt-l">Cliente</div><div class="ropt-d">Vê apenas o próprio evento</div></div></div>
+    <div class="ropt" onclick="_euPickRole('admin',this)"><span class="ropt-i">🔑</span><div><div class="ropt-l">Admin</div><div class="ropt-d">Acesso completo ao sistema</div></div></div>
     <div class="eswrap" id="eu-eswrap" style="display:none;">
       <span class="eslbl" id="eu-eslbl">Vincular ao evento</span>
       <div class="esl" id="eu-esl"></div>
@@ -1012,6 +1013,17 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <select id="eu-assessoria" class="inp" style="margin-top:6px;margin-bottom:0;">
         <option value="">— Nenhuma —</option>
       </select>
+    </div>
+    <div style="border-top:1px solid var(--br);margin-top:14px;padding-top:14px;">
+      <label class="lbl">Senha atual</label>
+      <div style="display:flex;gap:8px;margin-top:6px;align-items:center;">
+        <input type="text" id="eu-senha-atual" class="inp" style="margin-bottom:0;flex:1;font-family:monospace;" readonly>
+        <button onclick="document.getElementById('eu-senha-wrap').style.display='block'" style="white-space:nowrap;padding:8px 14px;border:1px solid var(--br);border-radius:8px;background:var(--al);font-size:12px;cursor:pointer;">Alterar</button>
+      </div>
+      <div id="eu-senha-wrap" style="display:none;margin-top:10px;">
+        <label class="lbl">Nova senha</label>
+        <input type="text" id="eu-nova-senha" class="inp" style="margin-top:6px;" placeholder="Digite a nova senha">
+      </div>
     </div>
     <div class="macts">
       <button class="btn-cancel" onclick="closeEditUser()">Cancelar</button>
@@ -4190,7 +4202,7 @@ async function renderFuturos() {
           <div style="display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap;">
             <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${st.bg};color:${st.color};">${st.label}</span>
             ${duracao}
-            ${ev.valor_locacao?`<span style="font-size:11px;font-weight:700;color:var(--ok);">${fmt(ev.valor_locacao)}</span>`:""}
+            ${ev.valor_locacao&&isAdmin(getCU())?`<span style="font-size:11px;font-weight:700;color:var(--ok);">${fmt(ev.valor_locacao)}</span>`:""}
           </div>
           ${ev.responsavel?`<div style="font-size:11px;color:var(--dl);margin-top:2px;">${ev.responsavel}</div>`:""}
           ${(()=>{const l=ev.local_evento?`📍 ${ev.local_evento}`:"";const a=ev.assessoria_cod?`🎗 ${_futAssMap[ev.assessoria_cod]||ev.assessoria_cod}`:"";const x=[l,a].filter(Boolean).join(" · ");return x?`<div style="font-size:10px;color:var(--dl);margin-top:2px;">${x}</div>`:""})()}
@@ -4248,10 +4260,11 @@ async function renderAgendaTabela(){
 
   if(!rows.length){ wr.innerHTML='<div class="empty"><div class="eicon">📅</div>Nenhum evento encontrado.</div>'; return; }
 
+  const _showValor = isAdmin(getCU());
   wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
     <thead><tr>
       <th>Cód.</th><th>Evento</th><th>Tipo</th><th>Data Início</th><th>Data Fim</th>
-      <th>Check-in</th><th>Check-out</th><th>Valor Locação</th><th>Responsável</th><th>Obs</th>
+      <th>Check-in</th><th>Check-out</th>${_showValor?`<th>Valor Locação</th>`:""}<th>Responsável</th><th>Obs</th>
     </tr></thead>
     <tbody>${rows.map(r=>{
       const st=getEvStyle(r);
@@ -4263,7 +4276,7 @@ async function renderAgendaTabela(){
         <td style="white-space:nowrap;">${r.data_fim&&r.data_fim!==r.data_evento?fmtDate(r.data_fim):"—"}</td>
         <td style="white-space:nowrap;">${fmtDate(r.cin)}</td>
         <td style="white-space:nowrap;">${fmtDate(r.cout)}</td>
-        <td style="font-weight:700;color:#1A4A7C;">${r.valor_locacao?fmt(r.valor_locacao):"—"}</td>
+        ${_showValor?`<td style="font-weight:700;color:#1A4A7C;">${r.valor_locacao?fmt(r.valor_locacao):"—"}</td>`:""}
         <td style="color:var(--dm);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.responsavel||"—"}</td>
         <td style="color:var(--dl);font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.obs||""}</td>
       </tr>`;
@@ -4757,6 +4770,7 @@ function _euPickRole(role, el) {
   _euRole=role;
   document.querySelectorAll("#m-edit-user .ropt").forEach(r=>r.classList.remove("sel"));
   el.classList.add("sel");
+  if(role==="admin"||role==="equipe") { document.getElementById("eu-eswrap").style.display="none"; _euEvIds=[]; return; }
   const wrap=document.getElementById("eu-eswrap");
   const lbl=document.getElementById("eu-eslbl");
   if(role==="cliente"||role==="fornecedor"){
@@ -4781,9 +4795,12 @@ async function openEditUser(u) {
   _euId=u.id; _euRole=u.role; _euEvIds=[...(u.event_ids||[])];
   document.getElementById("eu-sub").textContent="Editando: "+u.name;
   document.querySelectorAll("#m-edit-user .ropt").forEach(r=>r.classList.remove("sel"));
-  const roleIdx={equipe:0,fornecedor:1,cliente:2};
+  const roleIdx={equipe:0,fornecedor:1,cliente:2,admin:3};
   const ropts=document.querySelectorAll("#m-edit-user .ropt");
-  if(ropts[roleIdx[u.role]]) ropts[roleIdx[u.role]].classList.add("sel");
+  if(ropts[roleIdx[u.role]] !== undefined) ropts[roleIdx[u.role]].classList.add("sel");
+  document.getElementById("eu-senha-atual").value = u.password || "";
+  document.getElementById("eu-nova-senha").value = "";
+  document.getElementById("eu-senha-wrap").style.display = "none";
   const wrap=document.getElementById("eu-eswrap");
   if(u.role==="cliente"||u.role==="fornecedor"){
     wrap.style.display="block";
@@ -4820,7 +4837,10 @@ async function saveEditUser() {
   const btn=document.getElementById("eu-btn-save");
   btn.disabled=true; btn.textContent="Salvando...";
   try {
-    await dbUpdate("app_users","id=eq."+_euId,{role:_euRole,event_ids:_euEvIds,assessoria_cod:document.getElementById("eu-assessoria").value||null});
+    const patch={role:_euRole,event_ids:_euEvIds,assessoria_cod:document.getElementById("eu-assessoria").value||null};
+    const novaSenha=(document.getElementById("eu-nova-senha").value||"").trim();
+    if(novaSenha) patch.password=novaSenha;
+    await dbUpdate("app_users","id=eq."+_euId,patch);
     closeEditUser(); renderUsers(); toast("✅ Acesso atualizado!");
   } catch(e){ toast("Erro: "+e.message); }
   finally { btn.disabled=false; btn.textContent="Salvar"; }
