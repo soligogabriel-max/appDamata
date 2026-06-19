@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>DAMATA â€“ Gerador de Contrato</title>
+<title>DAMATA – Gerador de Contrato</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -36,37 +36,37 @@ select.inp{cursor:pointer}
     </div>
     <div style="text-align:left">
       <div style="font-size:20px;font-weight:800;color:#f1f5f9">Gerador de Contrato</div>
-      <div style="font-size:12px;color:#64748b;margin-top:2px">DAMATA â€“ Uso interno</div>
+      <div style="font-size:12px;color:#64748b;margin-top:2px">DAMATA – Uso interno</div>
     </div>
   </div>
 </div>
 
 <!-- Tipo de Contrato -->
 <div class="card" style="padding:14px">
-  <div class="ctitle" style="margin-bottom:10px">ðŸ“„ Tipo de Contrato</div>
+  <div class="ctitle" style="margin-bottom:10px">📄 Tipo de Contrato</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    <button id="tipo-btn-evento" onclick="setContractType('evento')" style="padding:12px;border-radius:10px;border:2px solid #3b82f6;background:rgba(59,130,246,.15);color:#93c5fd;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">ðŸŽ‰ Evento</button>
-    <button id="tipo-btn-hosp" onclick="setContractType('hospedagem')" style="padding:12px;border-radius:10px;border:2px solid #334155;background:#1e293b;color:#64748b;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">ðŸ  Hospedagem</button>
+    <button id="tipo-btn-evento" onclick="setContractType('evento')" style="padding:12px;border-radius:10px;border:2px solid #3b82f6;background:rgba(59,130,246,.15);color:#93c5fd;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">🎉 Evento</button>
+    <button id="tipo-btn-hosp" onclick="setContractType('hospedagem')" style="padding:12px;border-radius:10px;border:2px solid #334155;background:#1e293b;color:#64748b;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;">🏠 Hospedagem</button>
   </div>
 </div>
 
-<!-- IdentificaÃ§Ã£o -->
+<!-- Identificação -->
 <div class="card">
-  <div class="ctitle">ðŸ”– IdentificaÃ§Ã£o</div>
+  <div class="ctitle">🔖 Identificação</div>
   <div id="noivos-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
     <div><span class="lbl">Nome da Noiva</span><input class="inp" type="text" id="o-noiva" placeholder="Ex: Ana Paula" oninput="autoNomeEvento()"></div>
     <div><span class="lbl">Nome do Noivo</span><input class="inp" type="text" id="o-noivo" placeholder="Ex: Carlos" oninput="autoNomeEvento()"></div>
   </div>
   <div id="locatario-row" style="display:none;margin-bottom:12px">
-    <span class="lbl">Nome do LocatÃ¡rio</span>
-    <input class="inp" type="text" id="o-locatario" placeholder="Nome completo do locatÃ¡rio" oninput="autoNomeEvento()">
+    <span class="lbl">Nome do Locatário</span>
+    <input class="inp" type="text" id="o-locatario" placeholder="Nome completo do locatário" oninput="autoNomeEvento()">
   </div>
   <div style="margin-bottom:12px">
     <span class="lbl">Contratante (quem assina o contrato)</span>
     <input class="inp" type="text" id="o-contratante" placeholder="Nome completo do contratante">
   </div>
   <div style="margin-bottom:12px">
-    <span class="lbl">Nome do Evento <span style="color:#475569;font-weight:400;text-transform:none;letter-spacing:0">(gerado automaticamente â€” editÃ¡vel)</span></span>
+    <span class="lbl">Nome do Evento <span style="color:#475569;font-weight:400;text-transform:none;letter-spacing:0">(gerado automaticamente — editável)</span></span>
     <input class="inp" type="text" id="o-nome-evento" placeholder="Ex: Ana e Pedro - 22jun26">
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
@@ -80,14 +80,14 @@ select.inp{cursor:pointer}
         <option value="Outro">Outro</option>
       </select>
     </div>
-    <div><span class="lbl">CÃ³digo do Contrato</span><input class="inp" type="text" id="o-code" placeholder="Gerado automaticamente"></div>
-    <div><span class="lbl">ObservaÃ§Ã£o</span><input class="inp" type="text" id="o-obs" placeholder="Obs interna"></div>
+    <div><span class="lbl">Código do Contrato</span><input class="inp" type="text" id="o-code" placeholder="Gerado automaticamente"></div>
+    <div><span class="lbl">Observação</span><input class="inp" type="text" id="o-obs" placeholder="Obs interna"></div>
   </div>
 </div>
 
 <!-- Evento -->
 <div class="card" id="card-evento-dados">
-  <div class="ctitle">ðŸ“… Dados do Evento / Hospedagem</div>
+  <div class="ctitle">📅 Dados do Evento / Hospedagem</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
     <div><span class="lbl">Data do Evento</span><input class="inp" type="date" id="o-d1" onchange="autoNomeEvento()"></div>
     <div><span class="lbl">Data Final</span><input class="inp" type="date" id="o-d2"></div>
@@ -96,28 +96,28 @@ select.inp{cursor:pointer}
   </div>
 </div>
 
-<!-- EspaÃ§os e AcomodaÃ§Ãµes (Hospedagem) -->
+<!-- Espaços e Acomodações (Hospedagem) -->
 <div class="card" id="card-hosp" style="display:none">
   <div>
-    <span class="lbl" style="margin-bottom:8px">AcomodaÃ§Ãµes</span>
+    <span class="lbl" style="margin-bottom:8px">Acomodações</span>
     <label class="cb"><input type="checkbox" id="o-loft"> Loft Flamboyant</label>
     <label class="cb"><input type="checkbox" id="o-casa"> Casa Flamboyant</label>
-    <label class="cb"><input type="checkbox" id="o-sf1"> SuÃ­te Flamboyant 1 (king)</label>
-    <label class="cb"><input type="checkbox" id="o-sf2"> SuÃ­te Flamboyant 2 (king)</label>
-    <label class="cb"><input type="checkbox" id="o-sf3"> SuÃ­te Flamboyant 3 (4 solteiros)</label>
-    <label class="cb"><input type="checkbox" id="o-sf4"> SuÃ­te Flamboyant 4 (3 solteiros)</label>
-    <label class="cb"><input type="checkbox" id="o-sf5"> SuÃ­te Flamboyant 5 (3 solteiros)</label>
-    <label class="cb"><input type="checkbox" id="o-sb1"> SuÃ­te BromÃ©lias 1 (casal + solteiro)</label>
-    <label class="cb"><input type="checkbox" id="o-sb2"> SuÃ­te BromÃ©lias 2 (casal)</label>
-    <label class="cb"><input type="checkbox" id="o-sb3"> SuÃ­te BromÃ©lias 3 (2 casais)</label>
+    <label class="cb"><input type="checkbox" id="o-sf1"> Suíte Flamboyant 1 (king)</label>
+    <label class="cb"><input type="checkbox" id="o-sf2"> Suíte Flamboyant 2 (king)</label>
+    <label class="cb"><input type="checkbox" id="o-sf3"> Suíte Flamboyant 3 (4 solteiros)</label>
+    <label class="cb"><input type="checkbox" id="o-sf4"> Suíte Flamboyant 4 (3 solteiros)</label>
+    <label class="cb"><input type="checkbox" id="o-sf5"> Suíte Flamboyant 5 (3 solteiros)</label>
+    <label class="cb"><input type="checkbox" id="o-sb1"> Suíte Bromélias 1 (casal + solteiro)</label>
+    <label class="cb"><input type="checkbox" id="o-sb2"> Suíte Bromélias 2 (casal)</label>
+    <label class="cb"><input type="checkbox" id="o-sb3"> Suíte Bromélias 3 (2 casais)</label>
   </div>
 </div>
 
 <!-- Itens -->
 <div class="card" id="card-itens">
-  <div class="ctitle">ðŸ“‹ Itens do Contrato</div>
+  <div class="ctitle">📋 Itens do Contrato</div>
   <div style="margin-bottom:14px">
-    <span class="lbl">Tabela de preÃ§os</span>
+    <span class="lbl">Tabela de preços</span>
     <select class="inp" id="o-tabela" onchange="selectTabela(this.value)">
       <option value="">Carregando tabelas...</option>
     </select>
@@ -127,7 +127,7 @@ select.inp{cursor:pointer}
 
 <!-- Pagamento -->
 <div class="card">
-  <div class="ctitle">ðŸ’° Valor e Parcelas</div>
+  <div class="ctitle">💰 Valor e Parcelas</div>
   <div style="margin-bottom:12px">
     <span class="lbl">Desconto sobre todos os itens (%)</span>
     <div style="display:flex;align-items:center;gap:8px">
@@ -144,11 +144,11 @@ select.inp{cursor:pointer}
     </div>
   </div>
   <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:16px;margin-bottom:14px">
-    <div style="font-size:13px;font-weight:600;color:#93c5fd;margin-bottom:12px">âš¡ Gerar parcelas automaticamente</div>
+    <div style="font-size:13px;font-weight:600;color:#93c5fd;margin-bottom:12px">⚡ Gerar parcelas automaticamente</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
-      <div><span class="lbl">NÂº de parcelas</span><input class="inp" type="number" id="g-num" placeholder="Ex: 4" min="1" max="24"></div>
+      <div><span class="lbl">Nº de parcelas</span><input class="inp" type="number" id="g-num" placeholder="Ex: 4" min="1" max="24"></div>
       <div><span class="lbl">Dia do vencimento</span><input class="inp" type="number" id="g-day" placeholder="Ex: 15" min="1" max="28"></div>
-      <div><span class="lbl">MÃªs/Ano inicial</span><input class="inp" type="month" id="g-month"></div>
+      <div><span class="lbl">Mês/Ano inicial</span><input class="inp" type="month" id="g-month"></div>
     </div>
     <button onclick="autoGenPayments()" style="width:100%;background:#1e3a5f;color:#93c5fd;border:1px solid #3b82f6;padding:9px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">Gerar parcelas</button>
   </div>
@@ -159,9 +159,9 @@ select.inp{cursor:pointer}
   <div id="pmts-list"></div>
 </div>
 
-<!-- AÃ§Ãµes -->
+<!-- Ações -->
 <div class="card">
-  <div class="ctitle">âš¡ AÃ§Ãµes</div>
+  <div class="ctitle">⚡ Ações</div>
   <div style="display:flex;flex-direction:column;gap:10px">
     <button class="btn" onclick="generateFile()" style="background:#1d4ed8;color:white;font-size:15px;padding:14px 20px">
       <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
@@ -173,7 +173,7 @@ select.inp{cursor:pointer}
 </div>
 
 <script>
-// â”€â”€ Supabase â”€â”€
+// ── Supabase ──
 var SB_URL="https://wwnndsprpofmgbklqdgg.supabase.co";
 var SB_KEY="sb_publishable__RQxBa8P-lryd0LtWgTJPw_-aSWERWK";
 async function sbGet(path){
@@ -181,7 +181,7 @@ async function sbGet(path){
   var t=await r.text(); return t?JSON.parse(t):[];
 }
 
-// â”€â”€ Tipo de contrato â”€â”€
+// ── Tipo de contrato ──
 var _contractType = "evento";
 function setContractType(t) {
   _contractType = t;
@@ -204,7 +204,7 @@ function setContractType(t) {
   autoNomeEvento();
 }
 
-// â”€â”€ Contexto do app pai â”€â”€
+// ── Contexto do app pai ──
 var _gcEvt=null,_gcUser=null,_gcDate=null;
 window.addEventListener("message",function(e){
   if(e.data&&e.data.type==="damata_init_contrato"){
@@ -217,7 +217,7 @@ window.addEventListener("message",function(e){
   }
 });
 
-// PrÃ©-preenche a partir de um orÃ§amento efetivado
+// Pré-preenche a partir de um orçamento efetivado
 function prefillFromOrcamento(o){
   if(o.tipo_evento==="Casamento"){
     if(g("o-noiva")) g("o-noiva").value=o.nome_noiva||"";
@@ -233,14 +233,14 @@ function prefillFromOrcamento(o){
   autoNomeEvento();
 }
 
-// â”€â”€ Helpers â”€â”€
+// ── Helpers ──
 function g(id){return document.getElementById(id);}
 function v(id){var e=g(id);return e?e.value:"";}
 function fd(d){if(!d)return "";var p=d.split("-");return p.length<3?d:p[2]+"/"+p[1]+"/"+p[0];}
 function fc(val){if(val==null||val==="")return "";return parseFloat(val).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function onTotalChange(){}
 
-// â”€â”€ Nome do evento automÃ¡tico â”€â”€
+// ── Nome do evento automático ──
 var MESES_PT=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
 function _primeiroNome(n){return n?n.trim().split(/\s+/)[0]:"";}
 function autoNomeEvento(){
@@ -262,7 +262,7 @@ function autoNomeEvento(){
   if(nome.trim())g("o-nome-evento").value=nome;
 }
 
-// â”€â”€ PrÃ©-preenchimento â”€â”€
+// ── Pré-preenchimento ──
 function prefillFromContext(){
   if(!_gcUser)return;
   var p=_gcUser.personal||{};
@@ -274,10 +274,10 @@ function prefillFromContext(){
   autoNomeEvento();
 }
 
-// â”€â”€ Tabelas de preÃ§o â”€â”€
+// ── Tabelas de preço ──
 var _tabelas=[],_grupos=[],_itens=[],_invDesc={};
 
-// DescriÃ§Ã£o vinda do inventÃ¡rio (fonte da verdade), pelo cod_item
+// Descrição vinda do inventário (fonte da verdade), pelo cod_item
 function descOf(it){
   if(it&&it.cod_item&&_invDesc[it.cod_item])return _invDesc[it.cod_item];
   return (it&&(it.descricao||it.cod_item))||"";
@@ -296,7 +296,7 @@ async function loadTabelasPreco(){
     await loadInventarioDesc();
     _tabelas=await sbGet("tabelas_preco?deleted_at=is.null&order=id.desc&limit=50");
     var sel=g("o-tabela");
-    sel.innerHTML='<option value="">â€” Selecione a tabela de preÃ§os â€”</option>';
+    sel.innerHTML='<option value="">— Selecione a tabela de preços —</option>';
     _tabelas.forEach(function(t){
       var o=document.createElement("option");
       o.value=t.id; o.textContent=t.nome; sel.appendChild(o);
@@ -326,13 +326,13 @@ function renderItens(grupos,itens){
   });
   var html="";
   if(grupos.length){
-    html+='<div style="font-size:11px;font-weight:700;color:#93c5fd;letter-spacing:1px;margin-bottom:8px;text-transform:uppercase;">ðŸ“¦ Pacotes</div>';
+    html+='<div style="font-size:11px;font-weight:700;color:#93c5fd;letter-spacing:1px;margin-bottom:8px;text-transform:uppercase;">📦 Pacotes</div>';
     grupos.forEach(function(gr){
       var gItens=itensByGrupo[gr.id]||[];
       var sub=gItens.reduce(function(s,it){return s+(it.valor_unitario||0);},0);
       var total=Math.max(0,sub-(gr.desconto||0));
       var lista=gItens.map(function(it){
-        return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;color:#94a3b8;"><span style="color:#475569;">â€º</span>'+descOf(it)+'</div>';
+        return '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:12px;color:#94a3b8;"><span style="color:#475569;">›</span>'+descOf(it)+'</div>';
       }).join("");
       html+='<div class="pkg-box" data-grupo="'+gr.id+'" data-total="'+total+'">'+
         '<div class="pkg-hdr">'+
@@ -350,7 +350,7 @@ function renderItens(grupos,itens){
     });
   }
   if(avulsos.length){
-    html+='<div style="font-size:11px;font-weight:700;color:#93c5fd;letter-spacing:1px;margin:12px 0 8px;text-transform:uppercase;">ðŸ“‹ Itens Avulsos</div>';
+    html+='<div style="font-size:11px;font-weight:700;color:#93c5fd;letter-spacing:1px;margin:12px 0 8px;text-transform:uppercase;">📋 Itens Avulsos</div>';
     avulsos.forEach(function(it){
       html+='<div class="cb" id="lb-av-'+it.id+'" style="align-items:center;">'+
         '<input type="checkbox" id="av-'+it.id+'" data-vun="'+(it.valor_unitario||0)+'" onchange="recalcTotal()">'+
@@ -377,9 +377,9 @@ function addExtraItem(grupoId){
   div.id=id; div.dataset.grupoId=grupoId;
   div.style.cssText="display:grid;grid-template-columns:1fr auto auto;gap:6px;margin-top:6px;align-items:center;";
   div.innerHTML=
-    '<input class="inp" type="text" placeholder="DescriÃ§Ã£o do item extra" style="margin:0;font-size:12px;" oninput="recalcTotal()">'+
+    '<input class="inp" type="text" placeholder="Descrição do item extra" style="margin:0;font-size:12px;" oninput="recalcTotal()">'+
     '<input class="inp" type="number" placeholder="R$" style="margin:0;width:80px;font-size:12px;text-align:right;" oninput="recalcTotal()">'+
-    '<button onclick="document.getElementById(\''+id+'\').remove();recalcTotal()" style="background:none;border:none;color:#ef4444;font-size:18px;cursor:pointer;">âœ•</button>';
+    '<button onclick="document.getElementById(\''+id+'\').remove();recalcTotal()" style="background:none;border:none;color:#ef4444;font-size:18px;cursor:pointer;">✕</button>';
   document.getElementById("extra-"+grupoId).appendChild(div);
 }
 
@@ -408,7 +408,7 @@ function recalcTotal(){
   var final=total-descVal;
   g("o-total").value=final?final.toFixed(2):"";
   var info=g("o-desc-info");
-  if(info) info.textContent = pct>0 ? ("Subtotal R$ "+fc(total)+"  Â·  Desconto "+pct+"%  (âˆ’ R$ "+fc(descVal)+")") : "";
+  if(info) info.textContent = pct>0 ? ("Subtotal R$ "+fc(total)+"  ·  Desconto "+pct+"%  (− R$ "+fc(descVal)+")") : "";
 }
 
 function collectItens(){
@@ -427,7 +427,7 @@ function collectItens(){
       var vun=parseFloat(ed.querySelectorAll("input")[1].value||0);
       if(desc||vun)itens.push({cod:null,descricao:desc||"Item extra",quantidade:1,valor_unitario:vun});
     });
-    if(gr&&gr.desconto)itens.push({cod:null,descricao:"Desconto â€” "+gr.nome,quantidade:1,valor_unitario:-(gr.desconto)});
+    if(gr&&gr.desconto)itens.push({cod:null,descricao:"Desconto — "+gr.nome,quantidade:1,valor_unitario:-(gr.desconto)});
   });
   document.querySelectorAll("[id^='av-']").forEach(function(cb){
     if(!cb.checked)return;
@@ -449,12 +449,12 @@ function collectItens(){
   return itens;
 }
 
-// â”€â”€ Parcelas â”€â”€
+// ── Parcelas ──
 var payments=[{desc:"Sinal de reserva",date:"",value:""}];
 
 function autoGenPayments(){
   var tot=parseFloat(v("o-total")||0),num=parseInt(v("g-num")||0),day=parseInt(v("g-day")||1),month=v("g-month");
-  if(!tot||!num||!month){alert("Preencha: valor total, nÂº de parcelas, dia e mÃªs inicial.");return;}
+  if(!tot||!num||!month){alert("Preencha: valor total, nº de parcelas, dia e mês inicial.");return;}
   var valPer=tot/num,parts=month.split("-"),yr=parseInt(parts[0]),mo=parseInt(parts[1])-1;
   payments=[];
   for(var i=0;i<num;i++){
@@ -474,9 +474,9 @@ function renderPayments(){
   payments.forEach(function(p,i){
     var div=document.createElement("div");
     div.style.cssText="border:1px solid #334155;border-radius:10px;padding:12px;margin-bottom:8px;background:#0f172a;position:relative";
-    var rb=payments.length>1?'<button onclick="removePayment('+i+')" style="position:absolute;top:8px;right:10px;background:none;border:none;cursor:pointer;color:#475569;font-size:16px">âœ•</button>':"";
+    var rb=payments.length>1?'<button onclick="removePayment('+i+')" style="position:absolute;top:8px;right:10px;background:none;border:none;cursor:pointer;color:#475569;font-size:16px">✕</button>':"";
     div.innerHTML=rb
-      +'<input class="inp" type="text" placeholder="DescriÃ§Ã£o" value="'+(p.desc||"")+'" oninput="payments['+i+'].desc=this.value" style="margin-bottom:8px">'
+      +'<input class="inp" type="text" placeholder="Descrição" value="'+(p.desc||"")+'" oninput="payments['+i+'].desc=this.value" style="margin-bottom:8px">'
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
       +'<div><span class="lbl">Vencimento</span><input class="inp" type="date" value="'+(p.date||"")+'" onchange="payments['+i+'].date=this.value"></div>'
       +'<div><span class="lbl">Valor R$</span><input class="inp" type="number" placeholder="0,00" value="'+(p.value||"")+'" oninput="payments['+i+'].value=this.value"></div>'
@@ -485,10 +485,10 @@ function renderPayments(){
   });
 }
 
-// â”€â”€ PDF â”€â”€
+// ── PDF ──
 function exportarPDF(){window.print();}
 
-// â”€â”€ Salvar no sistema â”€â”€
+// ── Salvar no sistema ──
 function salvarNoSistema(){
   var noiva=v("o-noiva"),noivo=v("o-noivo");
   if(!noiva&&!noivo){alert("Preencha pelo menos o nome da noiva ou do noivo.");return;}
@@ -508,11 +508,11 @@ function salvarNoSistema(){
   if(window.parent&&window.parent!==window){
     window.parent.postMessage({type:"damata_salvar_contrato",preset:preset},"*");
   } else {
-    alert("Esta funÃ§Ã£o sÃ³ funciona dentro do App Damata.");
+    alert("Esta função só funciona dentro do App Damata.");
   }
 }
 
-// â”€â”€ Gerar arquivo HTML para cliente â”€â”€
+// ── Gerar arquivo HTML para cliente ──
 function b64ToUtf8(b64){
   var bin=atob(b64),bytes=new Uint8Array(bin.length);
   for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
@@ -522,9 +522,9 @@ async function generateFile(){
   var isH=_contractType==="hospedagem";
   var noiva=v("o-noiva"),noivo=v("o-noivo"),locatario=v("o-locatario");
   if(!isH&&!noiva&&!noivo){alert("Preencha pelo menos o nome da noiva ou do noivo.");return;}
-  if(isH&&!locatario){alert("Preencha o nome do locatÃ¡rio.");return;}
+  if(isH&&!locatario){alert("Preencha o nome do locatário.");return;}
   if(!v("o-d1")){alert("Preencha a data do evento.");return;}
-  // Garante que o cÃ³digo estÃ¡ preenchido antes de gerar o arquivo
+  // Garante que o código está preenchido antes de gerar o arquivo
   if(!v("o-code")&&!_gcEvt){
     try{
       var ano=new Date().getFullYear();
@@ -532,7 +532,7 @@ async function generateFile(){
       var seq=1;
       if(rows.length) seq=parseInt(rows[0].cod.slice(4))+1;
       g("o-code").value=String(ano)+String(seq).padStart(2,"0");
-    }catch(e){alert("Erro ao gerar cÃ³digo: "+e.message);return;}
+    }catch(e){alert("Erro ao gerar código: "+e.message);return;}
   }
   // Salva no sistema automaticamente
   var savePreset={
@@ -555,9 +555,9 @@ async function generateFile(){
   var pJson=JSON.stringify(preset);
   var tmpl=b64ToUtf8(isH?HOSPEDAGEM_B64:CLIENT_B64);
   var out=tmpl.replace("null;/*DAMATA_PRESET*/",pJson+";");
-  if(out===tmpl){alert("Erro: marcador de dados nÃ£o encontrado no template.");return;}
+  if(out===tmpl){alert("Erro: marcador de dados não encontrado no template.");return;}
   var code=(preset.code||"contrato").replace(/[^a-zA-Z0-9]/g,"-");
-  var blob=new Blob(["ï»¿"+out],{type:"text/html;charset=utf-8"});
+  var blob=new Blob(["﻿"+out],{type:"text/html;charset=utf-8"});
   var a=document.createElement("a");
   a.href=URL.createObjectURL(blob);
   a.download="contrato-"+code+".html";
@@ -594,7 +594,7 @@ function collectPreset(){
 
 function exportPayments(){
   var p=collectPreset();
-  var rows=[["CÃ³d. Contrato","#","DescriÃ§Ã£o","Vencimento","Valor (R$)"]];
+  var rows=[["Cód. Contrato","#","Descrição","Vencimento","Valor (R$)"]];
   payments.forEach(function(pm,i){
     rows.push([p.code||"",i+1,pm.desc||"",fd(pm.date),pm.value?parseFloat(pm.value):""]);
   });
@@ -606,7 +606,7 @@ function exportPayments(){
   XLSX.writeFile(wb,"parcelas-"+(p.code||"contrato")+".xlsx");
 }
 
-// â”€â”€ Init â”€â”€
+// ── Init ──
 window.addEventListener("load",function(){
   var codEvt=sessionStorage.getItem("dm_gc_evt");
   try{_gcUser=JSON.parse(sessionStorage.getItem("dm_gc_user")||"null");}catch(e){}
