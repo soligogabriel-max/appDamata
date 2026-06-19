@@ -333,7 +333,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.19d</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.19e</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1014,7 +1014,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <span class="eslbl" id="eu-eslbl">Vincular ao evento</span>
       <div class="esl" id="eu-esl"></div>
     </div>
-    <div style="border-top:1px solid var(--br);margin-top:14px;padding-top:14px;">
+    <div id="eu-assessoria-wrap" style="display:none;border-top:1px solid var(--br);margin-top:14px;padding-top:14px;">
       <label class="lbl">Vincular à Assessoria</label>
       <select id="eu-assessoria" class="inp" style="margin-top:6px;margin-bottom:0;">
         <option value="">— Nenhuma —</option>
@@ -1218,6 +1218,12 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <span class="eslbl" id="eslbl">Vincular ao evento</span>
       <div class="esl" id="esl"></div>
     </div>
+    <div id="apr-assessoria-wrap" style="display:none;margin-top:12px;">
+      <label class="lbl">Vincular à Assessoria</label>
+      <select id="apr-assessoria" class="inp" style="margin-top:6px;margin-bottom:0;">
+        <option value="">— Nenhuma —</option>
+      </select>
+    </div>
     <div class="macts">
       <button class="btn-cancel" onclick="closeApr()">Cancelar</button>
       <button class="btn-confirm" onclick="confirmApr()">Confirmar</button>
@@ -1341,14 +1347,18 @@ function _applyNavForRole(role){
     allGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     document.getElementById("t-pedidos-eq").style.display="";
   } else if(role==="fornecedor"){
-    document.getElementById("tnav").style.display="none";
+    // fornecedor vê agenda + visita técnica
+    allGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    document.getElementById("grp-eventos").style.display="";
+    ["t-contratos","t-pedidos","t-orcamentos"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    document.getElementById("t-vt").style.display="";
     document.getElementById("t-pedidos-eq").style.display="none";
   } else if(role==="assessoria"){
-    // mostra apenas grp-eventos (contratos+pedidos) e grp-financeiro (só receber)
+    // assessoria vê agenda, eventos (contratos+pedidos+vt), financeiro (só receber)
     ["grp-cadastros","grp-admin"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     ["grp-financeiro","grp-eventos"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
-    ["t-vt","t-orcamentos","t-pagar","t-fluxo","t-extrato","t-fluxoreal"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
-    ["t-contratos","t-pedidos"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
+    ["t-orcamentos","t-pagar","t-fluxo","t-extrato","t-fluxoreal"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    ["t-contratos","t-pedidos","t-vt"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     document.getElementById("t-pedidos-eq").style.display="none";
   }
 }
@@ -1524,8 +1534,8 @@ async function openApp(u) {
   }
   if (isAdmin(u)) { tn.style.display="flex"; bne.style.display="inline-flex"; document.getElementById("btn-sim").style.display=""; setTab("agenda"); updBadge(); }
   else if (u.role==="equipe") { tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("equipe"); setTab("agenda"); renderCal(null); }
-  else if (u.role==="fornecedor") { _userEventIds=u.event_ids||[]; tn.style.display="none"; bne.style.display="none"; document.getElementById("p-agenda").classList.add("on"); renderCal(_userEventIds); }
-  else if (u.role==="assessoria") { _userEventIds=u.event_ids||[]; tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("assessoria"); setTab("agenda"); renderCal(_userEventIds); }
+  else if (u.role==="fornecedor") { _userEventIds=u.event_ids||[]; tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("fornecedor"); setTab("agenda"); renderCal(_userEventIds); }
+  else if (u.role==="assessoria") { _userEventIds=u.event_ids||[]; tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("assessoria"); setTab("agenda"); renderCal(_userEventIds.length?_userEventIds:null); }
   else if (u.role==="cliente") { tn.style.display="none"; bne.style.display="none"; document.getElementById("p-client").classList.add("on"); renderCli(u); }
   showSc("app");
 }
@@ -2278,12 +2288,16 @@ let aprId=null, aprName="", chosenRole=null, selEvIds=[];
 async function openApr(id,name){
   aprId=id; aprName=name; chosenRole=null; selEvIds=[];
   document.getElementById("apr-sub").textContent="Definir acesso para "+name;
-  document.querySelectorAll(".ropt").forEach(r=>r.classList.remove("sel"));
+  document.querySelectorAll("#m-approve .ropt").forEach(r=>r.classList.remove("sel"));
   const esl=document.getElementById("esl"); esl.innerHTML='<div style="font-size:12px;color:var(--dl);padding:8px;">Carregando eventos...</div>';
   document.getElementById("eswrap").style.display="none";
+  document.getElementById("apr-assessoria-wrap").style.display="none";
   document.getElementById("m-approve").classList.add("open");
   try {
-    const evts=await dbGet("agenda","order=data_evento.desc&select=cod,nome_evento,tipo_evento,data_evento");
+    const [evts, assRows]=await Promise.all([
+      dbGet("agenda","order=data_evento.desc&select=cod,nome_evento,tipo_evento,data_evento"),
+      dbGet("assessorias","select=cod,nome&order=nome.asc&limit=500")
+    ]);
     esl.innerHTML="";
     evts.forEach(ev=>{
       const it=document.createElement("div");it.className="esitem";it.dataset.id=ev.cod;
@@ -2291,17 +2305,37 @@ async function openApr(id,name){
       it.innerHTML=`<div style="font-weight:700;font-size:12px;">${ev.nome_evento||ev.cod}</div><div style="font-size:10px;color:#7A8F96;">${ev.data_evento||""} · ${getEvLabel(ev)}</div>`;
       esl.appendChild(it);
     });
-  } catch(e){ esl.innerHTML='<div style="font-size:12px;color:var(--er);padding:8px;">Erro ao carregar eventos.</div>'; }
+    const aprSel=document.getElementById("apr-assessoria");
+    aprSel.innerHTML='<option value="">— Nenhuma —</option>';
+    assRows.forEach(a=>{ const o=document.createElement("option"); o.value=a.cod; o.textContent=a.nome; aprSel.appendChild(o); });
+  } catch(e){ esl.innerHTML='<div style="font-size:12px;color:var(--er);padding:8px;">Erro ao carregar.</div>'; }
 }
 function closeApr(){document.getElementById("m-approve").classList.remove("open");}
-function pickRole(role,el){chosenRole=role;document.querySelectorAll(".ropt").forEach(r=>r.classList.remove("sel"));el.classList.add("sel");const ew=document.getElementById("eswrap");if(role==="cliente"||role==="fornecedor"||role==="assessoria"){ew.style.display="block";document.getElementById("eslbl").textContent=role==="cliente"?"Vincular ao evento":"Vincular aos eventos";selEvIds=[];document.querySelectorAll(".esitem").forEach(i=>i.classList.remove("sel"));}else{ew.style.display="none";selEvIds=[];}}
+function pickRole(role,el){
+  chosenRole=role;
+  document.querySelectorAll("#m-approve .ropt").forEach(r=>r.classList.remove("sel"));el.classList.add("sel");
+  const ew=document.getElementById("eswrap");
+  const aw=document.getElementById("apr-assessoria-wrap");
+  if(role==="assessoria"){
+    ew.style.display="none"; aw.style.display="block"; selEvIds=[];
+  } else if(role==="cliente"||role==="fornecedor"){
+    ew.style.display="block"; aw.style.display="none";
+    document.getElementById("eslbl").textContent=role==="cliente"?"Vincular ao evento":"Vincular aos eventos";
+    selEvIds=[]; document.querySelectorAll(".esitem").forEach(i=>i.classList.remove("sel"));
+  } else {
+    ew.style.display="none"; aw.style.display="none"; selEvIds=[];
+  }
+}
 function togEv(id,el){if(chosenRole==="cliente"){selEvIds=[id];document.querySelectorAll(".esitem").forEach(i=>i.classList.remove("sel"));el.classList.add("sel");}else{const i=selEvIds.indexOf(id);if(i>-1){selEvIds.splice(i,1);el.classList.remove("sel");}else{selEvIds.push(id);el.classList.add("sel");}}}
 
 async function confirmApr(){
   if(!chosenRole){toast("Selecione um perfil.");return;}
-  if((chosenRole==="cliente"||chosenRole==="fornecedor"||chosenRole==="assessoria")&&!selEvIds.length){toast("Selecione ao menos um evento.");return;}
+  if((chosenRole==="cliente"||chosenRole==="fornecedor")&&!selEvIds.length){toast("Selecione ao menos um evento.");return;}
+  if(chosenRole==="assessoria"&&!document.getElementById("apr-assessoria").value){toast("Selecione a assessoria.");return;}
   try {
-    await dbUpdate("app_users","id=eq."+aprId,{status:"approved",role:chosenRole,event_ids:selEvIds});
+    const patch={status:"approved",role:chosenRole,event_ids:selEvIds,assessoria_cod:null};
+    if(chosenRole==="assessoria") patch.assessoria_cod=document.getElementById("apr-assessoria").value||null;
+    await dbUpdate("app_users","id=eq."+aprId,patch);
     closeApr(); renderPend(); updBadge(); toast("✅ "+aprName+" aprovado como "+RL[chosenRole]+"!");
   } catch(e){toast("Erro: "+e.message);}
 }
@@ -4860,13 +4894,17 @@ function _euPickRole(role, el) {
   _euRole=role;
   document.querySelectorAll("#m-edit-user .ropt").forEach(r=>r.classList.remove("sel"));
   el.classList.add("sel");
-  if(role==="admin"||role==="equipe") { document.getElementById("eu-eswrap").style.display="none"; _euEvIds=[]; return; }
   const wrap=document.getElementById("eu-eswrap");
-  const lbl=document.getElementById("eu-eslbl");
-  if(role==="cliente"||role==="fornecedor"||role==="assessoria"){
-    wrap.style.display="block";
-    lbl.textContent=role==="cliente"?"Vincular ao evento":"Vincular aos eventos";
-  } else { wrap.style.display="none"; _euEvIds=[]; }
+  const assWrap=document.getElementById("eu-assessoria-wrap");
+  if(role==="admin"||role==="equipe") {
+    wrap.style.display="none"; assWrap.style.display="none"; _euEvIds=[]; return;
+  }
+  if(role==="assessoria"){
+    wrap.style.display="none"; assWrap.style.display="block"; _euEvIds=[];
+  } else if(role==="cliente"||role==="fornecedor"){
+    wrap.style.display="block"; assWrap.style.display="none";
+    document.getElementById("eu-eslbl").textContent=role==="cliente"?"Vincular ao evento":"Vincular aos eventos";
+  } else { wrap.style.display="none"; assWrap.style.display="none"; _euEvIds=[]; }
 }
 
 function _euTogEv(cod, el) {
@@ -4892,10 +4930,13 @@ async function openEditUser(u) {
   document.getElementById("eu-nova-senha").value = "";
   document.getElementById("eu-senha-wrap").style.display = "none";
   const wrap=document.getElementById("eu-eswrap");
-  if(u.role==="cliente"||u.role==="fornecedor"||u.role==="assessoria"){
-    wrap.style.display="block";
+  const assWrapEu=document.getElementById("eu-assessoria-wrap");
+  if(u.role==="assessoria"){
+    wrap.style.display="none"; assWrapEu.style.display="block";
+  } else if(u.role==="cliente"||u.role==="fornecedor"){
+    wrap.style.display="block"; assWrapEu.style.display="none";
     document.getElementById("eu-eslbl").textContent=u.role==="cliente"?"Vincular ao evento":"Vincular aos eventos";
-  } else { wrap.style.display="none"; }
+  } else { wrap.style.display="none"; assWrapEu.style.display="none"; }
   const [evts, assRows] = await Promise.all([
     dbGet("agenda","order=assessoria_cod.asc.nullslast,data_evento.desc&select=cod,nome_evento,tipo_evento,data_evento,assessoria_cod&limit=500"),
     dbGet("assessorias","select=cod,nome&order=nome.asc&limit=500")
@@ -4924,10 +4965,11 @@ async function openEditUser(u) {
 async function saveEditUser() {
   if(!_euRole){toast("Selecione um perfil.");return;}
   if((_euRole==="cliente"||_euRole==="fornecedor")&&!_euEvIds.length){toast("Selecione ao menos um evento.");return;}
+  if(_euRole==="assessoria"&&!document.getElementById("eu-assessoria").value){toast("Selecione a assessoria.");return;}
   const btn=document.getElementById("eu-btn-save");
   btn.disabled=true; btn.textContent="Salvando...";
   try {
-    const patch={role:_euRole,event_ids:_euEvIds,assessoria_cod:document.getElementById("eu-assessoria").value||null};
+    const patch={role:_euRole,event_ids:_euRole==="assessoria"?[]:_euEvIds,assessoria_cod:_euRole==="assessoria"?document.getElementById("eu-assessoria").value||null:null};
     const novaSenha=(document.getElementById("eu-nova-senha").value||"").trim();
     if(novaSenha) patch.password=novaSenha;
     await dbUpdate("app_users","id=eq."+_euId,patch);
