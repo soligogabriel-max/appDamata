@@ -493,12 +493,17 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <div class="brand-n">DAMATA</div>
     </div>
     <div class="uarea">
-      <div><div class="un" id="hname"></div><div style="display:flex;justify-content:flex-end;margin-top:2px;"><span class="ur" id="hrole"></span></div></div>
+      <div><div class="un" id="hname"></div><div style="display:flex;justify-content:flex-end;margin-top:2px;gap:4px;"><span class="ur" id="hrole"></span><button id="btn-sim" onclick="openSimModal()" style="display:none;font-size:10px;padding:2px 7px;border-radius:8px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);color:#fff;cursor:pointer;font-weight:600;">👁 Simular</button></div></div>
       <button class="btn-out" onclick="doLogout()">Sair</button>
     </div>
   </div>
+  <!-- Banner de simulação -->
+  <div id="sim-banner" style="display:none;background:#F0AD4E;color:#7A5C00;font-size:12px;font-weight:700;padding:6px 16px;text-align:center;position:sticky;top:0;z-index:200;">
+    👁 Simulando como: <span id="sim-banner-role"></span> — <button onclick="exitSim()" style="background:none;border:none;color:#7A5C00;text-decoration:underline;cursor:pointer;font-weight:700;font-size:12px;">Sair da simulação</button>
+  </div>
   <div id="tnav" style="display:none;">
     <button class="tab on" onclick="setTab('agenda')" id="t-agenda">📅 Agenda</button>
+    <button class="tab" onclick="setTab('pedidos')" id="t-pedidos-eq" style="display:none;">🛒 Pedidos</button>
 
     <div class="tgrp" id="grp-eventos">
       <button class="tgrp-btn" onclick="toggleGrp('grp-eventos')">📆 Eventos</button>
@@ -1317,6 +1322,50 @@ function isAdmin(u){ return u && (u.role==="admin" || ADMIN_EMAILS.includes(u.em
 function getCU() { try { return JSON.parse(sessionStorage.getItem("dm_user")||"null"); } catch(e){return null;} }
 function setCU(u) { sessionStorage.setItem("dm_user", u ? JSON.stringify(u) : "null"); }
 
+var _simRole = null;
+function effRole() { var u=getCU(); return _simRole || (u&&u.role) || null; }
+function effIsAdmin() { return !_simRole && isAdmin(getCU()); }
+
+function _applyNavForRole(role){
+  var isA = !_simRole && isAdmin(getCU());
+  var adminGroups=["grp-financeiro","grp-cadastros","grp-admin","grp-eventos"];
+  if(isA || role==="admin"){
+    adminGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
+    ["t-contratos","t-vt","t-orcamentos"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
+    document.getElementById("t-pedidos-eq").style.display="none";
+    document.getElementById("grp-pedidos-eq") && (document.getElementById("grp-pedidos-eq").style.display="none");
+  } else if(role==="equipe"){
+    adminGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    document.getElementById("t-pedidos-eq").style.display="";
+  }
+}
+
+function openSimModal(){
+  if(!isAdmin(getCU())) return;
+  var r=prompt("Simular perfil:\n1 = Equipe\n(ESC para cancelar)","1");
+  if(r===null) return;
+  var map={"1":"equipe","equipe":"equipe"};
+  var picked=map[r.trim().toLowerCase()];
+  if(!picked){alert("Perfil inválido.");return;}
+  _simRole=picked;
+  document.getElementById("sim-banner").style.display="";
+  document.getElementById("sim-banner-role").textContent=RL[picked]||picked;
+  document.getElementById("tnav").style.display="flex";
+  document.getElementById("btn-new-ev").style.display="none";
+  _applyNavForRole(picked);
+  setTab("agenda");
+}
+
+function exitSim(){
+  _simRole=null;
+  document.getElementById("sim-banner").style.display="none";
+  document.getElementById("sim-banner-role").textContent="";
+  // restaura nav de admin
+  _applyNavForRole("admin");
+  document.getElementById("btn-new-ev").style.display="inline-flex";
+  setTab("agenda");
+}
+
 function showSc(sc) {
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   document.getElementById("sc-"+sc).classList.add("active");
@@ -1435,8 +1484,8 @@ async function openApp(u) {
       if(extra.length) u = {...u, event_ids:[...(u.event_ids||[]),...extra]};
     } catch(e){}
   }
-  if (isAdmin(u)) { tn.style.display="flex"; bne.style.display="inline-flex"; setTab("agenda"); updBadge(); }
-  else if (u.role==="equipe") { tn.style.display="none"; bne.style.display="none"; document.getElementById("p-agenda").classList.add("on"); renderCal(null); }
+  if (isAdmin(u)) { tn.style.display="flex"; bne.style.display="inline-flex"; document.getElementById("btn-sim").style.display=""; setTab("agenda"); updBadge(); }
+  else if (u.role==="equipe") { tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("equipe"); setTab("agenda"); renderCal(null); }
   else if (u.role==="fornecedor") { tn.style.display="none"; bne.style.display="none"; document.getElementById("p-agenda").classList.add("on"); renderCal(u.event_ids); }
   else if (u.role==="cliente") { tn.style.display="none"; bne.style.display="none"; document.getElementById("p-client").classList.add("on"); renderCli(u); }
   showSc("app");
@@ -4917,24 +4966,25 @@ async function renderPedidos() {
 
     if(!rows.length){ wr.innerHTML='<div class="empty"><div class="eicon">🛒</div>Nenhum pedido encontrado.</div>'; return; }
 
+    const showVals = effIsAdmin();
     wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
-      <thead><tr><th>Nº Pedido</th><th>Evento</th><th>Data Evento</th><th style="text-align:right;">Soma Itens</th><th style="text-align:right;">A Receber</th><th style="text-align:right;">Total Pedido</th><th></th></tr></thead>
+      <thead><tr><th>Nº Pedido</th><th>Evento</th><th>Data Evento</th>${showVals?`<th style="text-align:right;">Soma Itens</th><th style="text-align:right;">A Receber</th><th style="text-align:right;">Total Pedido</th><th></th>`:``}</tr></thead>
       <tbody>${rows.map(r=>{
         const rj      = _esc(JSON.stringify(r));
         const dataEv  = evDateMap[r.cod_evento];
         const isFut   = dataEv && dataEv >= hojeStr;
         const dv      = divergMap[r.id];
-        const divBadge = dv && dv.diff != null && Math.abs(dv.diff) > 0.01
+        const divBadge = showVals && dv && dv.diff != null && Math.abs(dv.diff) > 0.01
           ? `<span title="Divergência: ${fmt(Math.abs(dv.diff))}" style="display:inline-block;background:#F0AD4E;color:#7A5C00;font-size:10px;font-weight:700;border-radius:6px;padding:1px 6px;margin-left:6px;">⚠️ ${fmt(Math.abs(dv.diff))}</span>`
-          : (dv && dv.somaRec != null ? `<span style="color:#2A6644;font-size:10px;font-weight:700;margin-left:6px;">✓</span>` : "");
+          : (showVals && dv && dv.somaRec != null ? `<span style="color:#2A6644;font-size:10px;font-weight:700;margin-left:6px;">✓</span>` : "");
         return`<tr>
           <td style="font-weight:700;">${r.numero_pedido||"—"}${divBadge}</td>
           <td>${evMap[r.cod_evento]||r.cod_evento||"—"}</td>
           <td style="color:${isFut?"#2A6644":"var(--dl)"};">${dataEv?fmtDate(dataEv):"—"}</td>
-          <td style="text-align:right;">${dv?.somaItens ? fmt(dv.somaItens) : "—"}</td>
+          ${showVals?`<td style="text-align:right;">${dv?.somaItens ? fmt(dv.somaItens) : "—"}</td>
           <td style="text-align:right;color:#2A6644;">${dv?.somaRec != null ? fmt(dv.somaRec) : "—"}</td>
           <td style="text-align:right;font-weight:700;">${r.total_pedido?fmt(r.total_pedido):"—"}</td>
-          <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openPedidoModal(JSON.parse(this.dataset.r))' data-r="${rj}">✏️</button></div></td>
+          <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openPedidoModal(JSON.parse(this.dataset.r))' data-r="${rj}">✏️</button></div></td>`:``}
         </tr>`;
       }).join("")}</tbody>
     </table></div>`;
