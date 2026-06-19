@@ -81,7 +81,6 @@ Deno.serve(async (req) => {
         phone: normalizePhone(signerPhone),
         action: "SIGN",
         delivery_method: "DELIVERY_METHOD_WHATSAPP",
-        auth: { selfie: true },
       },
       ...(witnessName && witnessPhone
         ? [{
@@ -89,7 +88,6 @@ Deno.serve(async (req) => {
             phone: normalizePhone(witnessPhone),
             action: "SIGN",
             delivery_method: "DELIVERY_METHOD_WHATSAPP",
-            auth: { selfie: true },
           }]
         : []),
       ...FAZENDA_SIGNERS,
