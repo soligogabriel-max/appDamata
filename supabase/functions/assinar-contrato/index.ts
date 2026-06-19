@@ -67,6 +67,12 @@ Deno.serve(async (req) => {
       }
     }`;
 
+  // Signatários fixos da fazenda (assinam todo contrato, por WhatsApp)
+  const FAZENDA_SIGNERS = [
+    { name: "Vitoria Bedutti Rodrigues", phone: "+5519994086658", email: "vbedutti@gmail.com", action: "SIGN", delivery_method: "DELIVERY_METHOD_WHATSAPP" },
+    { name: "Gabriel Jose Soligo", phone: "+5519991677827", email: "soligogabriel@gmail.com", action: "SIGN", delivery_method: "DELIVERY_METHOD_WHATSAPP" },
+  ];
+
   const variables = {
     document: { name: docName || ("Contrato " + (cod || "")) },
     signers: [
@@ -77,6 +83,7 @@ Deno.serve(async (req) => {
         action: "SIGN",
         delivery_method: "DELIVERY_METHOD_WHATSAPP",
       },
+      ...FAZENDA_SIGNERS,
     ],
     file: null,
   };
