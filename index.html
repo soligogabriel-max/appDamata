@@ -1342,9 +1342,9 @@ function _applyNavForRole(role){
 
 function openSimModal(){
   if(!isAdmin(getCU())) return;
-  var r=prompt("Simular perfil:\n1 = Equipe\n(ESC para cancelar)","1");
+  var r=prompt("Simular perfil:\n1 = Equipe\n2 = Fornecedor\n(ESC para cancelar)","1");
   if(r===null) return;
-  var map={"1":"equipe","equipe":"equipe"};
+  var map={"1":"equipe","equipe":"equipe","2":"fornecedor","fornecedor":"fornecedor"};
   var picked=map[r.trim().toLowerCase()];
   if(!picked){alert("Perfil inválido.");return;}
   _simRole=picked;
@@ -1353,6 +1353,9 @@ function openSimModal(){
   document.getElementById("tnav").style.display="flex";
   document.getElementById("btn-new-ev").style.display="none";
   _applyNavForRole(picked);
+  // oculta botões admin no modal de evento
+  var adminBtns=document.getElementById("evd-admin-btns");
+  if(adminBtns) adminBtns.style.display="none";
   setTab("agenda");
 }
 
@@ -1360,9 +1363,10 @@ function exitSim(){
   _simRole=null;
   document.getElementById("sim-banner").style.display="none";
   document.getElementById("sim-banner-role").textContent="";
-  // restaura nav de admin
   _applyNavForRole("admin");
   document.getElementById("btn-new-ev").style.display="inline-flex";
+  var adminBtns=document.getElementById("evd-admin-btns");
+  if(adminBtns) adminBtns.style.display="";
   setTab("agenda");
 }
 
@@ -1764,7 +1768,7 @@ function openEvDet(ev){
   if(ev.obs){document.getElementById("evd-notes").textContent=ev.obs;nb.style.display="block";}
   else nb.style.display="none";
   const cu=getCU();
-  document.getElementById("evd-admin-btns").style.display=isAdmin(cu)?"block":"none";
+  document.getElementById("evd-admin-btns").style.display=effIsAdmin()?"block":"none";
   document.getElementById("m-evdet").classList.add("open");
 }
 function closeEvDet(){document.getElementById("m-evdet").classList.remove("open");}
@@ -4984,7 +4988,8 @@ async function renderPedidos() {
           ${showVals?`<td style="text-align:right;">${dv?.somaItens ? fmt(dv.somaItens) : "—"}</td>
           <td style="text-align:right;color:#2A6644;">${dv?.somaRec != null ? fmt(dv.somaRec) : "—"}</td>
           <td style="text-align:right;font-weight:700;">${r.total_pedido?fmt(r.total_pedido):"—"}</td>
-          <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openPedidoModal(JSON.parse(this.dataset.r))' data-r="${rj}">✏️</button></div></td>`:``}
+          <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openPedidoModal(JSON.parse(this.dataset.r),false)' data-r="${rj}">✏️</button></div></td>`
+          :`<td><div class="row-acts"><button class="act-btn" title="Ver itens" onclick='openPedidoModal(JSON.parse(this.dataset.r),true)' data-r="${rj}">👁</button></div></td>`}
         </tr>`;
       }).join("")}</tbody>
     </table></div>`;
@@ -4995,7 +5000,7 @@ function closePedidoModal() { document.getElementById("m-pedido").classList.remo
 
 let _pmInvItems = []; // cache do inventário para o modal
 
-function _pmAddItem(it={}) {
+function _pmAddItem(it={}, readOnly) {
   const tbody = document.getElementById("pm-itens-body");
   const tr = document.createElement("tr");
   tr.dataset.id = it.id||"";
@@ -5005,18 +5010,23 @@ function _pmAddItem(it={}) {
     return `<option value="${inv.cod}" ${sel}>${inv.cod} — ${inv.descricao||""}</option>`;
   }).join("");
   const sub = it.valor_subtotal ? fmt(it.valor_subtotal) : (it.quantidade&&it.valor_unitario ? fmt((it.quantidade||0)*(it.valor_unitario||0)) : "—");
-  tr.innerHTML=`
-    <td style="min-width:220px;">
-      <select class="inp pm-sel-cod" style="margin:0;width:100%;" onchange="_pmSelItem(this)">
-        <option value="">— Selecione item —</option>
-        ${opts}
-      </select>
-    </td>
-    <td style="display:none;" class="pm-descr">${(_pmInvItems.find(x=>x.cod===it.cod_item)||{}).descricao||it.descricao||""}</td>
-    <td><input class="inp pm-qtd" type="number" step="1" min="0" style="margin:0;width:70px;text-align:right;" value="${it.quantidade||""}" placeholder="0" oninput="_pmCalcSub(this)"/></td>
-    <td><input class="inp pm-vun" type="number" step="0.01" min="0" style="margin:0;width:100px;text-align:right;" value="${it.valor_unitario!=null?it.valor_unitario:""}" placeholder="0,00" oninput="_pmCalcSub(this)"/></td>
-    <td class="pm-sub" style="text-align:right;font-weight:700;white-space:nowrap;">${sub}</td>
-    <td><button class="act-btn" onclick="this.closest('tr').remove()" title="Remover">🗑</button></td>`;
+  const dn = readOnly ? "display:none;" : "";
+  const descricao = (_pmInvItems.find(x=>x.cod===it.cod_item)||{}).descricao||it.descricao||"";
+  tr.innerHTML = readOnly
+    ? `<td style="min-width:220px;">${descricao||it.cod_item||"—"}</td>
+       <td style="text-align:right;">${it.quantidade||"—"}</td>
+       <td style="${dn}"></td><td style="${dn}"></td><td style="${dn}"></td>`
+    : `<td style="min-width:220px;">
+        <select class="inp pm-sel-cod" style="margin:0;width:100%;" onchange="_pmSelItem(this)">
+          <option value="">— Selecione item —</option>
+          ${opts}
+        </select>
+       </td>
+       <td style="display:none;" class="pm-descr">${descricao}</td>
+       <td><input class="inp pm-qtd" type="number" step="1" min="0" style="margin:0;width:70px;text-align:right;" value="${it.quantidade||""}" placeholder="0" oninput="_pmCalcSub(this)"/></td>
+       <td><input class="inp pm-vun" type="number" step="0.01" min="0" style="margin:0;width:100px;text-align:right;" value="${it.valor_unitario!=null?it.valor_unitario:""}" placeholder="0,00" oninput="_pmCalcSub(this)"/></td>
+       <td class="pm-sub" style="text-align:right;font-weight:700;white-space:nowrap;">${sub}</td>
+       <td><button class="act-btn" onclick="this.closest('tr').remove()" title="Remover">🗑</button></td>`;
   tbody.appendChild(tr);
 }
 
@@ -5082,9 +5092,10 @@ async function _pmUpdateTotais() {
   }
 }
 
-async function openPedidoModal(ped) {
+async function openPedidoModal(ped, readOnly) {
   _pedidoId = ped ? ped.id : null;
-  document.getElementById("ped-modal-title").textContent = ped ? "Editar Pedido" : "Novo Pedido";
+  const ro = readOnly || !effIsAdmin();
+  document.getElementById("ped-modal-title").textContent = ro ? "Itens do Pedido" : (ped ? "Editar Pedido" : "Novo Pedido");
   document.getElementById("pm-numero").value = ped?.numero_pedido||"";
   document.getElementById("pm-total").value = ped?.total_pedido||"";
   document.getElementById("pm-itens-body").innerHTML = "";
@@ -5099,8 +5110,17 @@ async function openPedidoModal(ped) {
   _pmInvItems = invItems;
   _pmSomaReceber = null; // reset cache ao abrir novo pedido
   evts.forEach(e=>{ const o=document.createElement("option"); o.value=e.cod; o.textContent=(e.nome_evento||e.cod); if(ped&&e.cod===ped.cod_evento)o.selected=true; sel.appendChild(o); });
-  itens.forEach(it=>_pmAddItem(it));
-  await _pmUpdateTotais();
+  itens.forEach(it=>_pmAddItem(it, ro));
+  // modo leitura: oculta campos de valor e ações
+  document.getElementById("pm-total").closest("div").parentElement.style.display = ro ? "none" : "";
+  document.getElementById("pm-totais-panel").style.display = ro ? "none" : "";
+  document.getElementById("pm-itens-table").querySelectorAll("th")[2].style.display = ro ? "none" : "";
+  document.getElementById("pm-itens-table").querySelectorAll("th")[3].style.display = ro ? "none" : "";
+  document.getElementById("pm-itens-table").querySelectorAll("th")[4].style.display = ro ? "none" : "";
+  document.querySelector("#m-pedido .btn-cancel[onclick*='_pmAddItem']") && (document.querySelector("#m-pedido .btn-cancel[onclick*='_pmAddItem']").style.display = ro ? "none" : "");
+  document.getElementById("pm-btn-save").style.display = ro ? "none" : "";
+  document.querySelector("#m-pedido .macts .btn-cancel").textContent = ro ? "Fechar" : "Cancelar";
+  if(!ro) await _pmUpdateTotais();
   document.getElementById("m-pedido").classList.add("open");
 }
 
