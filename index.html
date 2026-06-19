@@ -1007,6 +1007,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div class="msub" id="eu-sub"></div>
     <div class="ropt" onclick="_euPickRole('equipe',this)"><span class="ropt-i">👥</span><div><div class="ropt-l">Equipe</div><div class="ropt-d">Acessa a agenda completa</div></div></div>
     <div class="ropt" onclick="_euPickRole('fornecedor',this)"><span class="ropt-i">🤝</span><div><div class="ropt-l">Fornecedor</div><div class="ropt-d">Vê apenas eventos vinculados</div></div></div>
+    <div class="ropt" onclick="_euPickRole('assessoria',this)"><span class="ropt-i">🎗</span><div><div class="ropt-l">Assessoria</div><div class="ropt-d">Agenda, pedidos, contratos e a receber</div></div></div>
     <div class="ropt" onclick="_euPickRole('cliente',this)"><span class="ropt-i">💍</span><div><div class="ropt-l">Cliente</div><div class="ropt-d">Vê apenas o próprio evento</div></div></div>
     <div class="ropt" onclick="_euPickRole('admin',this)"><span class="ropt-i">🔑</span><div><div class="ropt-l">Admin</div><div class="ropt-d">Acesso completo ao sistema</div></div></div>
     <div class="eswrap" id="eu-eswrap" style="display:none;">
@@ -1211,6 +1212,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div class="msub" id="apr-sub"></div>
     <div class="ropt" onclick="pickRole('equipe',this)"><span class="ropt-i">👥</span><div><div class="ropt-l">Equipe</div><div class="ropt-d">Acessa a agenda completa</div></div></div>
     <div class="ropt" onclick="pickRole('fornecedor',this)"><span class="ropt-i">🤝</span><div><div class="ropt-l">Fornecedor</div><div class="ropt-d">Vê apenas eventos vinculados</div></div></div>
+    <div class="ropt" onclick="pickRole('assessoria',this)"><span class="ropt-i">🎗</span><div><div class="ropt-l">Assessoria</div><div class="ropt-d">Agenda, pedidos, contratos e a receber</div></div></div>
     <div class="ropt" onclick="pickRole('cliente',this)"><span class="ropt-i">💍</span><div><div class="ropt-l">Cliente</div><div class="ropt-d">Vê apenas o próprio evento</div></div></div>
     <div class="eswrap" id="eswrap">
       <span class="eslbl" id="eslbl">Vincular ao evento</span>
@@ -1311,7 +1313,7 @@ const MONTHS=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Ago
 const WD=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 const ET={casamento:{label:"Casamento",color:"#2E3C44",bg:"#E8EEF0"},aniversario:{label:"Aniversário",color:"#7A5C1A",bg:"#FDF0CC"},corporativo:{label:"Corporativo",color:"#2A4A3A",bg:"#D8EDE2"},hospedagem:{label:"Hospedagem",color:"#1A4A5C",bg:"#D8EAF0"},festa:{label:"Festa",color:"#5C2A6A",bg:"#EDE0F5"},outro:{label:"Outro",color:"#4A4A4A",bg:"#EBEBEB"}};
 const SM={confirmado:{label:"Confirmado",color:"#2A6644"},proposta:{label:"Proposta",color:"#C08820"},cancelado:{label:"Cancelado",color:"#A03030"}};
-const RL={admin:"Admin",equipe:"Equipe",fornecedor:"Fornecedor",cliente:"Cliente"};
+const RL={admin:"Admin",equipe:"Equipe",fornecedor:"Fornecedor",cliente:"Cliente",assessoria:"Assessoria"};
 const ADMIN={id:"admin-0",name:"Gabriel Soligo",email:"soligogabriel@gmail.com",role:"admin",status:"approved",event_ids:[]};
 const ADMIN_EMAILS=["soligogabriel@gmail.com"];
 function isAdmin(u){ return u && (u.role==="admin" || ADMIN_EMAILS.includes(u.email)); }
@@ -1323,47 +1325,54 @@ function getCU() { try { return JSON.parse(sessionStorage.getItem("dm_user")||"n
 function setCU(u) { sessionStorage.setItem("dm_user", u ? JSON.stringify(u) : "null"); }
 
 var _simRole = null;
-function effRole() { var u=getCU(); return _simRole || (u&&u.role) || null; }
+var _userEventIds = null; // event_ids do usuario logado (assessoria/fornecedor)
+function effRole() { var u=getCU(); return (_simRole||"").split(":")[0] || (u&&u.role) || null; }
 function effIsAdmin() { return !_simRole && isAdmin(getCU()); }
 
 function _applyNavForRole(role){
   var isA = !_simRole && isAdmin(getCU());
-  var adminGroups=["grp-financeiro","grp-cadastros","grp-admin","grp-eventos"];
+  var allGroups=["grp-financeiro","grp-cadastros","grp-admin","grp-eventos"];
+  var allSubTabs=["t-contratos","t-vt","t-orcamentos","t-pagar","t-fluxo","t-extrato","t-fluxoreal"];
   if(isA || role==="admin"){
-    adminGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
-    ["t-contratos","t-vt","t-orcamentos"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
+    allGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
+    allSubTabs.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     document.getElementById("t-pedidos-eq").style.display="none";
-    document.getElementById("grp-pedidos-eq") && (document.getElementById("grp-pedidos-eq").style.display="none");
   } else if(role==="equipe"){
-    adminGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    allGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     document.getElementById("t-pedidos-eq").style.display="";
   } else if(role==="fornecedor"){
     document.getElementById("tnav").style.display="none";
+    document.getElementById("t-pedidos-eq").style.display="none";
+  } else if(role==="assessoria"){
+    // mostra apenas grp-eventos (contratos+pedidos) e grp-financeiro (só receber)
+    ["grp-cadastros","grp-admin"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    ["grp-financeiro","grp-eventos"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
+    ["t-vt","t-orcamentos","t-pagar","t-fluxo","t-extrato","t-fluxoreal"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    ["t-contratos","t-pedidos"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     document.getElementById("t-pedidos-eq").style.display="none";
   }
 }
 
 async function openSimModal(){
   if(!isAdmin(getCU())) return;
-  var r=prompt("Simular perfil:\n1 = Equipe\n2 = Fornecedor\n(ESC para cancelar)","1");
+  var r=prompt("Simular perfil:\n1 = Equipe\n2 = Fornecedor\n3 = Assessoria\n(ESC para cancelar)","1");
   if(r===null) return;
-  var map={"1":"equipe","equipe":"equipe","2":"fornecedor","fornecedor":"fornecedor"};
+  var map={"1":"equipe","equipe":"equipe","2":"fornecedor","fornecedor":"fornecedor","3":"assessoria","assessoria":"assessoria"};
   var picked=map[r.trim().toLowerCase()];
   if(!picked){alert("Perfil inválido.");return;}
 
-  var simEventIds=null;
-  if(picked==="fornecedor"){
+  if(picked==="fornecedor"||picked==="assessoria"){
     try{
-      var fornList=await dbGet("app_users","role=eq.fornecedor&status=eq.approved&select=id,name,event_ids&order=name.asc&limit=200");
-      if(!fornList.length){alert("Nenhum fornecedor cadastrado.");return;}
-      var opts=fornList.map(function(u,i){return (i+1)+") "+u.name;}).join("\n");
-      var idx=prompt("Escolha o fornecedor para simular:\n"+opts,"1");
+      var uList=await dbGet("app_users","role=eq."+picked+"&status=eq.approved&select=id,name,event_ids&order=name.asc&limit=200");
+      if(!uList.length){alert("Nenhum usuário desse perfil cadastrado.");return;}
+      var opts=uList.map(function(u,i){return (i+1)+") "+u.name;}).join("\n");
+      var idx=prompt("Escolha o usuário para simular:\n"+opts,"1");
       if(!idx)return;
-      var chosen=fornList[parseInt(idx)-1];
+      var chosen=uList[parseInt(idx)-1];
       if(!chosen){alert("Opção inválida.");return;}
-      simEventIds=chosen.event_ids||[];
-      picked="fornecedor:"+chosen.name;
-    }catch(e){alert("Erro ao buscar fornecedores: "+e.message);return;}
+      _userEventIds=chosen.event_ids||[];
+      picked=picked+":"+chosen.name;
+    }catch(e){alert("Erro ao buscar usuários: "+e.message);return;}
   }
 
   _simRole=picked;
@@ -1375,7 +1384,9 @@ async function openSimModal(){
   var adminBtns=document.getElementById("evd-admin-btns");
   if(adminBtns) adminBtns.style.display="none";
   if(picked.startsWith("fornecedor")){
-    renderCal(simEventIds);
+    renderCal(_userEventIds);
+  } else if(picked.startsWith("assessoria")){
+    setTab("agenda"); renderCal(_userEventIds);
   } else {
     setTab("agenda");
   }
@@ -1383,13 +1394,14 @@ async function openSimModal(){
 
 function exitSim(){
   _simRole=null;
+  _userEventIds=null;
   document.getElementById("sim-banner").style.display="none";
   document.getElementById("sim-banner-role").textContent="";
   _applyNavForRole("admin");
   document.getElementById("btn-new-ev").style.display="inline-flex";
   var adminBtns=document.getElementById("evd-admin-btns");
   if(adminBtns) adminBtns.style.display="";
-  setTab("agenda");
+  setTab("agenda"); renderCal(null);
 }
 
 function showSc(sc) {
@@ -1503,7 +1515,7 @@ async function openApp(u) {
   const tn = document.getElementById("tnav");
   const bne = document.getElementById("btn-new-ev");
   // Expand event_ids with all events from user's assessoria
-  if (u.assessoria_cod && (u.role==="fornecedor"||u.role==="cliente"||u.role==="equipe")) {
+  if (u.assessoria_cod && (u.role==="fornecedor"||u.role==="cliente"||u.role==="equipe"||u.role==="assessoria")) {
     try {
       const assEvts = await dbGet("agenda","select=cod&assessoria_cod=eq."+encodeURIComponent(u.assessoria_cod)+"&limit=500");
       const extra = assEvts.map(e=>e.cod).filter(c=>c && !(u.event_ids||[]).includes(c));
@@ -1512,7 +1524,8 @@ async function openApp(u) {
   }
   if (isAdmin(u)) { tn.style.display="flex"; bne.style.display="inline-flex"; document.getElementById("btn-sim").style.display=""; setTab("agenda"); updBadge(); }
   else if (u.role==="equipe") { tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("equipe"); setTab("agenda"); renderCal(null); }
-  else if (u.role==="fornecedor") { tn.style.display="none"; bne.style.display="none"; document.getElementById("p-agenda").classList.add("on"); renderCal(u.event_ids); }
+  else if (u.role==="fornecedor") { _userEventIds=u.event_ids||[]; tn.style.display="none"; bne.style.display="none"; document.getElementById("p-agenda").classList.add("on"); renderCal(_userEventIds); }
+  else if (u.role==="assessoria") { _userEventIds=u.event_ids||[]; tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("assessoria"); setTab("agenda"); renderCal(_userEventIds); }
   else if (u.role==="cliente") { tn.style.display="none"; bne.style.display="none"; document.getElementById("p-client").classList.add("on"); renderCli(u); }
   showSc("app");
 }
@@ -2281,12 +2294,12 @@ async function openApr(id,name){
   } catch(e){ esl.innerHTML='<div style="font-size:12px;color:var(--er);padding:8px;">Erro ao carregar eventos.</div>'; }
 }
 function closeApr(){document.getElementById("m-approve").classList.remove("open");}
-function pickRole(role,el){chosenRole=role;document.querySelectorAll(".ropt").forEach(r=>r.classList.remove("sel"));el.classList.add("sel");const ew=document.getElementById("eswrap");if(role==="cliente"||role==="fornecedor"){ew.style.display="block";document.getElementById("eslbl").textContent=role==="cliente"?"Vincular ao evento":"Vincular aos eventos";selEvIds=[];document.querySelectorAll(".esitem").forEach(i=>i.classList.remove("sel"));}else{ew.style.display="none";selEvIds=[];}}
+function pickRole(role,el){chosenRole=role;document.querySelectorAll(".ropt").forEach(r=>r.classList.remove("sel"));el.classList.add("sel");const ew=document.getElementById("eswrap");if(role==="cliente"||role==="fornecedor"||role==="assessoria"){ew.style.display="block";document.getElementById("eslbl").textContent=role==="cliente"?"Vincular ao evento":"Vincular aos eventos";selEvIds=[];document.querySelectorAll(".esitem").forEach(i=>i.classList.remove("sel"));}else{ew.style.display="none";selEvIds=[];}}
 function togEv(id,el){if(chosenRole==="cliente"){selEvIds=[id];document.querySelectorAll(".esitem").forEach(i=>i.classList.remove("sel"));el.classList.add("sel");}else{const i=selEvIds.indexOf(id);if(i>-1){selEvIds.splice(i,1);el.classList.remove("sel");}else{selEvIds.push(id);el.classList.add("sel");}}}
 
 async function confirmApr(){
   if(!chosenRole){toast("Selecione um perfil.");return;}
-  if((chosenRole==="cliente"||chosenRole==="fornecedor")&&!selEvIds.length){toast("Selecione ao menos um evento.");return;}
+  if((chosenRole==="cliente"||chosenRole==="fornecedor"||chosenRole==="assessoria")&&!selEvIds.length){toast("Selecione ao menos um evento.");return;}
   try {
     await dbUpdate("app_users","id=eq."+aprId,{status:"approved",role:chosenRole,event_ids:selEvIds});
     closeApr(); renderPend(); updBadge(); toast("✅ "+aprName+" aprovado como "+RL[chosenRole]+"!");
@@ -2359,6 +2372,7 @@ async function renderReceber(){
     const rows=await dbGetAll("contas_a_receber",q);
     const hoje=new Date(); hoje.setHours(0,0,0,0);
     let filtrado=rows.filter(r=>{
+      if(_userEventIds && !_userEventIds.includes(r.cod_evento)) return false;
       if(st==="Atrasado") return r.vencimento&&new Date(r.vencimento)<hoje;
       if(st==="Pendente") return !r.vencimento||new Date(r.vencimento)>=hoje;
       return true;
@@ -4229,6 +4243,7 @@ async function renderContratos() {
   el.innerHTML = `<div style="color:var(--dl);padding:20px;text-align:center;font-size:13px;">Carregando…</div>`;
   try {
     _contratosRows = await dbGet("agenda", "select=cod,nome_evento,data_evento,assinatura_status,contrato_ok&order=cod.desc&limit=200");
+    if(_userEventIds) _contratosRows = _contratosRows.filter(r=>_userEventIds.includes(r.cod));
     const q = (document.getElementById("contratos-filtro")?.value || "").trim();
     if (q) filtrarContratos(); else _renderContratosTabela(_contratosRows);
   } catch(e) {
@@ -4848,7 +4863,7 @@ function _euPickRole(role, el) {
   if(role==="admin"||role==="equipe") { document.getElementById("eu-eswrap").style.display="none"; _euEvIds=[]; return; }
   const wrap=document.getElementById("eu-eswrap");
   const lbl=document.getElementById("eu-eslbl");
-  if(role==="cliente"||role==="fornecedor"){
+  if(role==="cliente"||role==="fornecedor"||role==="assessoria"){
     wrap.style.display="block";
     lbl.textContent=role==="cliente"?"Vincular ao evento":"Vincular aos eventos";
   } else { wrap.style.display="none"; _euEvIds=[]; }
@@ -4870,14 +4885,14 @@ async function openEditUser(u) {
   _euId=u.id; _euRole=u.role; _euEvIds=[...(u.event_ids||[])];
   document.getElementById("eu-sub").textContent="Editando: "+u.name;
   document.querySelectorAll("#m-edit-user .ropt").forEach(r=>r.classList.remove("sel"));
-  const roleIdx={equipe:0,fornecedor:1,cliente:2,admin:3};
+  const roleIdx={equipe:0,fornecedor:1,assessoria:2,cliente:3,admin:4};
   const ropts=document.querySelectorAll("#m-edit-user .ropt");
   if(ropts[roleIdx[u.role]] !== undefined) ropts[roleIdx[u.role]].classList.add("sel");
   document.getElementById("eu-senha-atual").value = u.password || "";
   document.getElementById("eu-nova-senha").value = "";
   document.getElementById("eu-senha-wrap").style.display = "none";
   const wrap=document.getElementById("eu-eswrap");
-  if(u.role==="cliente"||u.role==="fornecedor"){
+  if(u.role==="cliente"||u.role==="fornecedor"||u.role==="assessoria"){
     wrap.style.display="block";
     document.getElementById("eu-eslbl").textContent=u.role==="cliente"?"Vincular ao evento":"Vincular aos eventos";
   } else { wrap.style.display="none"; }
@@ -4958,6 +4973,7 @@ async function renderPedidos() {
     }
 
     let rows = pedRows;
+    if(_userEventIds) rows = rows.filter(r=>_userEventIds.includes(r.cod_evento));
     if(_pedPer==="futuros")  rows = rows.filter(r=>{ const d=evDateMap[r.cod_evento]; return d && d >= hojeStr; });
     if(_pedPer==="passados") rows = rows.filter(r=>{ const d=evDateMap[r.cod_evento]; return !d || d < hojeStr; });
     if(evFil)  rows = rows.filter(r=>r.cod_evento===evFil);
