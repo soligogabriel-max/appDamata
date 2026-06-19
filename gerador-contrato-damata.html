@@ -133,21 +133,9 @@ select.inp{cursor:pointer}
 <div class="card">
   <div class="ctitle">⚡ Ações</div>
   <div style="display:flex;flex-direction:column;gap:10px">
-    <button class="btn" onclick="salvarNoSistema()" style="background:#166534;color:white;font-size:15px;padding:14px 20px">
-      <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-      Salvar no Sistema
-    </button>
     <button class="btn" onclick="generateFile()" style="background:#1d4ed8;color:white;font-size:15px;padding:14px 20px">
       <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
       Gerar arquivo para o cliente (.html)
-    </button>
-    <button class="btn" onclick="exportarPDF()" style="background:#7c3aed;color:white;font-size:15px;padding:14px 20px">
-      <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-      Exportar PDF (imprimir)
-    </button>
-    <button class="btn" onclick="exportPayments()" style="background:#15803d;color:white">
-      <svg width="16" height="16" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-      Exportar parcelas (.xlsx)
     </button>
   </div>
 </div>
@@ -474,6 +462,26 @@ function b64ToUtf8(b64){
   return new TextDecoder("utf-8").decode(bytes);
 }
 function generateFile(){
+  var noiva=v("o-noiva"),noivo=v("o-noivo");
+  if(!noiva&&!noivo){alert("Preencha pelo menos o nome da noiva ou do noivo.");return;}
+  if(!v("o-d1")){alert("Preencha a data do evento.");return;}
+  // Salva no sistema automaticamente
+  var savePreset={
+    code:v("o-code"),obs:v("o-obs"),
+    date1:v("o-d1"),date2:v("o-d2"),cin:v("o-cin"),cout:v("o-cout"),
+    total:v("o-total"),
+    payments:payments.map(function(p){return{desc:p.desc,date:p.date,value:p.value};}),
+    nomeNoiva:noiva,nomeNoivo:noivo,
+    tipoEvento:v("o-tipo")||"Casamento",
+    itens:collectItens(),
+    gcEvt:_gcEvt,
+    gcUserId:_gcUser?_gcUser.id:null,
+    contrato_gerado:true,
+  };
+  if(window.parent&&window.parent!==window){
+    window.parent.postMessage({type:"damata_salvar_contrato",preset:savePreset},"*");
+  }
+  // Gera o arquivo para o cliente
   var preset=collectPreset();
   var pJson=JSON.stringify(preset);
   var tmpl=b64ToUtf8(CLIENT_B64);

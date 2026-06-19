@@ -589,7 +589,20 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     </div>
     <!-- CONTRATOS -->
     <div id="p-contratos" class="panel">
-      <iframe src="./gerador-contrato-damata.html" style="width:100%;height:calc(100vh - 110px);border:none;display:block;"></iframe>
+      <!-- Tabela de status dos contratos -->
+      <div class="uwrap" style="max-width:1100px;padding-bottom:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+          <div class="sec-t" style="margin-bottom:0;">📄 Contratos</div>
+          <button onclick="setTab('contratos');document.getElementById('contratos-gerador').style.display='block';document.getElementById('contratos-gerador').scrollIntoView({behavior:'smooth'})" style="background:var(--a);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;">+ Novo contrato</button>
+        </div>
+        <div id="contratos-list" style="overflow-x:auto;">
+          <div style="color:var(--dl);padding:20px;text-align:center;font-size:13px;">Carregando…</div>
+        </div>
+      </div>
+      <!-- Gerador (iframe) abaixo -->
+      <div id="contratos-gerador" style="margin-top:16px;">
+        <iframe src="./gerador-contrato-damata.html" style="width:100%;height:calc(100vh - 130px);border:none;display:block;"></iframe>
+      </div>
     </div>
 
     <!-- ORÇAMENTOS REALIZADOS -->
@@ -1457,6 +1470,7 @@ function setTab(t) {
   if(t==="users") renderUsers();
   if(t==="fotoslanding") renderFotosLanding();
   if(t==="orcamentos") renderOrcamentos();
+  if(t==="contratos") renderContratos();
 }
 
 /* ── Fotos Landing ─────────────────────────────────────────── */
@@ -4017,10 +4031,19 @@ async function salvarContrato(preset) {
       }], prefer:"return=minimal"});
     }
 
+    // 8. Marcar contrato como gerado (arquivo gerado para o cliente)
+    if(preset.contrato_gerado) {
+      await sbFetch(`agenda?cod=eq.${encodeURIComponent(cod)}`, {
+        method:"PATCH",
+        body:{ assinatura_status:"gerado", contrato_gerado_at: new Date().toISOString() },
+        prefer:"return=minimal"
+      });
+    }
+
     // Invalida cache da agenda
-    cachedEvts = null; _agendaMap = null;
+    cachedEvts = null; _agendaMap = null; _contratosCache = null;
     alert(`✅ Contrato ${cod} salvo!\n${nomeEvento}`);
-    setTab("agenda");
+    setTab("contratos");
   } catch(e) {
     alert("❌ Erro ao salvar contrato:\n" + e.message);
   }
@@ -4032,6 +4055,52 @@ window.addEventListener("message", e => {
     salvarContrato(e.data.preset);
   }
 });
+
+// ══════════════════════════════════════════
+// CONTRATOS — tabela de status
+// ══════════════════════════════════════════
+let _contratosCache = null;
+
+const CONTRATO_STATUS_LABEL = {
+  null:              { label: "Falta gerar contrato",       color: "#dc2626", bg: "#fee2e2" },
+  "":                { label: "Falta gerar contrato",       color: "#dc2626", bg: "#fee2e2" },
+  "gerado":          { label: "Arquivo gerado p/ cliente",  color: "#d97706", bg: "#fef3c7" },
+  "dados_preenchidos":{ label: "Cliente preencheu dados",   color: "#7c3aed", bg: "#ede9fe" },
+  "enviado":         { label: "Aguardando assinatura",      color: "#2563eb", bg: "#dbeafe" },
+  "assinado":        { label: "✅ Assinado",                color: "#166534", bg: "#dcfce7" },
+};
+
+function contratoStatusBadge(st) {
+  const s = CONTRATO_STATUS_LABEL[st] || CONTRATO_STATUS_LABEL[null];
+  return `<span style="background:${s.bg};color:${s.color};padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap;">${s.label}</span>`;
+}
+
+async function renderContratos() {
+  const el = document.getElementById("contratos-list");
+  if (!el) return;
+  try {
+    const rows = await dbGet("agenda", "select=cod,nome_evento,data_evento,assinatura_status,assinatura_doc_id,contrato_ok&order=data_evento.desc.nullslast&limit=200");
+    if (!rows.length) { el.innerHTML = `<div style="color:var(--dl);padding:20px;text-align:center;font-size:13px;">Nenhum contrato encontrado.</div>`; return; }
+    const fmt = d => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : "—";
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:var(--s2);color:var(--dl);">
+        <th style="padding:8px 12px;text-align:left;font-weight:600;">Código</th>
+        <th style="padding:8px 12px;text-align:left;font-weight:600;">Evento</th>
+        <th style="padding:8px 12px;text-align:left;font-weight:600;">Data</th>
+        <th style="padding:8px 12px;text-align:left;font-weight:600;">Status do Contrato</th>
+      </tr></thead>
+      <tbody>${rows.map((r,i)=>`
+        <tr style="background:${i%2===0?'var(--s1)':'var(--s2)'};border-bottom:1px solid var(--br);">
+          <td style="padding:8px 12px;font-weight:700;color:var(--a);">${r.cod||"—"}</td>
+          <td style="padding:8px 12px;">${r.nome_evento||"—"}</td>
+          <td style="padding:8px 12px;white-space:nowrap;">${fmt(r.data_evento)}</td>
+          <td style="padding:8px 12px;">${contratoStatusBadge(r.contrato_ok ? "assinado" : (r.assinatura_status||null))}</td>
+        </tr>`).join("")}
+      </tbody></table>`;
+  } catch(e) {
+    el.innerHTML = `<div style="color:var(--er);padding:20px;font-size:13px;">Erro ao carregar contratos.</div>`;
+  }
+}
 
 // ══════════════════════════════════════════
 // FUTUROS
