@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     return json({ error: "JSON inválido." }, 400);
   }
 
-  const { cod, signerName, signerPhone, signerEmail, pdfBase64, filename, docName } = payload || {};
+  const { cod, signerName, signerPhone, signerEmail, witnessName, witnessPhone, witnessEmail, pdfBase64, filename, docName } = payload || {};
   if (!pdfBase64 || !signerName || !signerPhone) {
     return json({ error: "Campos obrigatórios: pdfBase64, signerName, signerPhone." }, 400);
   }
@@ -83,6 +83,15 @@ Deno.serve(async (req) => {
         action: "SIGN",
         delivery_method: "DELIVERY_METHOD_WHATSAPP",
       },
+      ...(witnessName && witnessPhone
+        ? [{
+            name: witnessName,
+            phone: normalizePhone(witnessPhone),
+            email: witnessEmail || null,
+            action: "SIGN",
+            delivery_method: "DELIVERY_METHOD_WHATSAPP",
+          }]
+        : []),
       ...FAZENDA_SIGNERS,
     ],
     file: null,
