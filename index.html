@@ -615,10 +615,11 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 
     <!-- ORÇAMENTOS REALIZADOS -->
     <div id="p-orcamentos" class="panel">
-      <div class="uwrap" style="max-width:1000px;">
+      <div class="uwrap" style="max-width:1100px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
           <div style="display:flex;align-items:center;gap:12px;">
             <div class="sec-t" style="margin-bottom:0;">Orçamentos Realizados</div>
+            <span id="orc-count" style="background:var(--a);color:#fff;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;display:none;"></span>
             <button onclick="abrirOrcamentoAdmin()" style="padding:8px 16px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;white-space:nowrap;">➕ Novo orçamento</button>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -630,7 +631,10 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
               <option value="convertido">Convertido</option>
               <option value="expirado">Expirado</option>
             </select>
-            <input type="text" id="orc-fil-busca" class="inp inp-inline" style="width:180px;font-size:12px;" placeholder="Buscar nome…" oninput="renderOrcamentos()"/>
+            <input type="text" id="orc-fil-busca" class="inp inp-inline" style="width:170px;font-size:12px;" placeholder="Buscar nome…" oninput="renderOrcamentos()"/>
+            <input type="date" id="orc-fil-de" class="inp inp-inline" style="width:140px;font-size:12px;margin-bottom:0;" onchange="renderOrcamentos()" title="Data do evento — de"/>
+            <input type="date" id="orc-fil-ate" class="inp inp-inline" style="width:140px;font-size:12px;margin-bottom:0;" onchange="renderOrcamentos()" title="Data do evento — até"/>
+            <button class="btn-cancel" style="font-size:12px;padding:5px 12px;" onclick="document.getElementById('orc-fil-status').value='';document.getElementById('orc-fil-busca').value='';document.getElementById('orc-fil-de').value='';document.getElementById('orc-fil-ate').value='';renderOrcamentos()">Limpar</button>
           </div>
         </div>
         <div id="orc-list"></div>
@@ -1255,6 +1259,18 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <button class="btn-delete" style="width:100%;margin-bottom:6px;" onclick="deleteEventCascade()">🗑 Apagar Evento</button>
     </div>
     <button class="btn-cancel" style="width:100%;margin-top:4px;" onclick="closeEvDet()">Fechar</button>
+  </div>
+</div>
+
+<div class="moverlay" id="m-orc-det" onclick="if(event.target===this)closeOrcDet()">
+  <div class="mbox" style="max-width:560px;overflow-y:auto;max-height:90vh;">
+    <div class="mtitle" id="orc-det-title">Orçamento</div>
+    <div id="orc-det-body" style="margin-top:12px;"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;">
+      <button onclick="editarOrcamento(_orcDetId)" style="flex:1;padding:10px;background:var(--a);color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;">✏ Editar</button>
+      <button onclick="excluirOrcamento(_orcDetId)" style="padding:10px 16px;background:#fff;color:var(--er);border:1.5px solid var(--er);border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;">🗑 Excluir</button>
+      <button onclick="closeOrcDet()" style="padding:10px 16px;background:transparent;color:var(--dm);border:1.5px solid var(--br);border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;">Fechar</button>
+    </div>
   </div>
 </div>
 
@@ -3183,21 +3199,27 @@ const ORC_STATUS_COLOR={lead:"#94a3b8",orcado:"#3b82f6",pendente:"#E8A52A",conve
 async function renderOrcamentos(){
   const status=document.getElementById("orc-fil-status")?.value||"";
   const busca=(document.getElementById("orc-fil-busca")?.value||"").toLowerCase();
+  const filDe=document.getElementById("orc-fil-de")?.value||"";
+  const filAte=document.getElementById("orc-fil-ate")?.value||"";
   let q="orcamentos?order=created_at.desc&limit=200";
   if(status) q+=`&status=eq.${status}`;
   const rows=await sbFetch(q)||[];
   _orcRowsCache=rows;
   const list=document.getElementById("orc-list");
   let filtered=rows.filter(r=>{
-    if(!busca) return true;
-    return [r.nome_noiva,r.nome_noivo,r.nome_contratante,r.tipo_evento].some(v=>v&&v.toLowerCase().includes(busca));
+    if(busca&&![r.nome_noiva,r.nome_noivo,r.nome_contratante,r.tipo_evento].some(v=>v&&v.toLowerCase().includes(busca))) return false;
+    if(filDe&&r.data_evento&&r.data_evento<filDe) return false;
+    if(filAte&&r.data_evento&&r.data_evento>filAte) return false;
+    return true;
   });
+  const cnt=document.getElementById("orc-count");
+  if(cnt){cnt.textContent=filtered.length+" orçamento"+(filtered.length!==1?"s":"");cnt.style.display=filtered.length?"inline":"none";}
   if(!filtered.length){list.innerHTML=`<div style="padding:40px;text-align:center;color:var(--dl)">Nenhum orçamento encontrado.</div>`;return;}
   list.innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px;">
     <thead><tr style="background:#f5f6f7;text-align:left;">
-      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Data solicitação</th>
-      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Data evento</th>
-      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Noiva / Noivo</th>
+      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Solicitação</th>
+      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Evento</th>
+      <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Nome</th>
       <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Tipo</th>
       <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Convidados</th>
       <th style="padding:10px 12px;font-weight:700;color:var(--dl);">Valor</th>
@@ -3213,16 +3235,17 @@ async function renderOrcamentos(){
       return `<tr style="border-bottom:1px solid var(--br);">
         <td style="padding:10px 12px;">${r.created_at?r.created_at.slice(0,10).split("-").reverse().join("/"):"—"}</td>
         <td style="padding:10px 12px;">${r.data_evento?r.data_evento.split("-").reverse().join("/"):"—"}</td>
-        <td style="padding:10px 12px;font-weight:600;">${nomes}</td>
+        <td style="padding:10px 12px;font-weight:600;cursor:pointer;" onclick="verOrcamento(${r.id})">${nomes}</td>
         <td style="padding:10px 12px;">${r.tipo_evento||"—"}</td>
         <td style="padding:10px 12px;text-align:center;">${r.num_convidados||"—"}</td>
         <td style="padding:10px 12px;font-weight:700;">R$ ${r.valor_total?Number(r.valor_total).toLocaleString("pt-BR",{minimumFractionDigits:2}):"—"}</td>
         <td style="padding:10px 12px;">${r.validade?r.validade.split("-").reverse().join("/"):"—"}</td>
         <td style="padding:10px 12px;"><span style="background:${ORC_STATUS_COLOR[statusReal]}22;color:${ORC_STATUS_COLOR[statusReal]};padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;">${ORC_STATUS_LABEL[statusReal]||statusReal}</span></td>
-        <td style="padding:10px 12px;display:flex;gap:6px;">
-          <button onclick="efetivarOrcamento(${r.id})" title="Efetivar → gerar contrato" style="padding:4px 10px;border:1px solid var(--a);color:#fff;background:var(--a);border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap;">📄 Efetivar</button>
-          <button onclick="orcSetStatus(${r.id},'convertido')" title="Marcar convertido" style="padding:4px 8px;border:1px solid #27ae60;color:#27ae60;border-radius:6px;background:#fff;font-size:11px;">✓</button>
-          <button onclick="orcSetStatus(${r.id},'expirado')" title="Marcar expirado" style="padding:4px 8px;border:1px solid #e74c3c;color:#e74c3c;border-radius:6px;background:#fff;font-size:11px;">✕</button>
+        <td style="padding:10px 12px;white-space:nowrap;display:flex;gap:5px;">
+          <button onclick="verOrcamento(${r.id})" title="Ver detalhes" style="padding:4px 8px;border:1px solid var(--br);color:var(--dm);border-radius:6px;background:#fff;font-size:11px;" >👁</button>
+          <button onclick="efetivarOrcamento(${r.id})" title="Efetivar → gerar contrato" style="padding:4px 9px;border:1px solid var(--a);color:#fff;background:var(--a);border-radius:6px;font-size:11px;font-weight:700;white-space:nowrap;">📄</button>
+          <button onclick="editarOrcamento(${r.id})" title="Editar orçamento" style="padding:4px 8px;border:1px solid #3b82f6;color:#3b82f6;border-radius:6px;background:#fff;font-size:11px;">✏</button>
+          <button onclick="excluirOrcamento(${r.id})" title="Excluir orçamento" style="padding:4px 8px;border:1px solid var(--er);color:var(--er);border-radius:6px;background:#fff;font-size:11px;">🗑</button>
         </td>
       </tr>`;
     }).join("")}</tbody>
@@ -3230,6 +3253,76 @@ async function renderOrcamentos(){
 }
 async function orcSetStatus(id,status){
   await sbFetch(`orcamentos?id=eq.${id}`,{method:"PATCH",body:{status}});
+  renderOrcamentos();
+}
+let _orcDetId=null;
+function verOrcamento(id){
+  const row=(_orcRowsCache||[]).find(r=>r.id===id);
+  if(!row) return;
+  _orcDetId=id;
+  const hoje=new Date().toISOString().slice(0,10);
+  const exp=row.validade&&row.validade<hoje&&row.status==="pendente";
+  const statusReal=exp?"expirado":row.status||"pendente";
+  const nomes=[row.nome_noiva,row.nome_noivo].filter(Boolean).join(" e ")||row.nome_contratante||"—";
+  const itens=row.itens||[];
+  const fmt=v=>"R$ "+Number(v).toLocaleString("pt-BR",{minimumFractionDigits:2});
+  const itensTpl=itens.length
+    ?itens.map(i=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--br);font-size:13px;"><span>${_esc(i.descricao||i.cod||"—")}${i.qty>1?" × "+i.qty:""}</span><span style="color:var(--dm);white-space:nowrap;margin-left:12px">${i.subtotal?fmt(i.subtotal):""}</span></div>`).join("")
+    :`<div style="color:var(--dl);font-size:13px;padding:8px 0;">Nenhum item registrado.</div>`;
+  document.getElementById("orc-det-title").textContent=nomes;
+  document.getElementById("orc-det-body").innerHTML=`
+    <div style="margin-bottom:12px;"><span style="background:${ORC_STATUS_COLOR[statusReal]}22;color:${ORC_STATUS_COLOR[statusReal]};padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700;">${ORC_STATUS_LABEL[statusReal]||statusReal}</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:14px;font-size:13px;">
+      <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Tipo</div><div style="font-weight:600;">${_esc(row.tipo_evento||"—")}</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Data do evento</div><div style="font-weight:600;">${row.data_evento?row.data_evento.split("-").reverse().join("/"):"—"}</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Salão</div><div style="font-weight:600;">${_esc(row.salao||"—")}</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Convidados</div><div style="font-weight:600;">${row.num_convidados||"—"}</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Contratante</div><div style="font-weight:600;">${_esc(row.nome_contratante||"—")}</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">WhatsApp</div><div style="font-weight:600;">${_esc(row.whatsapp||"—")}</div></div>
+      ${row.email?`<div style="grid-column:span 2"><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">E-mail</div><div style="font-weight:600;">${_esc(row.email)}</div></div>`:""}
+      <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Solicitado em</div><div>${row.created_at?row.created_at.slice(0,10).split("-").reverse().join("/"):"—"}</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Válido até</div><div>${row.validade?row.validade.split("-").reverse().join("/"):"—"}</div></div>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Itens orçados</div>
+    ${itensTpl}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;margin-top:4px;border-top:2px solid var(--br);"><span style="font-size:15px;font-weight:700;">Total</span><span style="font-size:20px;font-weight:700;color:var(--a);">${row.valor_total?fmt(row.valor_total):"—"}</span></div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="efetivarOrcamento(${id});closeOrcDet()" style="flex:1;padding:7px;border:1px solid var(--a);color:#fff;background:var(--a);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">📄 Efetivar</button>
+      <button onclick="orcSetStatus(${id},'convertido');closeOrcDet()" style="flex:1;padding:7px;border:1px solid #27ae60;color:#27ae60;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;">✓ Convertido</button>
+      <button onclick="orcSetStatus(${id},'expirado');closeOrcDet()" style="flex:1;padding:7px;border:1px solid #e74c3c;color:#e74c3c;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;">✕ Expirado</button>
+    </div>`;
+  document.getElementById("m-orc-det").classList.add("open");
+}
+function closeOrcDet(){document.getElementById("m-orc-det").classList.remove("open");}
+function editarOrcamento(id){
+  closeOrcDet();
+  const row=(_orcRowsCache||[]).find(r=>r.id===id);
+  if(!row){toast&&toast("Orçamento não encontrado.");return;}
+  const conv=parseInt(row.num_convidados)||0;
+  const salao=row.salao||(conv<=100?"Bromélias":"Tumbergia");
+  _orc={
+    step:1,tipo_evento:row.tipo_evento||"Casamento",data_evento:row.data_evento||"",
+    num_convidados:row.num_convidados||"",nome_noiva:row.nome_noiva||"",
+    nome_noivo:row.nome_noivo||"",nome_contratante:row.nome_contratante||"",
+    whatsapp:row.whatsapp||"",email:row.email||"",salao:salao,
+    pacote_cod:row.pacote_cod||null,pacote_grupo_id:null,pacote_nome:"",
+    pacote_valor:row.valor_total||0,pacote_itens_desc:"",extras:{},
+    _pacotes:[],_invItems:[],valor_total:row.valor_total||0,
+    _selectedItems:(row.itens||[]).map(i=>({cod_item:i.cod,descricao:i.descricao,qty:i.qty||1,valor_unitario:i.valor_unitario||0,subtotal:i.subtotal||0})),
+    _subtotal:row.valor_total||0,_discount:0,_discountPkg:null,
+    _saved:true,_activePkg:null,_uSel:{},_dbId:row.id,_stage:row.status||"lead"
+  };
+  (row.itens||[]).forEach(i=>{if(i.cod)_orc._uSel[i.cod]={qty:i.qty||1,vun:i.valor_unitario||0};});
+  _orc._admin=isAdmin(getCU());
+  _orc._valorAjustado=true;
+  showSc("orcamento");
+  _orcStep();
+}
+async function excluirOrcamento(id){
+  if(!confirm("Excluir este orçamento permanentemente? Esta ação não pode ser desfeita.")) return;
+  await sbFetch(`orcamentos?id=eq.${id}`,{method:"DELETE"});
+  closeOrcDet();
+  toast&&toast("Orçamento excluído.");
   renderOrcamentos();
 }
 let _orcRowsCache=[];
