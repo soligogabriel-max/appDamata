@@ -461,13 +461,23 @@ function b64ToUtf8(b64){
   for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
   return new TextDecoder("utf-8").decode(bytes);
 }
-function generateFile(){
+async function generateFile(){
   var noiva=v("o-noiva"),noivo=v("o-noivo");
   if(!noiva&&!noivo){alert("Preencha pelo menos o nome da noiva ou do noivo.");return;}
   if(!v("o-d1")){alert("Preencha a data do evento.");return;}
+  // Garante que o código está preenchido antes de gerar o arquivo
+  if(!v("o-code")&&!_gcEvt){
+    try{
+      var ano=new Date().getFullYear();
+      var rows=await sbGet("agenda?select=cod&cod=like."+ano+"%25&order=cod.desc&limit=1");
+      var seq=1;
+      if(rows.length) seq=parseInt(rows[0].cod.slice(4))+1;
+      g("o-code").value=String(ano)+String(seq).padStart(2,"0");
+    }catch(e){alert("Erro ao gerar código: "+e.message);return;}
+  }
   // Salva no sistema automaticamente
   var savePreset={
-    code:v("o-code"),obs:v("o-obs"),
+    code:_gcEvt||v("o-code"),obs:v("o-obs"),
     date1:v("o-d1"),date2:v("o-d2"),cin:v("o-cin"),cout:v("o-cout"),
     total:v("o-total"),
     payments:payments.map(function(p){return{desc:p.desc,date:p.date,value:p.value};}),

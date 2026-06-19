@@ -3949,8 +3949,31 @@ async function salvarContrato(preset) {
         tipo_evento: preset.tipoEvento||"Casamento",
         obs: preset.obs||null,
       }, prefer:"return=minimal"});
+    } else if(preset.code) {
+      // Código já gerado pelo gerador (fluxo normal) — verifica se já existe
+      cod = preset.code;
+      nomeEvento = `${nomes} - ${dStr}`;
+      const agExist = await dbGet("agenda",`select=cod&cod=eq.${cod}&limit=1`);
+      if(agExist.length) {
+        // Já existe (duplo clique?) — só atualiza
+        await sbFetch(`agenda?cod=eq.${cod}`, {method:"PATCH", body:{
+          valor_locacao: preset.total ? parseFloat(preset.total) : null,
+          cin: preset.cin||null, cout: preset.cout||null,
+          tipo_evento: preset.tipoEvento||"Casamento",
+          obs: preset.obs||null,
+        }, prefer:"return=minimal"});
+      } else {
+        await sbFetch("agenda", {method:"POST", body:{
+          cod, nome_evento: nomeEvento,
+          data_evento: d1||null, data_fim: d2||null,
+          cin: preset.cin||null, cout: preset.cout||null,
+          tipo_evento: preset.tipoEvento||"Casamento",
+          valor_locacao: preset.total ? parseFloat(preset.total) : null,
+          obs: preset.obs||null,
+        }, prefer:"return=minimal"});
+      }
     } else {
-      // 1. Próximo código de evento: ano + sequencial
+      // Fallback: gera código no servidor
       const ano = new Date().getFullYear();
       const existentes = await dbGet("agenda",`select=cod&cod=like.${ano}%25&order=cod.desc&limit=1`);
       let seq = 1;
