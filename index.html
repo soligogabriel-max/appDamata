@@ -1387,44 +1387,27 @@ async function openSimModal(){
   var picked=map[r.trim().toLowerCase()];
   if(!picked){alert("Perfil inválido.");return;}
 
+  var simUser=null;
   if(picked==="fornecedor"||picked==="assessoria"){
     try{
-      var uList=await dbGet("app_users","role=eq."+picked+"&status=eq.approved&select=id,name,event_ids,assessoria_cod&order=name.asc&limit=200");
+      var uList=await dbGet("app_users","role=eq."+picked+"&status=eq.approved&select=id,name,role,event_ids,assessoria_cod&order=name.asc&limit=200");
       if(!uList.length){alert("Nenhum usuário desse perfil cadastrado.");return;}
       var opts=uList.map(function(u,i){return (i+1)+") "+u.name;}).join("\n");
       var idx=prompt("Escolha o usuário para simular:\n"+opts,"1");
       if(!idx)return;
-      var chosen=uList[parseInt(idx)-1];
-      if(!chosen){alert("Opção inválida.");return;}
-      _userEventIds=chosen.event_ids||[];
-      // Expand event_ids via assessoria_cod (same as real login)
-      if(chosen.assessoria_cod){
-        try{
-          var assEvts=await dbGet("agenda","select=cod&assessoria_cod=eq."+encodeURIComponent(chosen.assessoria_cod)+"&limit=500");
-          var extra=assEvts.map(function(e){return e.cod;}).filter(function(c){return c&&!_userEventIds.includes(c);});
-          if(extra.length) _userEventIds=[..._userEventIds,...extra];
-        }catch(_){}
-      }
-      picked=picked+":"+chosen.name;
+      simUser=uList[parseInt(idx)-1];
+      if(!simUser){alert("Opção inválida.");return;}
+      picked=picked+":"+simUser.name;
     }catch(e){alert("Erro ao buscar usuários: "+e.message);return;}
   }
 
   _simRole=picked;
   document.getElementById("sim-banner").style.display="";
   document.getElementById("sim-banner-role").textContent=picked.startsWith("fornecedor:")?picked.split(":")[1]:(RL[picked]||picked);
-  document.getElementById("tnav").style.display="flex";
   document.getElementById("btn-new-ev").style.display="none";
-  _applyNavForRole(picked.split(":")[0]);
   var adminBtns=document.getElementById("evd-admin-btns");
   if(adminBtns) adminBtns.style.display="none";
-  _agendaTabelaCache=null;
-  if(picked.startsWith("fornecedor")){
-    renderCal(_userEventIds);
-  } else if(picked.startsWith("assessoria")){
-    setTab("agenda"); renderCal(_userEventIds);
-  } else {
-    setTab("agenda");
-  }
+  await _setupUserAccess(simUser||{role:picked,event_ids:[],assessoria_cod:null});
 }
 
 function exitSim(){
@@ -1544,25 +1527,42 @@ function doLogout() { setCU(null); showSc("login"); }
 // ══════════════════════════════════════════
 // APP
 // ══════════════════════════════════════════
+
+// Fonte única de verdade para aplicar permissões de acesso de um usuário
+// não-admin. Usada tanto no login real quanto na simulação.
+async function _setupUserAccess(u){
+  if(u.assessoria_cod&&(u.role==="fornecedor"||u.role==="equipe"||u.role==="assessoria")){
+    try{
+      const assEvts=await dbGet("agenda","select=cod&assessoria_cod=eq."+encodeURIComponent(u.assessoria_cod)+"&limit=500");
+      const extra=assEvts.map(e=>e.cod).filter(c=>c&&!(u.event_ids||[]).includes(c));
+      if(extra.length) u={...u,event_ids:[...(u.event_ids||[]),...extra]};
+    }catch(_){}
+  }
+  _agendaTabelaCache=null;
+  if(u.role==="equipe"){
+    _userEventIds=null;
+    _applyNavForRole("equipe");
+    setTab("agenda"); renderCal(null);
+  } else if(u.role==="fornecedor"){
+    _userEventIds=u.event_ids||[];
+    _applyNavForRole("fornecedor");
+    setTab("agenda"); renderCal(_userEventIds);
+  } else if(u.role==="assessoria"){
+    _userEventIds=u.event_ids||[];
+    _applyNavForRole("assessoria");
+    setTab("agenda"); renderCal(u.assessoria_cod?_userEventIds:null);
+  }
+}
+
 async function openApp(u) {
   document.getElementById("hname").textContent = u.name;
   document.getElementById("hrole").textContent = RL[u.role]||"";
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
   const tn = document.getElementById("tnav");
   const bne = document.getElementById("btn-new-ev");
-  // Expand event_ids with all events from user's assessoria
-  if (u.assessoria_cod && (u.role==="fornecedor"||u.role==="cliente"||u.role==="equipe"||u.role==="assessoria")) {
-    try {
-      const assEvts = await dbGet("agenda","select=cod&assessoria_cod=eq."+encodeURIComponent(u.assessoria_cod)+"&limit=500");
-      const extra = assEvts.map(e=>e.cod).filter(c=>c && !(u.event_ids||[]).includes(c));
-      if(extra.length) u = {...u, event_ids:[...(u.event_ids||[]),...extra]};
-    } catch(e){}
-  }
   if (isAdmin(u)) { tn.style.display="flex"; bne.style.display="inline-flex"; document.getElementById("btn-sim").style.display=""; setTab("agenda"); updBadge(); }
-  else if (u.role==="equipe") { tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("equipe"); setTab("agenda"); renderCal(null); }
-  else if (u.role==="fornecedor") { _userEventIds=u.event_ids||[]; tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("fornecedor"); setTab("agenda"); renderCal(_userEventIds); }
-  else if (u.role==="assessoria") { _userEventIds=u.event_ids||[]; tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("assessoria"); setTab("agenda"); renderCal(u.assessoria_cod ? _userEventIds : null); }
   else if (u.role==="cliente") { tn.style.display="none"; bne.style.display="none"; document.getElementById("p-client").classList.add("on"); renderCli(u); }
+  else { tn.style.display="flex"; bne.style.display="none"; await _setupUserAccess(u); }
   showSc("app");
 }
 
