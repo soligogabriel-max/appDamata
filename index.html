@@ -3925,8 +3925,10 @@ function _orcCalcSimulacao(valorTotal, dataEvento) {
   let fMn = todayMn + 1, fYr = todayYr;
   if(fMn === 13) { fMn = 1; fYr++; }
   // Número de parcelas = meses de fMn/fYr até mbMn/mbYr inclusive
-  const n = (mbYr * 12 + mbMn) - (fYr * 12 + fMn) + 1;
+  let n = (mbYr * 12 + mbMn) - (fYr * 12 + fMn) + 1;
   if(n <= 0) return null;
+  // Parcela mínima de R$ 1.200 — elimina as últimas parcelas até atingir
+  while(n > 1 && valorTotal / n < 1200) n--;
   const parcela = valorTotal / n;
   const discPct = (n / 2) * 0.5;
   const desconto = valorTotal * (discPct / 100);
