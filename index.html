@@ -2432,14 +2432,29 @@ async function renderReceber(){
       const nomeEv=(agendaMapRec[r.cod_evento]||"").toLowerCase();
       return nomeEv.includes(busca)||(r.cod_evento||"").toLowerCase().includes(busca);
     });
-    const total=filtrado.reduce((a,r)=>a+(r.valor||0),0);
-    const recebido=filtrado.filter(r=>(r.status||"").toUpperCase()==="PAGO").reduce((a,r)=>a+(r.valor||0),0);
-    const pendente=total-recebido;
-    totWr.innerHTML=`
-      <div class="tot-card"><div class="tot-lbl">Total</div><div class="tot-val blue">${fmt(total)}</div></div>
-      <div class="tot-card"><div class="tot-lbl">Recebido</div><div class="tot-val green">${fmt(recebido)}</div></div>
-      <div class="tot-card"><div class="tot-lbl">Pendente</div><div class="tot-val red">${fmt(pendente)}</div></div>
-      <div class="tot-card"><div class="tot-lbl">Títulos</div><div class="tot-val">${filtrado.length}</div></div>`;
+
+    const isAssessoria = effRole()==="assessoria";
+    const hojeStr = new Date().toISOString().slice(0,10);
+
+    // Assessoria: exibe apenas parcelas de eventos futuros
+    if(isAssessoria && _userEventIds && _userEventIds.length > 0){
+      const evDates = await dbGet("agenda","select=cod,data_evento&cod=in.("+_userEventIds.map(encodeURIComponent).join(",")+")"+"&limit=500");
+      const futureSet = new Set(evDates.filter(e=>e.data_evento&&e.data_evento>=hojeStr).map(e=>e.cod));
+      filtrado = filtrado.filter(r=>futureSet.has(r.cod_evento));
+    }
+
+    // Somatória: ocultar para assessoria
+    totWr.style.display = isAssessoria ? "none" : "flex";
+    if(!isAssessoria){
+      const total=filtrado.reduce((a,r)=>a+(r.valor||0),0);
+      const recebido=filtrado.filter(r=>(r.status||"").toUpperCase()==="PAGO").reduce((a,r)=>a+(r.valor||0),0);
+      const pendente=total-recebido;
+      totWr.innerHTML=`
+        <div class="tot-card"><div class="tot-lbl">Total</div><div class="tot-val blue">${fmt(total)}</div></div>
+        <div class="tot-card"><div class="tot-lbl">Recebido</div><div class="tot-val green">${fmt(recebido)}</div></div>
+        <div class="tot-card"><div class="tot-lbl">Pendente</div><div class="tot-val red">${fmt(pendente)}</div></div>
+        <div class="tot-card"><div class="tot-lbl">Títulos</div><div class="tot-val">${filtrado.length}</div></div>`;
+    }
     // Carrega extrato SEM filtro de mês para pegar conciliações de qualquer data
     const agendaMap = agendaMapRec;
     const extratoRows = await dbGet("extrato_bancario","select=id_extrato_c6,titulo_a_receber,entrada&titulo_a_receber=not.is.null&limit=2000");
