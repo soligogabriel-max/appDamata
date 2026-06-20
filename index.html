@@ -1389,7 +1389,7 @@ async function openSimModal(){
 
   if(picked==="fornecedor"||picked==="assessoria"){
     try{
-      var uList=await dbGet("app_users","role=eq."+picked+"&status=eq.approved&select=id,name,event_ids&order=name.asc&limit=200");
+      var uList=await dbGet("app_users","role=eq."+picked+"&status=eq.approved&select=id,name,event_ids,assessoria_cod&order=name.asc&limit=200");
       if(!uList.length){alert("Nenhum usuário desse perfil cadastrado.");return;}
       var opts=uList.map(function(u,i){return (i+1)+") "+u.name;}).join("\n");
       var idx=prompt("Escolha o usuário para simular:\n"+opts,"1");
@@ -1397,6 +1397,14 @@ async function openSimModal(){
       var chosen=uList[parseInt(idx)-1];
       if(!chosen){alert("Opção inválida.");return;}
       _userEventIds=chosen.event_ids||[];
+      // Expand event_ids via assessoria_cod (same as real login)
+      if(chosen.assessoria_cod){
+        try{
+          var assEvts=await dbGet("agenda","select=cod&assessoria_cod=eq."+encodeURIComponent(chosen.assessoria_cod)+"&limit=500");
+          var extra=assEvts.map(function(e){return e.cod;}).filter(function(c){return c&&!_userEventIds.includes(c);});
+          if(extra.length) _userEventIds=[..._userEventIds,...extra];
+        }catch(_){}
+      }
       picked=picked+":"+chosen.name;
     }catch(e){alert("Erro ao buscar usuários: "+e.message);return;}
   }
