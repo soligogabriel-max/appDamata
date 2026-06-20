@@ -1417,6 +1417,7 @@ async function openSimModal(){
   _applyNavForRole(picked.split(":")[0]);
   var adminBtns=document.getElementById("evd-admin-btns");
   if(adminBtns) adminBtns.style.display="none";
+  _agendaTabelaCache=null;
   if(picked.startsWith("fornecedor")){
     renderCal(_userEventIds);
   } else if(picked.startsWith("assessoria")){
@@ -1429,6 +1430,7 @@ async function openSimModal(){
 function exitSim(){
   _simRole=null;
   _userEventIds=null;
+  _agendaTabelaCache=null;
   document.getElementById("sim-banner").style.display="none";
   document.getElementById("sim-banner-role").textContent="";
   _applyNavForRole("admin");
@@ -2430,7 +2432,7 @@ async function renderReceber(){
     const rows=await dbGetAll("contas_a_receber",q);
     const hoje=new Date(); hoje.setHours(0,0,0,0);
     let filtrado=rows.filter(r=>{
-      if(_userEventIds && !_userEventIds.includes(r.cod_evento)) return false;
+      if(_userEventIds != null && !_userEventIds.includes(r.cod_evento)) return false;
       if(st==="Atrasado") return r.vencimento&&new Date(r.vencimento)<hoje;
       if(st==="Pendente") return !r.vencimento||new Date(r.vencimento)>=hoje;
       return true;
@@ -4400,7 +4402,11 @@ async function renderFuturos() {
       dbGet("assessorias","select=cod,nome&limit=500")
     ]);
     const _futAssMap = {}; _futAssRows.forEach(a=>{ _futAssMap[a.cod]=a.nome; });
-    const validos = rows.filter(r => r.data_evento && parseInt(r.data_evento.slice(0,4)) <= 2100);
+    const validos = rows.filter(r => {
+      if(!r.data_evento || parseInt(r.data_evento.slice(0,4)) > 2100) return false;
+      if(_userEventIds != null && !_userEventIds.includes(r.cod)) return false;
+      return true;
+    });
     if(!validos.length){ wr.innerHTML='<div class="empty"><div class="eicon">📅</div>Nenhum evento futuro.</div>'; return; }
     const MESES_ABR=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
     wr.innerHTML = validos.map(ev => {
@@ -4475,6 +4481,7 @@ async function renderAgendaTabela(){
   const ate   = document.getElementById("tab-ate").value;
 
   let rows = _agendaTabelaCache;
+  if(_userEventIds != null) rows = rows.filter(r => _userEventIds.includes(r.cod));
   if(busca) rows = rows.filter(r=>(r.nome_evento||"").toLowerCase().includes(busca)||(r.cod||"").toLowerCase().includes(busca)||(r.responsavel||"").toLowerCase().includes(busca));
   if(tipo)  rows = rows.filter(r=>(r.tipo_evento||"").toLowerCase()===tipo);
   if(ano)   rows = rows.filter(r=>r.data_evento&&r.data_evento.startsWith(ano));
