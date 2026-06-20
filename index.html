@@ -3912,6 +3912,34 @@ function _orcNext3(){
   _orc.step=4;_orcStep();
 }
 
+function _orcCalcSimulacao(valorTotal, dataEvento) {
+  if(!dataEvento || !valorTotal) return null;
+  const today = new Date();
+  const ev = new Date(dataEvento + "T00:00:00");
+  const todayYr = today.getFullYear(), todayMn = today.getMonth() + 1;
+  const evYr = ev.getFullYear(), evMn = ev.getMonth() + 1;
+  // Mês anterior ao evento
+  let mbMn = evMn - 1, mbYr = evYr;
+  if(mbMn === 0) { mbMn = 12; mbYr--; }
+  // Primeira parcela: próximo mês a partir de hoje
+  let fMn = todayMn + 1, fYr = todayYr;
+  if(fMn === 13) { fMn = 1; fYr++; }
+  // Número de parcelas = meses de fMn/fYr até mbMn/mbYr inclusive
+  const n = (mbYr * 12 + mbMn) - (fYr * 12 + fMn) + 1;
+  if(n <= 0) return null;
+  const parcela = valorTotal / n;
+  const discPct = (n / 2) * 0.5;
+  const desconto = valorTotal * (discPct / 100);
+  const valorAVista = valorTotal - desconto;
+  const parcelas = [];
+  let m = fMn, y = fYr;
+  for(let i = 0; i < n; i++) {
+    parcelas.push({ mes: MONTHS[m - 1], ano: y, valor: parcela });
+    m++; if(m > 12) { m = 1; y++; }
+  }
+  return { n, parcela, discPct, desconto, valorAVista, parcelas };
+}
+
 function _orcHTML4(){
   if(!_orc._valorAjustado) _orc.valor_total=_orc.pacote_valor;
   const validade=new Date(); validade.setDate(validade.getDate()+7);
@@ -3939,6 +3967,32 @@ function _orcHTML4(){
       <span style="color:var(--dl)">Subtotal</span>
       <span style="color:var(--dl)">${fmt(_orc._subtotal)}</span>
     </div>`:"";
+  const sim = _orcCalcSimulacao(_orc.valor_total, _orc.data_evento);
+  const simHTML = sim ? `
+    <div style="border-top:2px solid var(--br);margin-top:10px;padding-top:16px;">
+      <div style="font-size:13px;font-weight:700;color:var(--dk);margin-bottom:12px;letter-spacing:.3px;">💳 Condições de Pagamento</div>
+      <div style="background:#EEF4FF;border:1.5px solid #B8D0FF;border-radius:10px;padding:14px;margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:700;color:#2A4A7A;margin-bottom:10px;">
+          Parcelamento em ${sim.n}× de ${fmt(sim.parcela)} <span style="font-weight:400;font-size:12px;color:#555;">(sem juros)</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="background:#DDE8FF;">
+            <th style="padding:5px 8px;text-align:left;font-weight:600;color:#2A4A7A;">Mês</th>
+            <th style="padding:5px 8px;text-align:right;font-weight:600;color:#2A4A7A;">Valor</th>
+          </tr></thead>
+          <tbody>${sim.parcelas.map(p=>`
+            <tr style="border-bottom:1px solid #C8DEFF;">
+              <td style="padding:5px 8px;color:var(--dk);">${p.mes}/${p.ano}</td>
+              <td style="padding:5px 8px;text-align:right;font-weight:600;">${fmt(p.valor)}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+      <div style="background:#EFFFF5;border:1.5px solid #A8E6C0;border-radius:10px;padding:14px;">
+        <div style="font-size:13px;font-weight:700;color:#2A6644;">À vista: ${fmt(sim.valorAVista)}</div>
+        <div style="font-size:11px;color:#2A6644;margin-top:4px;">${sim.discPct.toFixed(1)}% de desconto — economia de ${fmt(sim.desconto)}</div>
+      </div>
+    </div>` : '';
   return `<div class="orc-card">
     <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:20px;">Resumo do orçamento</div>
     <div style="display:flex;flex-direction:column;gap:2px;font-size:14px;">
@@ -3956,6 +4010,7 @@ function _orcHTML4(){
         <span style="font-size:16px;font-weight:700;color:var(--dk)">Total</span>
         <span style="font-size:22px;font-weight:700;color:var(--a)">${fmt(_orc.valor_total)}</span>
       </div>
+      ${simHTML}
       ${_orc._admin?`<div style="border-top:1px dashed var(--br);padding-top:12px;margin-top:4px;">
         <button onclick="_orcToggleEdit()" id="orc-edit-btn" style="padding:7px 14px;background:transparent;color:var(--a);border:1.5px solid var(--a);border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">✏️ Alterar valor (admin)</button>
         <div id="orc-edit-box" style="display:none;margin-top:10px;">
@@ -3994,6 +4049,26 @@ function _orcAbrirPDF(){
   const fmt=v=>"R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:2});
   const nomes=[_orc.nome_noiva,_orc.nome_noivo].filter(Boolean).join(" e ")||_orc.nome_contratante;
   const validade=new Date(); validade.setDate(validade.getDate()+7);
+  const sim=_orcCalcSimulacao(_orc.valor_total,_orc.data_evento);
+  const simPDF=sim?`
+  <div style="margin-top:28px;border-top:2px solid #ddd;padding-top:18px;">
+    <div style="font-size:15px;font-weight:700;color:#333;margin-bottom:14px;">Condições de Pagamento</div>
+    <div style="background:#EEF4FF;border:1.5px solid #B8D0FF;border-radius:8px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:700;color:#2A4A7A;margin-bottom:10px;">Parcelamento em ${sim.n}× de ${fmt(sim.parcela)} (sem juros)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:#DDE8FF;">
+          <th style="padding:5px 8px;text-align:left;color:#2A4A7A;">Mês</th>
+          <th style="padding:5px 8px;text-align:right;color:#2A4A7A;">Valor</th>
+        </tr></thead>
+        <tbody>${sim.parcelas.map(p=>`<tr style="border-bottom:1px solid #C8DEFF;"><td style="padding:5px 8px;">${p.mes}/${p.ano}</td><td style="padding:5px 8px;text-align:right;font-weight:600;">${fmt(p.valor)}</td></tr>`).join("")}</tbody>
+      </table>
+    </div>
+    <div style="background:#EFFFF5;border:1.5px solid #A8E6C0;border-radius:8px;padding:14px;">
+      <div style="font-size:13px;font-weight:700;color:#2A6644;">À vista: ${fmt(sim.valorAVista)}</div>
+      <div style="font-size:11px;color:#2A6644;margin-top:4px;">${sim.discPct.toFixed(1)}% de desconto — economia de ${fmt(sim.desconto)}</div>
+    </div>
+  </div>`:'';
+
   const itemRows=(_orc._selectedItems||[]).map(i=>{
     const info=_orcItemInfo(i);
     const det=info?info.d:null;
@@ -4037,6 +4112,7 @@ function _orcAbrirPDF(){
     <tr class="total-row"><td>Total</td><td style="text-align:right">${fmt(_orc.valor_total)}</td></tr>
   </tbody>
 </table>
+${simPDF}
 <div class="footer">Fazenda Damata · fazendadamata.com · (19) 99638-3386<br>Este orçamento é válido por 7 dias a partir da data de emissão. Os valores poderão ser reajustados após o prazo.</div>
 <script>window.onload=function(){window.print();}<\/script>
 </body></html>`;
