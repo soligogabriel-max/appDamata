@@ -1025,6 +1025,12 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       </select>
     </div>
     <div style="border-top:1px solid var(--br);margin-top:14px;padding-top:14px;">
+      <label class="lbl">Email</label>
+      <div style="display:flex;gap:8px;margin-top:6px;align-items:center;">
+        <input type="email" id="eu-email" class="inp" style="margin-bottom:0;flex:1;">
+      </div>
+    </div>
+    <div style="border-top:1px solid var(--br);margin-top:14px;padding-top:14px;">
       <label class="lbl">Senha atual</label>
       <div style="display:flex;gap:8px;margin-top:6px;align-items:center;">
         <input type="text" id="eu-senha-atual" class="inp" style="margin-bottom:0;flex:1;font-family:monospace;" readonly>
@@ -1336,9 +1342,7 @@ const WD=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 const ET={casamento:{label:"Casamento",color:"#2E3C44",bg:"#E8EEF0"},aniversario:{label:"Aniversário",color:"#7A5C1A",bg:"#FDF0CC"},corporativo:{label:"Corporativo",color:"#2A4A3A",bg:"#D8EDE2"},hospedagem:{label:"Hospedagem",color:"#1A4A5C",bg:"#D8EAF0"},festa:{label:"Festa",color:"#5C2A6A",bg:"#EDE0F5"},outro:{label:"Outro",color:"#4A4A4A",bg:"#EBEBEB"}};
 const SM={confirmado:{label:"Confirmado",color:"#2A6644"},proposta:{label:"Proposta",color:"#C08820"},cancelado:{label:"Cancelado",color:"#A03030"}};
 const RL={admin:"Admin",equipe:"Equipe",fornecedor:"Fornecedor",cliente:"Cliente",assessoria:"Assessoria"};
-const ADMIN={id:"admin-0",name:"Gabriel Soligo",email:"soligogabriel@gmail.com",role:"admin",status:"approved",event_ids:[]};
-const ADMIN_EMAILS=["soligogabriel@gmail.com"];
-function isAdmin(u){ return u && (u.role==="admin" || ADMIN_EMAILS.includes(u.email)); }
+function isAdmin(u){ return u && u.role==="admin"; }
 
 // ══════════════════════════════════════════
 // AUTH (simples — sem Supabase Auth ainda)
@@ -1443,11 +1447,6 @@ async function doLogin() {
   const btn = document.getElementById("btn-login");
   btn.disabled = true; btn.textContent = "Entrando...";
   try {
-    // Check admin
-    if (em === ADMIN.email && pw === "ogilos-1") {
-      setCU(ADMIN); openApp(ADMIN); return;
-    }
-    // Check DB users
     const users = await dbGet("app_users", "email=eq." + encodeURIComponent(em) + "&select=*");
     if (!users.length) { er.style.display="block"; er.textContent="Email não encontrado."; return; }
     const u = users[0];
@@ -5036,6 +5035,7 @@ async function openEditUser(u) {
   const roleIdx={equipe:0,fornecedor:1,assessoria:2,cliente:3,admin:4};
   const ropts=document.querySelectorAll("#m-edit-user .ropt");
   if(ropts[roleIdx[u.role]] !== undefined) ropts[roleIdx[u.role]].classList.add("sel");
+  document.getElementById("eu-email").value = u.email || "";
   document.getElementById("eu-senha-atual").value = u.password || "";
   document.getElementById("eu-nova-senha").value = "";
   document.getElementById("eu-senha-wrap").style.display = "none";
@@ -5079,7 +5079,10 @@ async function saveEditUser() {
   const btn=document.getElementById("eu-btn-save");
   btn.disabled=true; btn.textContent="Salvando...";
   try {
-    const patch={role:_euRole,event_ids:_euRole==="assessoria"?[]:_euEvIds,assessoria_cod:_euRole==="assessoria"?document.getElementById("eu-assessoria").value||null:null};
+    const novoEmail=(document.getElementById("eu-email").value||"").trim().toLowerCase();
+    const _emailRe=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if(!novoEmail||!_emailRe.test(novoEmail)){toast("Informe um email válido.");return;}
+    const patch={email:novoEmail,role:_euRole,event_ids:_euRole==="assessoria"?[]:_euEvIds,assessoria_cod:_euRole==="assessoria"?document.getElementById("eu-assessoria").value||null:null};
     const novaSenha=(document.getElementById("eu-nova-senha").value||"").trim();
     if(novaSenha) patch.password=novaSenha;
     await dbUpdate("app_users","id=eq."+_euId,patch);
