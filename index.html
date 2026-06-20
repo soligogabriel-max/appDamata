@@ -3323,7 +3323,7 @@ function editarOrcamento(id){
     _saved:true,_activePkg:null,_uSel:{},_dbId:row.id,_stage:row.status||"lead"
   };
   (row.itens||[]).forEach(i=>{if(i.cod)_orc._uSel[i.cod]={qty:i.qty||1,vun:i.valor_unitario||0};});
-  _orc._admin=isAdmin(getCU());
+  _orc._admin=effIsAdmin();
   _orc._valorAjustado=true;
   showSc("orcamento");
   _orcStep();
@@ -3509,7 +3509,7 @@ function abrirOrcamento(){
 // Abre o wizard de dentro do app (admin) — permite ajustar valores no resumo
 function abrirOrcamentoAdmin(){
   abrirOrcamento();
-  _orc._admin=isAdmin(getCU());
+  _orc._admin=effIsAdmin();
 }
 // Botão voltar do wizard: admin retorna ao app; público vai ao login
 function _orcVoltar(){ showSc(_orc._admin?"app":"login"); }
@@ -4433,7 +4433,7 @@ async function renderFuturos() {
           <div style="display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap;">
             <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${st.bg};color:${st.color};">${st.label}</span>
             ${duracao}
-            ${ev.valor_locacao&&isAdmin(getCU())?`<span style="font-size:11px;font-weight:700;color:var(--ok);">${fmt(ev.valor_locacao)}</span>`:""}
+            ${ev.valor_locacao&&effIsAdmin()?`<span style="font-size:11px;font-weight:700;color:var(--ok);">${fmt(ev.valor_locacao)}</span>`:""}
           </div>
           ${ev.responsavel?`<div style="font-size:11px;color:var(--dl);margin-top:2px;">${ev.responsavel}</div>`:""}
           ${(()=>{const l=ev.local_evento?`📍 ${ev.local_evento}`:"";const a=ev.assessoria_cod?`🎗 ${_futAssMap[ev.assessoria_cod]||ev.assessoria_cod}`:"";const x=[l,a].filter(Boolean).join(" · ");return x?`<div style="font-size:10px;color:var(--dl);margin-top:2px;">${x}</div>`:""})()}
@@ -4492,7 +4492,7 @@ async function renderAgendaTabela(){
 
   if(!rows.length){ wr.innerHTML='<div class="empty"><div class="eicon">📅</div>Nenhum evento encontrado.</div>'; return; }
 
-  const _showValor = isAdmin(getCU());
+  const _showValor = effIsAdmin();
   wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
     <thead><tr>
       <th>Cód.</th><th>Evento</th><th>Tipo</th><th>Data Início</th><th>Data Fim</th>
