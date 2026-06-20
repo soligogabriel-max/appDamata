@@ -1551,7 +1551,7 @@ async function openApp(u) {
   if (isAdmin(u)) { tn.style.display="flex"; bne.style.display="inline-flex"; document.getElementById("btn-sim").style.display=""; setTab("agenda"); updBadge(); }
   else if (u.role==="equipe") { tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("equipe"); setTab("agenda"); renderCal(null); }
   else if (u.role==="fornecedor") { _userEventIds=u.event_ids||[]; tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("fornecedor"); setTab("agenda"); renderCal(_userEventIds); }
-  else if (u.role==="assessoria") { _userEventIds=u.event_ids||[]; tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("assessoria"); setTab("agenda"); renderCal(_userEventIds.length?_userEventIds:null); }
+  else if (u.role==="assessoria") { _userEventIds=u.event_ids||[]; tn.style.display="flex"; bne.style.display="none"; _applyNavForRole("assessoria"); setTab("agenda"); renderCal(u.assessoria_cod ? _userEventIds : null); }
   else if (u.role==="cliente") { tn.style.display="none"; bne.style.display="none"; document.getElementById("p-client").classList.add("on"); renderCli(u); }
   showSc("app");
 }
@@ -1694,7 +1694,7 @@ function tk(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")
 
 function evDay(dk, fi) {
   return cachedEvts.filter(e=>{
-    if(fi && fi.length && !fi.includes(e.cod)) return false;
+    if(fi != null && !fi.includes(e.cod)) return false;
     if(!e.data_evento) return false;
     const day=pd(dk);
     const eStart=pd(e.data_evento);
@@ -1790,7 +1790,7 @@ function renderGrid(fi){
 
 function renderListV(fi){
   const wr=document.getElementById("lgrid"); wr.innerHTML="";
-  const evts=cachedEvts.filter(e=>!fi||!fi.length||fi.includes(e.cod));
+  const evts=cachedEvts.filter(e=>fi==null||fi.includes(e.cod));
   if(!evts.length){wr.innerHTML='<div class="empty"><div class="eicon">📅</div>Nenhum evento este mês.<br/>Clique em "+ Novo Evento" para começar.</div>';return;}
   evts.forEach(ev=>{
     const et=getEvStyle(ev), st=SM[ev.status]||SM.proposta;
