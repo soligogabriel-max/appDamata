@@ -1515,6 +1515,8 @@ async function doReg() {
   const er    = document.getElementById("rerr");
   er.style.display = "none";
   if (!name||!em||!pw) { er.style.display="block"; er.textContent="Preencha nome, email e senha."; return; }
+  const _emailRe=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  if (!_emailRe.test(em)) { er.style.display="block"; er.textContent="Informe um email válido (ex: nome@dominio.com)."; return; }
   const btn = document.getElementById("btn-reg");
   btn.disabled=true; btn.textContent="Enviando...";
   try {
