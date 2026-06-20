@@ -5281,19 +5281,9 @@ async function openPedidoModal(ped, readOnly) {
   document.getElementById("ped-modal-title").textContent = ro ? "Itens do Pedido" : (ped ? "Editar Pedido" : "Novo Pedido");
   document.getElementById("pm-numero").value = ped?.numero_pedido||"";
   document.getElementById("pm-total").value = ped?.total_pedido||"";
-  document.getElementById("pm-itens-body").innerHTML = "";
+  document.getElementById("pm-itens-body").innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--dl);">Carregando...</td></tr>';
   const sel = document.getElementById("pm-evento");
   sel.innerHTML = '<option value="">— Selecione —</option>';
-  // Carrega eventos e inventário em paralelo
-  const [evts, invItems, itens] = await Promise.all([
-    dbGet("agenda","select=cod,nome_evento&order=data_evento.desc&limit=500"),
-    dbGet("inventario","select=cod,descricao,valor_unitario&order=cod.asc&limit=500"),
-    _pedidoId ? dbGet("itens_pedido","pedido_id=eq."+_pedidoId+"&order=id.asc&limit=500") : Promise.resolve([])
-  ]);
-  _pmInvItems = invItems;
-  _pmSomaReceber = null; // reset cache ao abrir novo pedido
-  evts.forEach(e=>{ const o=document.createElement("option"); o.value=e.cod; o.textContent=(e.nome_evento||e.cod); if(ped&&e.cod===ped.cod_evento)o.selected=true; sel.appendChild(o); });
-  itens.forEach(it=>_pmAddItem(it, ro));
   // modo leitura: oculta campos de valor e ações
   document.getElementById("pm-total").closest("div").parentElement.style.display = ro ? "none" : "";
   document.getElementById("pm-totais-panel").style.display = ro ? "none" : "";
@@ -5303,8 +5293,26 @@ async function openPedidoModal(ped, readOnly) {
   document.querySelector("#m-pedido .btn-cancel[onclick*='_pmAddItem']") && (document.querySelector("#m-pedido .btn-cancel[onclick*='_pmAddItem']").style.display = ro ? "none" : "");
   document.getElementById("pm-btn-save").style.display = ro ? "none" : "";
   document.querySelector("#m-pedido .macts .btn-cancel").textContent = ro ? "Fechar" : "Cancelar";
-  if(!ro) await _pmUpdateTotais();
   document.getElementById("m-pedido").classList.add("open");
+  try {
+    const [evts, invItems, itens] = await Promise.all([
+      dbGet("agenda","select=cod,nome_evento&order=data_evento.desc&limit=500"),
+      dbGet("inventario","select=cod,descricao,valor_unitario&order=cod.asc&limit=500"),
+      _pedidoId ? dbGet("itens_pedido","pedido_id=eq."+_pedidoId+"&select=id,cod_item,descricao,quantidade,valor_unitario,valor_subtotal&order=id.asc&limit=500") : Promise.resolve([])
+    ]);
+    _pmInvItems = invItems;
+    _pmSomaReceber = null;
+    evts.forEach(e=>{ const o=document.createElement("option"); o.value=e.cod; o.textContent=(e.nome_evento||e.cod); if(ped&&e.cod===ped.cod_evento)o.selected=true; sel.appendChild(o); });
+    document.getElementById("pm-itens-body").innerHTML = "";
+    if(itens.length) {
+      itens.forEach(it=>_pmAddItem(it, ro));
+    } else {
+      document.getElementById("pm-itens-body").innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--dl);">Nenhum item cadastrado neste pedido.</td></tr>';
+    }
+    if(!ro) await _pmUpdateTotais();
+  } catch(e) {
+    document.getElementById("pm-itens-body").innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:#A03030;">Erro ao carregar itens: '+e.message+'</td></tr>';
+  }
 }
 
 async function savePedido() {
