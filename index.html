@@ -83,8 +83,9 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .un{font-size:11px;color:var(--dl);}
 .ur{font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--a);color:var(--dk);text-transform:uppercase;}
 .btn-out{background:rgba(255,255,255,.08);border:none;color:var(--dl);font-size:11px;font-weight:600;padding:5px 10px;border-radius:20px;}
-#tnav{display:flex;background:#fff;border-bottom:1px solid var(--br);position:relative;z-index:100;overflow-x:auto;overflow-y:visible;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
-#tnav::-webkit-scrollbar{display:none;}
+#tnav{display:block;background:#fff;border-bottom:1px solid var(--br);position:relative;z-index:100;overflow:visible;}
+#tnav-inner{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+#tnav-inner::-webkit-scrollbar{display:none;}
 .tab{padding:12px 16px;border:none;background:transparent;font-size:11px;font-weight:700;color:var(--dl);white-space:nowrap;border-bottom:2px solid transparent;transition:all .2s;}
 .tab.on{color:var(--a);border-bottom-color:var(--a);}
 .tgrp{position:relative;display:inline-flex;}
@@ -503,6 +504,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     👁 Simulando como: <span id="sim-banner-role"></span> — <button onclick="exitSim()" style="background:none;border:none;color:#7A5C00;text-decoration:underline;cursor:pointer;font-weight:700;font-size:12px;">Sair da simulação</button>
   </div>
   <div id="tnav" style="display:none;">
+   <div id="tnav-inner">
     <button class="tab on" onclick="setTab('agenda')" id="t-agenda">📅 Agenda</button>
     <button class="tab" onclick="setTab('pedidos')" id="t-pedidos-eq" style="display:none;">🛒 Pedidos</button>
 
@@ -546,6 +548,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <button class="tab" onclick="openSettings();closeGrps()" id="t-settings">⚙ Config</button>
       </div>
     </div>
+   </div>
   </div>
   <div id="app-content">
     <div id="p-agenda" class="panel on">
@@ -1587,9 +1590,9 @@ async function openApp(u) {
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
   const tn = document.getElementById("tnav");
   const bne = document.getElementById("btn-new-ev");
-  if (isAdmin(u)) { tn.style.display="flex"; bne.style.display="inline-flex"; document.getElementById("btn-sim").style.display=""; setTab("agenda"); updBadge(); }
+  if (isAdmin(u)) { tn.style.display="block"; bne.style.display="inline-flex"; document.getElementById("btn-sim").style.display=""; setTab("agenda"); updBadge(); }
   else if (u.role==="cliente") { tn.style.display="none"; bne.style.display="none"; document.getElementById("p-client").classList.add("on"); renderCli(u); }
-  else { tn.style.display="flex"; bne.style.display="none"; await _setupUserAccess(u); }
+  else { tn.style.display="block"; bne.style.display="none"; await _setupUserAccess(u); }
   showSc("app");
 }
 
