@@ -1926,12 +1926,14 @@ function togCb(el){el.closest("label").classList.toggle("on",el.checked);}
 function togCustom(f){const sel=document.getElementById("mef-"+f+"-sel");document.getElementById("mef-"+f+"-custom").style.display=sel.value==="outro"?"block":"none";}
 
 async function genCode(){
-  const yr=new Date().getFullYear();
   try {
-    const evts=await dbGet("agenda","cod=like."+yr+"%&select=cod&order=cod.desc&limit=1");
-    if(evts.length){ const last=evts[0].cod; const seq=parseInt(last.slice(4))+1; return yr+String(seq).padStart(2,"0"); }
+    const evts=await dbGet("agenda","select=cod&deleted_at=is.null&order=id.desc&limit=1");
+    if(evts.length && evts[0].cod){
+      const num=parseInt(evts[0].cod.replace(/\D/g,""));
+      if(!isNaN(num)) return String(num+1);
+    }
   } catch(e){}
-  return yr+"01";
+  return "1";
 }
 
 function openNewEvent(existing){
