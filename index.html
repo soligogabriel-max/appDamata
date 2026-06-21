@@ -648,6 +648,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <div style="display:flex;align-items:center;gap:10px;">
             <div class="sec-t" style="margin-bottom:0;">Contas a Receber</div>
             <button class="btn-a" style="font-size:12px;" onclick="openCrud('contas_a_receber',null,renderReceber)">+ Novo</button>
+            <button id="btn-wpp-lembretes" class="btn-a" style="font-size:12px;background:#25D366;display:none;" onclick="openWppLembretes()">📱 Lembretes WPP</button>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <input type="text" class="inp inp-inline" id="rec-busca" placeholder="Buscar evento/cód..." oninput="renderReceber()" style="width:200px;margin-bottom:0;"/>
@@ -1038,6 +1039,31 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div class="macts">
       <button class="btn-cancel" onclick="closeEditUser()">Cancelar</button>
       <button class="btn-confirm" id="eu-btn-save" onclick="saveEditUser()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: LEMBRETES WPP -->
+<div class="moverlay" id="m-wpp-lembretes" onclick="if(event.target===this)closeWppLembretes()">
+  <div class="mbox" style="max-width:460px;">
+    <div class="mtitle">📱 Enviar Lembretes WPP</div>
+    <div style="font-size:13px;color:var(--dm);margin-bottom:16px;">Envia mensagem WhatsApp para clientes com parcelas vencendo no período selecionado (status: Pendente).</div>
+    <div style="display:grid;gap:12px;margin-bottom:16px;">
+      <div>
+        <label class="lbl">Vencimento de</label>
+        <input type="date" id="wpp-de" class="inp" style="margin-bottom:0;"/>
+      </div>
+      <div>
+        <label class="lbl">Vencimento até</label>
+        <input type="date" id="wpp-ate" class="inp" style="margin-bottom:0;"/>
+      </div>
+    </div>
+    <div id="wpp-preview" style="background:var(--al);border:1px solid var(--am);border-radius:8px;padding:10px;font-size:12px;color:var(--dk);margin-bottom:14px;display:none;"></div>
+    <div id="wpp-result" style="margin-bottom:12px;display:none;"></div>
+    <div class="macts">
+      <button class="btn-cancel" onclick="closeWppLembretes()">Fechar</button>
+      <button class="btn-confirm" id="wpp-btn-preview" onclick="previewWppLembretes()">🔍 Pré-visualizar</button>
+      <button class="btn-confirm" id="wpp-btn-send" style="background:#25D366;display:none;" onclick="sendWppLembretes()">📤 Enviar</button>
     </div>
   </div>
 </div>
@@ -2415,6 +2441,7 @@ function statusBadgeVenc(s,venc){
 async function renderReceber(){
   const wr=document.getElementById("rec-list"); wr.innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   const totWr=document.getElementById("rec-totais"); totWr.innerHTML="";
+  const wppBtn=document.getElementById("btn-wpp-lembretes"); if(wppBtn) wppBtn.style.display=effIsAdmin()?"":"none";
   try {
     const mesEl=document.getElementById("rec-fil-mes");
     const mes=mesEl.value;
@@ -5933,6 +5960,102 @@ async function bulkDeleteReceber(){
   }
   toast(`${ids.length} título${ids.length!==1?"s":""} apagado${ids.length!==1?"s":""}`);
   renderReceber();
+}
+
+// ══════════════════════════════════════════
+// LEMBRETES WHATSAPP (Meta Cloud API)
+// ══════════════════════════════════════════
+let _wppParcelas = [];
+
+function openWppLembretes() {
+  const hoje = new Date().toISOString().slice(0, 10);
+  const ate = new Date(); ate.setDate(ate.getDate() + 7);
+  const ateStr = ate.toISOString().slice(0, 10);
+  document.getElementById("wpp-de").value = hoje;
+  document.getElementById("wpp-ate").value = ateStr;
+  document.getElementById("wpp-preview").style.display = "none";
+  document.getElementById("wpp-result").style.display = "none";
+  document.getElementById("wpp-btn-send").style.display = "none";
+  document.getElementById("wpp-btn-preview").style.display = "";
+  _wppParcelas = [];
+  document.getElementById("m-wpp-lembretes").classList.add("open");
+}
+
+function closeWppLembretes() {
+  document.getElementById("m-wpp-lembretes").classList.remove("open");
+}
+
+async function previewWppLembretes() {
+  const de = document.getElementById("wpp-de").value;
+  const ate = document.getElementById("wpp-ate").value;
+  if (!de || !ate) { toast("Preencha as datas."); return; }
+  const prevDiv = document.getElementById("wpp-preview");
+  prevDiv.innerHTML = "Buscando parcelas...";
+  prevDiv.style.display = "";
+  document.getElementById("wpp-btn-send").style.display = "none";
+  try {
+    const parcelas = await dbGet("contas_a_receber",
+      `status=eq.NP&vencimento=gte.${de}&vencimento=lte.${ate}&select=id,cod_evento,parcela,num_parcela,valor,vencimento&order=vencimento.asc&limit=500`
+    );
+    if (!parcelas.length) {
+      prevDiv.innerHTML = "<b>Nenhuma parcela pendente no período.</b>";
+      return;
+    }
+    const agMap = await getAgendaMap();
+    const codEvts = [...new Set(parcelas.map(p => p.cod_evento).filter(Boolean))];
+    const fichas = codEvts.length
+      ? await dbGet("ficha_do_evento", `cod=in.(${codEvts.join(",")})&select=cod,nome_contratante,celular&limit=500`)
+      : [];
+    const fichaMap = {};
+    fichas.forEach(f => fichaMap[f.cod] = f);
+    _wppParcelas = parcelas;
+    const semTel = parcelas.filter(p => !fichaMap[p.cod_evento]?.celular).length;
+    const comTel = parcelas.length - semTel;
+    let html = `<b>${parcelas.length} parcela${parcelas.length !== 1 ? "s" : ""} encontrada${parcelas.length !== 1 ? "s" : ""}`;
+    html += ` — ${comTel} com telefone, ${semTel} sem telefone</b><br><br>`;
+    html += parcelas.map(p => {
+      const ficha = fichaMap[p.cod_evento];
+      const nome = ficha?.nome_contratante || "—";
+      const tel = ficha?.celular || "<span style='color:#A03030'>SEM TEL</span>";
+      const ev = agMap[p.cod_evento] || p.cod_evento || "?";
+      return `• <b>${p.vencimento ? p.vencimento.split("-").reverse().join("/") : "—"}</b> — ${ev} — Parc. ${p.parcela || "?"}/${p.num_parcela || "?"} — R$ ${Number(p.valor || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })} — ${nome} ${tel}`;
+    }).join("<br>");
+    prevDiv.innerHTML = html;
+    if (comTel > 0) document.getElementById("wpp-btn-send").style.display = "";
+  } catch (e) {
+    prevDiv.innerHTML = `<span style="color:#A03030">Erro: ${e.message}</span>`;
+  }
+}
+
+async function sendWppLembretes() {
+  const de = document.getElementById("wpp-de").value;
+  const ate = document.getElementById("wpp-ate").value;
+  const btn = document.getElementById("wpp-btn-send");
+  const resDiv = document.getElementById("wpp-result");
+  btn.disabled = true; btn.textContent = "Enviando...";
+  resDiv.style.display = "none";
+  try {
+    const res = await fetch(SB_URL + "/functions/v1/enviar-lembretes-wpp", {
+      method: "POST",
+      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ vencimento_de: de, vencimento_ate: ate }),
+    });
+    const resp = await res.json();
+    let html = "";
+    if (resp.enviados > 0) html += `<div style="color:#1A6644;font-weight:700;">✅ ${resp.enviados} mensagem${resp.enviados !== 1 ? "ns" : ""} enviada${resp.enviados !== 1 ? "s" : ""}!</div>`;
+    if (resp.erros && resp.erros.length) {
+      html += `<div style="color:#A03030;margin-top:6px;font-weight:600;">⚠️ ${resp.erros.length} erro${resp.erros.length !== 1 ? "s" : ""}:</div>`;
+      html += resp.erros.map(e => `<div style="font-size:11px;color:#A03030;">• ${e.cod_evento} parc.${e.parcela}: ${e.erro}</div>`).join("");
+    }
+    if (!resp.enviados && (!resp.erros || !resp.erros.length)) html = `<div style="color:var(--dm);">${resp.msg || "Nenhuma mensagem enviada."}</div>`;
+    resDiv.innerHTML = html;
+    resDiv.style.display = "";
+  } catch (e) {
+    resDiv.innerHTML = `<div style="color:#A03030;">Erro: ${e.message}</div>`;
+    resDiv.style.display = "";
+  } finally {
+    btn.disabled = false; btn.textContent = "📤 Enviar";
+  }
 }
 
 // ── Bulk delete: A Pagar ──
