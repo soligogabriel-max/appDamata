@@ -931,6 +931,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <div id="mef-loc-custom" style="display:none;margin-bottom:8px;"><label class="lbl">Local personalizado</label><input class="inp inp-inline" type="text" id="mef-loc-txt" placeholder="Digite o local"/></div>
       <div id="mef-type-custom" style="display:none;"><label class="lbl">Tipo personalizado</label><input class="inp inp-inline" type="text" id="mef-type-txt" placeholder="Digite o tipo"/></div>
       <div style="margin-top:10px;"><label class="lbl">Nome / Descrição do evento</label><textarea class="inp inp-inline" id="mef-desc" placeholder="Ex: Casamento Silva & Costa"></textarea></div>
+      <div style="margin-top:10px;"><label class="lbl">📱 Celular do contratante (WhatsApp)</label><input class="inp inp-inline" type="tel" id="mef-celular" placeholder="(11) 99999-9999"/></div>
     </div>
     <div class="fsec" style="margin-bottom:10px;">
       <div class="fsec-title">🏛️ Espaços Locados</div>
@@ -1942,6 +1943,7 @@ function openNewEvent(existing){
   Object.keys(cvals).forEach(k=>{const el=document.getElementById("v-"+k);if(el)el.textContent=cvals[k];});
   document.querySelectorAll(".cbtog").forEach(l=>{l.classList.remove("on");const cb=l.querySelector("input[type=checkbox]");if(cb)cb.checked=false;});
   renderPmts();
+  document.getElementById("mef-celular").value="";
   if(existing){
     document.getElementById("mef-title").textContent="Editar Evento";
     document.getElementById("mef-id").value=existing.cod||existing.id||"";
@@ -1953,6 +1955,11 @@ function openNewEvent(existing){
     document.getElementById("mef-cout").value=existing.cout||"14:00";
     document.getElementById("mef-total").value=existing.valor_locacao||"";
     document.getElementById("mef-desc").value=existing.nome_evento||"";
+    if(existing.cod){
+      dbGet("ficha_do_evento","cod=eq."+encodeURIComponent(existing.cod)+"&select=celular&limit=1")
+        .then(rows=>{ if(rows[0]?.celular) document.getElementById("mef-celular").value=rows[0].celular; })
+        .catch(()=>{});
+    }
     const ll=["Salão Tumbérgia","Salão Bromélias","Flamboyant","Peroba Rosa"];
     if(ll.includes(existing.local_evento)){document.getElementById("mef-loc-sel").value=existing.local_evento;document.getElementById("mef-loc-custom").style.display="none";}
     else if(existing.local_evento){document.getElementById("mef-loc-sel").value="outro";document.getElementById("mef-loc-custom").style.display="block";document.getElementById("mef-loc-txt").value=existing.local_evento;}
@@ -2059,6 +2066,12 @@ async function saveEvent(){
       toast("✅ Evento criado — "+code);
     }
     closeMEF(); renderCal(null);
+    // Salva celular na ficha_do_evento em background
+    const celular = document.getElementById("mef-celular").value.trim();
+    if(celular && code){
+      sbFetch("ficha_do_evento?cod=eq."+encodeURIComponent(code), {method:"PATCH", body:{celular}, prefer:"return=minimal"})
+        .catch(()=>{});
+    }
     // Sincroniza com Google Calendar em background (não bloqueia a UI)
     _syncGoogleCal({ ...evData, google_cal_id: googleCalId });
   } catch(e) {
