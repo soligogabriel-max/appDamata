@@ -1286,6 +1286,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div id="evd-admin-btns" style="display:none;">
       <button class="btn-confirm" style="width:100%;margin-bottom:6px;background:var(--al);color:var(--dk);" onclick="editCurrentEvent()">✏️ Editar Evento</button>
       <button class="btn-confirm" style="width:100%;margin-bottom:6px;" onclick="downloadContract(currentEvId)">📄 Baixar Contrato</button>
+      <button id="evd-btn-pdf-assinado" class="btn-confirm" style="width:100%;margin-bottom:6px;background:#dcfce7;color:#166534;display:none;" onclick="window.open(currentEvPdfUrl,'_blank')">✅ Ver Contrato Assinado</button>
       <button class="btn-delete" style="width:100%;margin-bottom:6px;" onclick="deleteEventCascade()">🗑 Apagar Evento</button>
     </div>
     <button class="btn-cancel" style="width:100%;margin-top:4px;" onclick="closeEvDet()">Fechar</button>
@@ -1843,10 +1844,11 @@ function renderListV(fi){
 // ══════════════════════════════════════════
 // EVENT DETAIL
 // ══════════════════════════════════════════
-let currentEvId=null, currentEvCod=null;
+let currentEvId=null, currentEvCod=null, currentEvPdfUrl=null;
 function openEvDet(ev){
   currentEvId = ev.id||ev.cod;
   currentEvCod = ev.cod||null;
+  currentEvPdfUrl = ev.assinatura_pdf_url||null;
   const et=getEvStyle(ev), st=SM[ev.status]||SM.proposta;
   const s=pd(ev.data_evento), fim=pd(ev.data_fim||ev.data_evento);
   const mul=ev.data_fim&&ev.data_fim!==ev.data_evento;
@@ -1863,8 +1865,8 @@ function openEvDet(ev){
   const nb=document.getElementById("evd-nb");
   if(ev.obs){document.getElementById("evd-notes").textContent=ev.obs;nb.style.display="block";}
   else nb.style.display="none";
-  const cu=getCU();
   document.getElementById("evd-admin-btns").style.display=effIsAdmin()?"block":"none";
+  document.getElementById("evd-btn-pdf-assinado").style.display=effIsAdmin()&&currentEvPdfUrl?"block":"none";
   document.getElementById("m-evdet").classList.add("open");
 }
 function closeEvDet(){document.getElementById("m-evdet").classList.remove("open");}
@@ -4001,6 +4003,32 @@ function _orcNext3(){
   _orc.step=4;_orcStep();
 }
 
+function _orcCalcSimulacao(valorTotal, dataEvento) {
+  if(!dataEvento || !valorTotal) return null;
+  const today = new Date();
+  const ev = new Date(dataEvento + "T00:00:00");
+  const todayYr = today.getFullYear(), todayMn = today.getMonth() + 1;
+  const evYr = ev.getFullYear(), evMn = ev.getMonth() + 1;
+  let mbMn = evMn - 1, mbYr = evYr;
+  if(mbMn === 0) { mbMn = 12; mbYr--; }
+  let fMn = todayMn + 1, fYr = todayYr;
+  if(fMn === 13) { fMn = 1; fYr++; }
+  let n = (mbYr * 12 + mbMn) - (fYr * 12 + fMn) + 1;
+  if(n <= 0) return null;
+  while(n > 1 && valorTotal / n < 1200) n--;
+  const parcela = valorTotal / n;
+  const discPct = (n / 2) * 0.5;
+  const desconto = valorTotal * (discPct / 100);
+  const valorAVista = valorTotal - desconto;
+  const parcelas = [];
+  let m = fMn, y = fYr;
+  for(let i = 0; i < n; i++) {
+    parcelas.push({ mes: MONTHS[m - 1], ano: y, valor: parcela });
+    m++; if(m > 12) { m = 1; y++; }
+  }
+  return { n, parcela, discPct, desconto, valorAVista, parcelas };
+}
+
 function _orcHTML4(){
   if(!_orc._valorAjustado) _orc.valor_total=_orc.pacote_valor;
   const validade=new Date(); validade.setDate(validade.getDate()+7);
@@ -4028,6 +4056,32 @@ function _orcHTML4(){
       <span style="color:var(--dl)">Subtotal</span>
       <span style="color:var(--dl)">${fmt(_orc._subtotal)}</span>
     </div>`:"";
+  const sim = _orcCalcSimulacao(_orc.valor_total, _orc.data_evento);
+  const simHTML = sim ? `
+    <div style="border-top:2px solid var(--br);margin-top:10px;padding-top:16px;">
+      <div style="font-size:13px;font-weight:700;color:var(--dk);margin-bottom:12px;letter-spacing:.3px;">💳 Condições de Pagamento</div>
+      <div style="background:#EEF4FF;border:1.5px solid #B8D0FF;border-radius:10px;padding:14px;margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:700;color:#2A4A7A;margin-bottom:10px;">
+          Parcelamento em ${sim.n}× de ${fmt(sim.parcela)} <span style="font-weight:400;font-size:12px;color:#555;">(sem juros)</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="background:#DDE8FF;">
+            <th style="padding:5px 8px;text-align:left;font-weight:600;color:#2A4A7A;">Mês</th>
+            <th style="padding:5px 8px;text-align:right;font-weight:600;color:#2A4A7A;">Valor</th>
+          </tr></thead>
+          <tbody>${sim.parcelas.map(p=>`
+            <tr style="border-bottom:1px solid #C8DEFF;">
+              <td style="padding:5px 8px;color:var(--dk);">${p.mes}/${p.ano}</td>
+              <td style="padding:5px 8px;text-align:right;font-weight:600;">${fmt(p.valor)}</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+      <div style="background:#EFFFF5;border:1.5px solid #A8E6C0;border-radius:10px;padding:14px;">
+        <div style="font-size:13px;font-weight:700;color:#2A6644;">À vista: ${fmt(sim.valorAVista)}</div>
+        <div style="font-size:11px;color:#2A6644;margin-top:4px;">${sim.discPct.toFixed(1)}% de desconto — economia de ${fmt(sim.desconto)}</div>
+      </div>
+    </div>` : '';
   return `<div class="orc-card">
     <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:20px;">Resumo do orçamento</div>
     <div style="display:flex;flex-direction:column;gap:2px;font-size:14px;">
@@ -4045,6 +4099,7 @@ function _orcHTML4(){
         <span style="font-size:16px;font-weight:700;color:var(--dk)">Total</span>
         <span style="font-size:22px;font-weight:700;color:var(--a)">${fmt(_orc.valor_total)}</span>
       </div>
+      ${simHTML}
       ${_orc._admin?`<div style="border-top:1px dashed var(--br);padding-top:12px;margin-top:4px;">
         <button onclick="_orcToggleEdit()" id="orc-edit-btn" style="padding:7px 14px;background:transparent;color:var(--a);border:1.5px solid var(--a);border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">✏️ Alterar valor (admin)</button>
         <div id="orc-edit-box" style="display:none;margin-top:10px;">
@@ -4083,6 +4138,25 @@ function _orcAbrirPDF(){
   const fmt=v=>"R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:2});
   const nomes=[_orc.nome_noiva,_orc.nome_noivo].filter(Boolean).join(" e ")||_orc.nome_contratante;
   const validade=new Date(); validade.setDate(validade.getDate()+7);
+  const sim=_orcCalcSimulacao(_orc.valor_total,_orc.data_evento);
+  const simPDF=sim?`
+  <div style="margin-top:28px;border-top:2px solid #ddd;padding-top:18px;">
+    <div style="font-size:15px;font-weight:700;color:#333;margin-bottom:14px;">Condições de Pagamento</div>
+    <div style="background:#EEF4FF;border:1.5px solid #B8D0FF;border-radius:8px;padding:14px;margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:700;color:#2A4A7A;margin-bottom:10px;">Parcelamento em ${sim.n}× de ${fmt(sim.parcela)} (sem juros)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:#DDE8FF;">
+          <th style="padding:5px 8px;text-align:left;color:#2A4A7A;">Mês</th>
+          <th style="padding:5px 8px;text-align:right;color:#2A4A7A;">Valor</th>
+        </tr></thead>
+        <tbody>${sim.parcelas.map(p=>`<tr style="border-bottom:1px solid #C8DEFF;"><td style="padding:5px 8px;">${p.mes}/${p.ano}</td><td style="padding:5px 8px;text-align:right;font-weight:600;">${fmt(p.valor)}</td></tr>`).join("")}</tbody>
+      </table>
+    </div>
+    <div style="background:#EFFFF5;border:1.5px solid #A8E6C0;border-radius:8px;padding:14px;">
+      <div style="font-size:13px;font-weight:700;color:#2A6644;">À vista: ${fmt(sim.valorAVista)}</div>
+      <div style="font-size:11px;color:#2A6644;margin-top:4px;">${sim.discPct.toFixed(1)}% de desconto — economia de ${fmt(sim.desconto)}</div>
+    </div>
+  </div>`:'';
   const itemRows=(_orc._selectedItems||[]).map(i=>{
     const info=_orcItemInfo(i);
     const det=info?info.d:null;
@@ -4442,7 +4516,7 @@ function _renderContratosTabela(rows) {
         <td style="padding:8px 12px;font-weight:700;color:var(--a);">${r.cod||"—"}</td>
         <td style="padding:8px 12px;">${r.nome_evento||"—"}</td>
         <td style="padding:8px 12px;white-space:nowrap;">${fmt(r.data_evento)}</td>
-        <td style="padding:8px 12px;">${contratoStatusBadge(r.contrato_ok ? "assinado" : (r.assinatura_status||null))}</td>
+        <td style="padding:8px 12px;">${contratoStatusBadge(r.contrato_ok ? "assinado" : (r.assinatura_status||null))}${r.assinatura_pdf_url?` <a href="${r.assinatura_pdf_url}" target="_blank" style="margin-left:8px;font-size:11px;font-weight:700;color:#166534;text-decoration:none;background:#dcfce7;padding:2px 8px;border-radius:99px;white-space:nowrap;">✅ Ver PDF</a>`:""}</td>
       </tr>`).join("")}
     </tbody></table>`;
 }
@@ -4463,7 +4537,7 @@ async function renderContratos() {
   if (!el) return;
   el.innerHTML = `<div style="color:var(--dl);padding:20px;text-align:center;font-size:13px;">Carregando…</div>`;
   try {
-    _contratosRows = await dbGet("agenda", "select=cod,nome_evento,data_evento,assinatura_status,contrato_ok&order=cod.desc&limit=200");
+    _contratosRows = await dbGet("agenda", "select=cod,nome_evento,data_evento,assinatura_status,contrato_ok,assinatura_pdf_url&order=cod.desc&limit=200");
     if(_userEventIds) _contratosRows = _contratosRows.filter(r=>_userEventIds.includes(r.cod));
     const q = (document.getElementById("contratos-filtro")?.value || "").trim();
     if (q) filtrarContratos(); else _renderContratosTabela(_contratosRows);
@@ -5370,19 +5444,9 @@ async function openPedidoModal(ped, readOnly) {
   document.getElementById("ped-modal-title").textContent = ro ? "Itens do Pedido" : (ped ? "Editar Pedido" : "Novo Pedido");
   document.getElementById("pm-numero").value = ped?.numero_pedido||"";
   document.getElementById("pm-total").value = ped?.total_pedido||"";
-  document.getElementById("pm-itens-body").innerHTML = "";
+  document.getElementById("pm-itens-body").innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--dl);">Carregando...</td></tr>';
   const sel = document.getElementById("pm-evento");
   sel.innerHTML = '<option value="">— Selecione —</option>';
-  // Carrega eventos e inventário em paralelo
-  const [evts, invItems, itens] = await Promise.all([
-    dbGet("agenda","select=cod,nome_evento&order=data_evento.desc&limit=500"),
-    dbGet("inventario","select=cod,descricao,valor_unitario&order=cod.asc&limit=500"),
-    _pedidoId ? dbGet("itens_pedido","pedido_id=eq."+_pedidoId+"&order=id.asc&limit=500") : Promise.resolve([])
-  ]);
-  _pmInvItems = invItems;
-  _pmSomaReceber = null; // reset cache ao abrir novo pedido
-  evts.forEach(e=>{ const o=document.createElement("option"); o.value=e.cod; o.textContent=(e.nome_evento||e.cod); if(ped&&e.cod===ped.cod_evento)o.selected=true; sel.appendChild(o); });
-  itens.forEach(it=>_pmAddItem(it, ro));
   // modo leitura: oculta campos de valor e ações
   document.getElementById("pm-total").closest("div").parentElement.style.display = ro ? "none" : "";
   document.getElementById("pm-totais-panel").style.display = ro ? "none" : "";
@@ -5392,8 +5456,26 @@ async function openPedidoModal(ped, readOnly) {
   document.querySelector("#m-pedido .btn-cancel[onclick*='_pmAddItem']") && (document.querySelector("#m-pedido .btn-cancel[onclick*='_pmAddItem']").style.display = ro ? "none" : "");
   document.getElementById("pm-btn-save").style.display = ro ? "none" : "";
   document.querySelector("#m-pedido .macts .btn-cancel").textContent = ro ? "Fechar" : "Cancelar";
-  if(!ro) await _pmUpdateTotais();
   document.getElementById("m-pedido").classList.add("open");
+  try {
+    const [evts, invItems, itens] = await Promise.all([
+      dbGet("agenda","select=cod,nome_evento&order=data_evento.desc&limit=500"),
+      dbGet("inventario","select=cod,descricao,valor_unitario&order=cod.asc&limit=500"),
+      _pedidoId ? dbGet("itens_pedido","pedido_id=eq."+_pedidoId+"&select=id,cod_item,descricao,quantidade,valor_unitario,valor_subtotal&order=id.asc&limit=500") : Promise.resolve([])
+    ]);
+    _pmInvItems = invItems;
+    _pmSomaReceber = null;
+    evts.forEach(e=>{ const o=document.createElement("option"); o.value=e.cod; o.textContent=(e.nome_evento||e.cod); if(ped&&e.cod===ped.cod_evento)o.selected=true; sel.appendChild(o); });
+    document.getElementById("pm-itens-body").innerHTML = "";
+    if(itens.length) {
+      itens.forEach(it=>_pmAddItem(it, ro));
+    } else {
+      document.getElementById("pm-itens-body").innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--dl);">Nenhum item cadastrado neste pedido.</td></tr>';
+    }
+    if(!ro) await _pmUpdateTotais();
+  } catch(e) {
+    document.getElementById("pm-itens-body").innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:#A03030;">Erro ao carregar itens: '+e.message+'</td></tr>';
+  }
 }
 
 async function savePedido() {
