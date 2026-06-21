@@ -1926,14 +1926,15 @@ function togCb(el){el.closest("label").classList.toggle("on",el.checked);}
 function togCustom(f){const sel=document.getElementById("mef-"+f+"-sel");document.getElementById("mef-"+f+"-custom").style.display=sel.value==="outro"?"block":"none";}
 
 async function genCode(){
+  const yr=String(new Date().getFullYear());
   try {
-    const evts=await dbGet("agenda","select=cod&deleted_at=is.null&order=id.desc&limit=1");
-    if(evts.length && evts[0].cod){
-      const num=parseInt(evts[0].cod.replace(/\D/g,""));
-      if(!isNaN(num)) return String(num+1);
+    const evts=await dbGet("agenda","cod=like."+yr+"%&select=cod&deleted_at=is.null&order=id.desc&limit=200");
+    if(evts.length){
+      const seqs=evts.map(e=>parseInt((e.cod||"").slice(yr.length))).filter(n=>!isNaN(n)&&n>0);
+      if(seqs.length) return yr+String(Math.max(...seqs)+1).padStart(2,"0");
     }
   } catch(e){}
-  return "1";
+  return yr+"01";
 }
 
 function openNewEvent(existing){
