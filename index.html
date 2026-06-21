@@ -2042,7 +2042,10 @@ async function saveEvent(){
   const btn=document.getElementById("btn-save-ev");
   btn.disabled=true; btn.textContent="Salvando...";
   try {
+    let googleCalId = null;
     if(existCod){
+      const existing = await dbGet("agenda","cod=eq."+existCod+"&select=google_cal_id");
+      googleCalId = existing[0]?.google_cal_id || null;
       await dbUpdate("agenda","cod=eq."+existCod, evData);
       toast("✅ Evento atualizado — "+code);
     } else {
@@ -2050,11 +2053,39 @@ async function saveEvent(){
       toast("✅ Evento criado — "+code);
     }
     closeMEF(); renderCal(null);
+    // Sincroniza com Google Calendar em background (não bloqueia a UI)
+    _syncGoogleCal({ ...evData, google_cal_id: googleCalId });
   } catch(e) {
     toast("Erro ao salvar: "+e.message);
     console.error(e);
   } finally {
     btn.disabled=false; btn.textContent="Salvar Evento";
+  }
+}
+
+async function _syncGoogleCal(evData) {
+  try {
+    const res = await fetch(SB_URL + "/functions/v1/sync-google-calendar", {
+      method: "POST",
+      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "upsert",
+        cod: evData.cod,
+        nome_evento: evData.nome_evento,
+        data_evento: evData.data_evento,
+        data_fim: evData.data_fim,
+        tipo_evento: evData.tipo_evento,
+        local_evento: evData.local_evento,
+        status: evData.status,
+        google_cal_id: evData.google_cal_id || null,
+      }),
+    });
+    const resp = await res.json();
+    if (resp.google_cal_id && resp.google_cal_id !== evData.google_cal_id) {
+      await dbUpdate("agenda", "cod=eq."+encodeURIComponent(evData.cod), { google_cal_id: resp.google_cal_id });
+    }
+  } catch(e) {
+    console.warn("Google Calendar sync falhou:", e.message);
   }
 }
 
