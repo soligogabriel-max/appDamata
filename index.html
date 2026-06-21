@@ -1047,8 +1047,11 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 <div class="moverlay" id="m-wpp-lembretes" onclick="if(event.target===this)closeWppLembretes()">
   <div class="mbox" style="max-width:460px;">
     <div class="mtitle">📱 Enviar Lembretes WPP</div>
-    <div style="font-size:13px;color:var(--dm);margin-bottom:16px;">Envia mensagem WhatsApp para clientes com parcelas vencendo no período selecionado (status: Pendente).</div>
-    <div style="display:grid;gap:12px;margin-bottom:16px;">
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button id="wpp-modo-vencendo" onclick="setWppModo('vencendo')" style="flex:1;padding:8px;border-radius:8px;border:2px solid var(--pr);background:var(--pr);color:#fff;font-weight:700;font-size:13px;cursor:pointer;">📅 Vencendo em breve</button>
+      <button id="wpp-modo-atrasados" onclick="setWppModo('atrasados')" style="flex:1;padding:8px;border-radius:8px;border:2px solid var(--am);background:var(--bg);color:var(--dk);font-weight:700;font-size:13px;cursor:pointer;">⚠️ Atrasados</button>
+    </div>
+    <div id="wpp-periodo-box" style="display:grid;gap:12px;margin-bottom:16px;">
       <div>
         <label class="lbl">Vencimento de</label>
         <input type="date" id="wpp-de" class="inp" style="margin-bottom:0;"/>
@@ -5997,6 +6000,27 @@ async function bulkDeleteReceber(){
 // LEMBRETES WHATSAPP (Meta Cloud API)
 // ══════════════════════════════════════════
 let _wppParcelas = [];
+let _wppModo = "vencendo";
+
+function setWppModo(modo) {
+  _wppModo = modo;
+  const btnV = document.getElementById("wpp-modo-vencendo");
+  const btnA = document.getElementById("wpp-modo-atrasados");
+  const periodoBox = document.getElementById("wpp-periodo-box");
+  if (modo === "atrasados") {
+    btnA.style.background = "#A03030"; btnA.style.color = "#fff"; btnA.style.borderColor = "#A03030";
+    btnV.style.background = "var(--bg)"; btnV.style.color = "var(--dk)"; btnV.style.borderColor = "var(--pr)";
+    periodoBox.style.display = "none";
+  } else {
+    btnV.style.background = "var(--pr)"; btnV.style.color = "#fff"; btnV.style.borderColor = "var(--pr)";
+    btnA.style.background = "var(--bg)"; btnA.style.color = "var(--dk)"; btnA.style.borderColor = "var(--am)";
+    periodoBox.style.display = "grid";
+  }
+  document.getElementById("wpp-preview").style.display = "none";
+  document.getElementById("wpp-result").style.display = "none";
+  document.getElementById("wpp-btn-send").style.display = "none";
+  _wppParcelas = [];
+}
 
 function openWppLembretes() {
   const hoje = new Date().toISOString().slice(0, 10);
@@ -6009,6 +6033,7 @@ function openWppLembretes() {
   document.getElementById("wpp-btn-send").style.display = "none";
   document.getElementById("wpp-btn-preview").style.display = "";
   _wppParcelas = [];
+  setWppModo("vencendo");
   document.getElementById("m-wpp-lembretes").classList.add("open");
 }
 
@@ -6017,8 +6042,9 @@ function closeWppLembretes() {
 }
 
 async function previewWppLembretes() {
-  const de = document.getElementById("wpp-de").value;
-  const ate = document.getElementById("wpp-ate").value;
+  const ontem = new Date(); ontem.setDate(ontem.getDate() - 1);
+  const de = _wppModo === "atrasados" ? "2000-01-01" : document.getElementById("wpp-de").value;
+  const ate = _wppModo === "atrasados" ? ontem.toISOString().slice(0, 10) : document.getElementById("wpp-ate").value;
   if (!de || !ate) { toast("Preencha as datas."); return; }
   const prevDiv = document.getElementById("wpp-preview");
   prevDiv.innerHTML = "Buscando parcelas...";
@@ -6059,8 +6085,9 @@ async function previewWppLembretes() {
 }
 
 async function sendWppLembretes() {
-  const de = document.getElementById("wpp-de").value;
-  const ate = document.getElementById("wpp-ate").value;
+  const ontem = new Date(); ontem.setDate(ontem.getDate() - 1);
+  const de = _wppModo === "atrasados" ? "2000-01-01" : document.getElementById("wpp-de").value;
+  const ate = _wppModo === "atrasados" ? ontem.toISOString().slice(0, 10) : document.getElementById("wpp-ate").value;
   const btn = document.getElementById("wpp-btn-send");
   const resDiv = document.getElementById("wpp-result");
   btn.disabled = true; btn.textContent = "Enviando...";
