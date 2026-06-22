@@ -2,14 +2,27 @@
 
 ## Início de cada sessão
 
-Antes de fazer qualquer mudança, sincronizar os arquivos principais com o main:
+Trabalhar sempre direto no `main`. Sincronizar antes de qualquer mudança:
 
 ```bash
 git fetch origin
-git checkout origin/main -- index.html gerador-contrato-damata.html
+git checkout main
+git pull origin main
 ```
 
 Isso garante que partimos sempre da versão mais recente, evitando perder fixes anteriores.
+
+## Deploy
+
+**Toda mudança vai direto ao `main` e entra em produção imediatamente.**
+Não usar branches intermediários nem PRs — o usuário testa em produção.
+
+Fluxo após cada alteração:
+```bash
+git add index.html gerador-contrato-damata.html  # (ou outros arquivos alterados)
+git commit -m "fix/feat: descrição"
+git push origin main
+```
 
 ## Arquitetura
 
@@ -43,15 +56,18 @@ b64 = base64.b64encode(html.encode('utf-8')).decode('ascii')
 A cada commit com mudanças funcionais, atualizar o número de versão na linha 338 do `index.html`:
 
 ```html
-<div id="ll-version" ...>v2026.06.19h</div>
+<div id="ll-version" ...>v2026.06.22b</div>
 ```
 
 Formato: `v{ANO}.{MÊS}.{DIA}{letra}` — a letra (`a`, `b`, `c`...) distingue múltiplos deploys no mesmo dia.
 Exemplo: segunda mudança em 22/06/2026 → `v2026.06.22b`
 
-## Workflow de branches
+## Edições em massa
 
-- Trabalhar sempre no branch designado pela sessão
-- Usar Python para edições em massa (arquivo é grande demais para Edit direto)
-- Commits atômicos com todas as mudanças relacionadas juntas
-- Nunca usar `git stash pop` entre branches diferentes com `index.html`
+Usar Python para edições no `index.html` (arquivo muito grande para o editor direto):
+
+```python
+with open('index.html', 'r', encoding='utf-8') as f: c = f.read()
+c = c.replace(OLD, NEW, 1)
+with open('index.html', 'w', encoding='utf-8') as f: f.write(c)
+```
