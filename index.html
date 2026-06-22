@@ -4520,12 +4520,14 @@ function _renderContratosTabela(rows) {
   if (!el) return;
   if (!rows.length) { el.innerHTML = `<div style="color:var(--dl);padding:20px;text-align:center;font-size:13px;">Nenhum contrato encontrado.</div>`; return; }
   const fmt = d => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR") : "—";
+  const adm = effIsAdmin();
   el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
     <thead><tr style="background:var(--s2);color:var(--dl);">
       <th style="padding:8px 12px;text-align:left;font-weight:600;">Código</th>
       <th style="padding:8px 12px;text-align:left;font-weight:600;">Evento</th>
       <th style="padding:8px 12px;text-align:left;font-weight:600;">Data</th>
       <th style="padding:8px 12px;text-align:left;font-weight:600;">Status do Contrato</th>
+      <th style="padding:8px 12px;text-align:left;font-weight:600;">Ações</th>
     </tr></thead>
     <tbody>${rows.map((r,i)=>`
       <tr style="background:${i%2===0?'var(--s1)':'var(--s2)'};border-bottom:1px solid var(--br);">
@@ -4533,8 +4535,40 @@ function _renderContratosTabela(rows) {
         <td style="padding:8px 12px;">${r.nome_evento||"—"}</td>
         <td style="padding:8px 12px;white-space:nowrap;">${fmt(r.data_evento)}</td>
         <td style="padding:8px 12px;">${contratoStatusBadge(r.contrato_ok ? "assinado" : (r.assinatura_status||null))}${r.assinatura_pdf_url?` <a href="${r.assinatura_pdf_url}" target="_blank" style="margin-left:8px;font-size:11px;font-weight:700;color:#166534;text-decoration:none;background:#dcfce7;padding:2px 8px;border-radius:99px;white-space:nowrap;">✅ Ver PDF</a>`:""}</td>
+        <td style="padding:8px 12px;white-space:nowrap;display:flex;gap:4px;">
+          <button onclick="_contratoAbrir('${r.cod}')" title="Visualizar evento" style="padding:4px 8px;border:1px solid var(--br);border-radius:6px;background:#fff;color:var(--dm);font-size:12px;cursor:pointer;">👁</button>
+          ${adm?`<button onclick="_contratoEditar('${r.cod}')" title="Editar evento" style="padding:4px 8px;border:1px solid #3b82f6;border-radius:6px;background:#fff;color:#3b82f6;font-size:12px;cursor:pointer;">✏️</button>`:""}
+          ${adm?`<button onclick="downloadContract('${r.cod}')" title="Baixar contrato HTML" style="padding:4px 8px;border:1px solid var(--a);border-radius:6px;background:#fff;color:var(--a);font-size:12px;cursor:pointer;">📄</button>`:""}
+          ${adm?`<button onclick="_contratoApagar('${r.cod}')" title="Apagar evento" style="padding:4px 8px;border:1px solid var(--er);border-radius:6px;background:#fff;color:var(--er);font-size:12px;cursor:pointer;">🗑</button>`:""}
+        </td>
       </tr>`).join("")}
     </tbody></table>`;
+}
+
+async function _contratoGetEv(cod) {
+  let ev = (cachedEvts||[]).find(e=>e.cod===cod);
+  if (!ev) {
+    const rows = await dbGet("agenda", `cod=eq.${encodeURIComponent(cod)}&limit=1`);
+    if (!rows.length) { toast("Evento não encontrado."); return null; }
+    ev = rows[0];
+    if (cachedEvts) cachedEvts.push(ev); else cachedEvts = [ev];
+  }
+  return ev;
+}
+async function _contratoAbrir(cod) {
+  const ev = await _contratoGetEv(cod);
+  if (ev) openEvDet(ev);
+}
+async function _contratoEditar(cod) {
+  const ev = await _contratoGetEv(cod);
+  if (ev) openNewEvent(ev);
+}
+async function _contratoApagar(cod) {
+  const ev = await _contratoGetEv(cod);
+  currentEvId = ev ? (ev.id||ev.cod) : cod;
+  currentEvCod = cod;
+  await deleteEventCascade();
+  renderContratos();
 }
 
 function filtrarContratos() {
