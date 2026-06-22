@@ -4263,6 +4263,21 @@ async function salvarContrato(preset) {
     const dStr = d2 && d2!==d1 ? `${fmtNome(d1)} a ${fmtNome(d2)}` : fmtNome(d1);
     const nomes = [preset.nomeNoivo, preset.nomeNoiva].filter(Boolean).join(" e ") || preset.obs || "Evento";
 
+    // Build payments_json and spaces_json from preset so downloads work
+    const paymentsJson = JSON.stringify(preset.payments||[]);
+    const itens = preset.itens||[];
+    const descHas = kw => itens.some(it=>(it.descricao||"").toLowerCase().includes(kw.toLowerCase()));
+    const spacesJson = JSON.stringify({
+      spTumb: descHas("Tumb"), spPeroba: descHas("Peroba"), spBrom: descHas("Brom"),
+      dayQty: 0,
+      acLoft: preset.acLoft||false, acCasa: preset.acCasa||false,
+      acSf1: preset.acSf1||false, acSf2: preset.acSf2||false, acSf3: preset.acSf3||false,
+      acSf4: preset.acSf4||false, acSf5: preset.acSf5||false,
+      acSb1: preset.acSb1||false, acSb2: preset.acSb2||false, acSb3: preset.acSb3||false,
+      fuBal: preset.fuBal||false,
+      mesas: 0, cad: 0, ban: 0, horas: 0, mont: 0, desm: 0,
+    });
+
     if(preset.gcEvt) {
       // Evento já criado pelo fluxo app_users — apenas atualiza valor
       cod = preset.gcEvt;
@@ -4273,6 +4288,8 @@ async function salvarContrato(preset) {
         cin: preset.cin||null, cout: preset.cout||null,
         tipo_evento: preset.tipoEvento||"Casamento",
         obs: preset.obs||null,
+        payments_json: paymentsJson,
+        spaces_json: spacesJson,
       }, prefer:"return=minimal"});
     } else if(preset.code) {
       // Código já gerado pelo gerador (fluxo normal) — verifica se já existe
@@ -4286,6 +4303,8 @@ async function salvarContrato(preset) {
           cin: preset.cin||null, cout: preset.cout||null,
           tipo_evento: preset.tipoEvento||"Casamento",
           obs: preset.obs||null,
+          payments_json: paymentsJson,
+          spaces_json: spacesJson,
         }, prefer:"return=minimal"});
       } else {
         await sbFetch("agenda", {method:"POST", body:{
@@ -4295,6 +4314,8 @@ async function salvarContrato(preset) {
           tipo_evento: preset.tipoEvento||"Casamento",
           valor_locacao: preset.total ? parseFloat(preset.total) : null,
           obs: preset.obs||null,
+          payments_json: paymentsJson,
+          spaces_json: spacesJson,
         }, prefer:"return=minimal"});
       }
     } else {
@@ -4305,7 +4326,6 @@ async function salvarContrato(preset) {
       if(existentes.length) { seq = parseInt(existentes[0].cod.slice(4)) + 1; }
       cod = String(ano) + String(seq).padStart(2,"0");
       nomeEvento = `${nomes} - ${dStr}`;
-      // 3. Criar evento na agenda
       await sbFetch("agenda", {method:"POST", body:{
         cod, nome_evento: nomeEvento,
         data_evento: d1||null, data_fim: d2||null,
@@ -4313,6 +4333,8 @@ async function salvarContrato(preset) {
         tipo_evento: preset.tipoEvento||"Casamento",
         valor_locacao: preset.total ? parseFloat(preset.total) : null,
         obs: preset.obs||null,
+        payments_json: paymentsJson,
+        spaces_json: spacesJson,
       }, prefer:"return=minimal"});
     }
 
