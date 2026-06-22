@@ -503,7 +503,11 @@ function salvarNoSistema(){
     tipoEvento:v("o-tipo")||"Casamento",
     itens:itens,
     gcEvt:_gcEvt,
-    gcUserId:_gcUser?_gcUser.id:null
+    gcUserId:_gcUser?_gcUser.id:null,
+    acLoft:g("o-loft").checked,acCasa:g("o-casa").checked,
+    acSf1:g("o-sf1").checked,acSf2:g("o-sf2").checked,acSf3:g("o-sf3").checked,
+    acSf4:g("o-sf4").checked,acSf5:g("o-sf5").checked,
+    acSb1:g("o-sb1").checked,acSb2:g("o-sb2").checked,acSb3:g("o-sb3").checked,
   };
   if(window.parent&&window.parent!==window){
     window.parent.postMessage({type:"damata_salvar_contrato",preset:preset},"*");
