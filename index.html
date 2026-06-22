@@ -2049,9 +2049,9 @@ async function saveEvent(){
     mesas:cvals.mesas,cad:cvals.cad,ban:cvals.ban,horas:cvals.horas,mont:cvals.mont,desm:cvals.desm
   };
 
+  const statusVal = document.getElementById("mef-status").value;
   const evData = {
     cod: code,
-    status: document.getElementById("mef-status").value,
     data_evento: d1,
     data_fim: d2,
     cin: document.getElementById("mef-cin").value,
@@ -2083,6 +2083,11 @@ async function saveEvent(){
     const celular = document.getElementById("mef-celular").value.trim();
     if(celular && code){
       sbFetch("ficha_do_evento?cod=eq."+encodeURIComponent(code), {method:"PATCH", body:{celular}, prefer:"return=minimal"})
+        .catch(()=>{});
+    }
+    // Salva status em background (silencioso se coluna ainda não existir)
+    if(statusVal){
+      sbFetch("agenda?cod=eq."+encodeURIComponent(code), {method:"PATCH", body:{status:statusVal}, prefer:"return=minimal"})
         .catch(()=>{});
     }
     // Sincroniza com Google Calendar em background (não bloqueia a UI)
