@@ -38,6 +38,17 @@ b64 = base64.b64encode(html.encode('utf-8')).decode('ascii')
 - Campos relevantes: `cod`, `nome_evento`, `data_evento`, `data_fim`, `tipo_evento`,
   `valor_locacao`, `cin`, `cout`, `status`, `payments_json`, `spaces_json`, `obs`
 
+## Versão na landing page
+
+A cada commit com mudanças funcionais, atualizar o número de versão na linha 338 do `index.html`:
+
+```html
+<div id="ll-version" ...>v2026.06.19h</div>
+```
+
+Formato: `v{ANO}.{MÊS}.{DIA}{letra}` — a letra (`a`, `b`, `c`...) distingue múltiplos deploys no mesmo dia.
+Exemplo: segunda mudança em 22/06/2026 → `v2026.06.22b`
+
 ## Workflow de branches
 
 - Trabalhar sempre no branch designado pela sessão
