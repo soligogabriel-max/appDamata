@@ -100,17 +100,17 @@ select.inp{cursor:pointer}
 <div class="card" id="card-hosp" style="display:none">
   <div>
     <span class="lbl" style="margin-bottom:8px">Acomodações</span>
-    <label class="cb"><input type="checkbox" id="o-loft"> Loft Flamboyant</label>
-    <label class="cb"><input type="checkbox" id="o-casa"> Casa Flamboyant</label>
-    <label class="cb"><input type="checkbox" id="o-suiteass"> Suíte Assessoria</label>
-    <label class="cb"><input type="checkbox" id="o-sf1"> Suíte Flamboyant 1 (king)</label>
-    <label class="cb"><input type="checkbox" id="o-sf2"> Suíte Flamboyant 2 (king)</label>
-    <label class="cb"><input type="checkbox" id="o-sf3"> Suíte Flamboyant 3 (4 solteiros)</label>
-    <label class="cb"><input type="checkbox" id="o-sf4"> Suíte Flamboyant 4 (3 solteiros)</label>
-    <label class="cb"><input type="checkbox" id="o-sf5"> Suíte Flamboyant 5 (3 solteiros)</label>
-    <label class="cb"><input type="checkbox" id="o-sb1"> Suíte Bromélias 1 (casal + solteiro)</label>
-    <label class="cb"><input type="checkbox" id="o-sb2"> Suíte Bromélias 2 (casal)</label>
-    <label class="cb"><input type="checkbox" id="o-sb3"> Suíte Bromélias 3 (2 casais)</label>
+    <label class="cb"><input type="checkbox" id="o-loft"> <span id="g-loft">Loft Flamboyant</span></label>
+    <label class="cb"><input type="checkbox" id="o-casa"> <span id="g-casa">Casa Flamboyant</span></label>
+    <label class="cb"><input type="checkbox" id="o-suiteass"> <span id="g-suiteass">Suíte Assessoria</span></label>
+    <label class="cb"><input type="checkbox" id="o-sf1"> <span id="g-sf1">Suíte Flamboyant 1 (king)</span></label>
+    <label class="cb"><input type="checkbox" id="o-sf2"> <span id="g-sf2">Suíte Flamboyant 2 (king)</span></label>
+    <label class="cb"><input type="checkbox" id="o-sf3"> <span id="g-sf3">Suíte Flamboyant 3 (4 solteiros)</span></label>
+    <label class="cb"><input type="checkbox" id="o-sf4"> <span id="g-sf4">Suíte Flamboyant 4 (3 solteiros)</span></label>
+    <label class="cb"><input type="checkbox" id="o-sf5"> <span id="g-sf5">Suíte Flamboyant 5 (3 solteiros)</span></label>
+    <label class="cb"><input type="checkbox" id="o-sb1"> <span id="g-sb1">Suíte Bromélias 1 (casal + solteiro)</span></label>
+    <label class="cb"><input type="checkbox" id="o-sb2"> <span id="g-sb2">Suíte Bromélias 2 (casal)</span></label>
+    <label class="cb"><input type="checkbox" id="o-sb3"> <span id="g-sb3">Suíte Bromélias 3 (2 casais)</span></label>
   </div>
 </div>
 
@@ -291,6 +291,9 @@ async function loadInventarioDesc(){
     _invDesc={};_invDescOrc={};
     (inv||[]).forEach(function(r){_invDesc[r.cod]=r.descricao;_invDescOrc[r.cod]=r.descricao_orc||"";});
   }catch(e){/* fallback usa descricao salva */}
+  // Atualizar labels dos checkboxes
+  var _ACG={loft:"000019",casa:"000006",suiteass:"000022",sf1:"000011",sf2:"000012",sf3:"000029",sf4:"000030",sf5:"000031",sb1:"000013",sb2:"000014",sb3:"000015"};
+  Object.entries(_ACG).forEach(function(e){var sp=document.getElementById("g-"+e[0]);if(sp&&_invDesc[e[1]])sp.textContent=_invDesc[e[1]];});
 }
 
 async function loadTabelasPreco(){

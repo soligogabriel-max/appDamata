@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.23b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.23c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -951,17 +951,17 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div class="fsec" style="margin-bottom:10px;">
       <div class="fsec-title">🛏️ Acomodações</div>
       <div class="fgrid2">
-        <label class="cbtog" id="cb-loft"><input type="checkbox" id="mef-loft" onchange="togCb(this)"> Loft Flamboyant</label>
-        <label class="cbtog" id="cb-casa"><input type="checkbox" id="mef-casa" onchange="togCb(this)"> Casa Flamboyant</label>
-        <label class="cbtog" id="cb-suiteass"><input type="checkbox" id="mef-suiteass" onchange="togCb(this)"> Suíte Assessoria</label>
-        <label class="cbtog" id="cb-sf1"><input type="checkbox" id="mef-sf1" onchange="togCb(this)"> Suíte Flamb. 1</label>
-        <label class="cbtog" id="cb-sf2"><input type="checkbox" id="mef-sf2" onchange="togCb(this)"> Suíte Flamb. 2</label>
-        <label class="cbtog" id="cb-sf3"><input type="checkbox" id="mef-sf3" onchange="togCb(this)"> Suíte Flamb. 3</label>
-        <label class="cbtog" id="cb-sf4"><input type="checkbox" id="mef-sf4" onchange="togCb(this)"> Suíte Flamb. 4</label>
-        <label class="cbtog" id="cb-sf5"><input type="checkbox" id="mef-sf5" onchange="togCb(this)"> Suíte Flamb. 5</label>
-        <label class="cbtog" id="cb-sb1"><input type="checkbox" id="mef-sb1" onchange="togCb(this)"> Suíte Brom. 1</label>
-        <label class="cbtog" id="cb-sb2"><input type="checkbox" id="mef-sb2" onchange="togCb(this)"> Suíte Brom. 2</label>
-        <label class="cbtog" id="cb-sb3"><input type="checkbox" id="mef-sb3" onchange="togCb(this)"> Suíte Brom. 3</label>
+        <label class="cbtog" id="cb-loft"><input type="checkbox" id="mef-loft" onchange="togCb(this)"> <span id="lbl-loft">Loft Flamboyant</span></label>
+        <label class="cbtog" id="cb-casa"><input type="checkbox" id="mef-casa" onchange="togCb(this)"> <span id="lbl-casa">Casa Flamboyant</span></label>
+        <label class="cbtog" id="cb-suiteass"><input type="checkbox" id="mef-suiteass" onchange="togCb(this)"> <span id="lbl-suiteass">Suíte Assessoria</span></label>
+        <label class="cbtog" id="cb-sf1"><input type="checkbox" id="mef-sf1" onchange="togCb(this)"> <span id="lbl-sf1">Suíte Flamb. 1</span></label>
+        <label class="cbtog" id="cb-sf2"><input type="checkbox" id="mef-sf2" onchange="togCb(this)"> <span id="lbl-sf2">Suíte Flamb. 2</span></label>
+        <label class="cbtog" id="cb-sf3"><input type="checkbox" id="mef-sf3" onchange="togCb(this)"> <span id="lbl-sf3">Suíte Flamb. 3</span></label>
+        <label class="cbtog" id="cb-sf4"><input type="checkbox" id="mef-sf4" onchange="togCb(this)"> <span id="lbl-sf4">Suíte Flamb. 4</span></label>
+        <label class="cbtog" id="cb-sf5"><input type="checkbox" id="mef-sf5" onchange="togCb(this)"> <span id="lbl-sf5">Suíte Flamb. 5</span></label>
+        <label class="cbtog" id="cb-sb1"><input type="checkbox" id="mef-sb1" onchange="togCb(this)"> <span id="lbl-sb1">Suíte Brom. 1</span></label>
+        <label class="cbtog" id="cb-sb2"><input type="checkbox" id="mef-sb2" onchange="togCb(this)"> <span id="lbl-sb2">Suíte Brom. 2</span></label>
+        <label class="cbtog" id="cb-sb3"><input type="checkbox" id="mef-sb3" onchange="togCb(this)"> <span id="lbl-sb3">Suíte Brom. 3</span></label>
       </div>
     </div>
     <div class="fsec" style="margin-bottom:10px;">
@@ -1724,7 +1724,21 @@ async function _setupUserAccess(u){
   }
 }
 
-async function openApp(u) {
+async 
+async function updateAcLabels(){
+  const AC_ADMIN_COD={loft:"000019",casa:"000006",suiteass:"000022",sf1:"000011",sf2:"000012",sf3:"000029",sf4:"000030",sf5:"000031",sb1:"000013",sb2:"000014",sb3:"000015"};
+  try{
+    const cods=Object.values(AC_ADMIN_COD).join(",");
+    const items=await dbGet("inventario","cod=in.("+cods+")&select=cod,descricao&limit=20");
+    const map={};(items||[]).forEach(i=>{map[i.cod]=i.descricao;});
+    Object.entries(AC_ADMIN_COD).forEach(([key,cod])=>{
+      const sp=document.getElementById("lbl-"+key);
+      if(sp&&map[cod])sp.textContent=map[cod];
+    });
+  }catch(e){/* mantém labels estáticos em caso de erro */}
+}
+function openApp(u) {
+  updateAcLabels();
   document.getElementById("hname").textContent = u.name;
   document.getElementById("hrole").textContent = RL[u.role]||"";
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
