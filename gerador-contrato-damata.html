@@ -284,11 +284,12 @@ function descOf(it){
   return (it&&(it.descricao||it.cod_item))||"";
 }
 
+var _invDescOrc={};
 async function loadInventarioDesc(){
   try{
-    var inv=await sbGet("inventario?select=cod,descricao&limit=1000");
-    _invDesc={};
-    (inv||[]).forEach(function(r){_invDesc[r.cod]=r.descricao;});
+    var inv=await sbGet("inventario?select=cod,descricao,descricao_orc&limit=1000");
+    _invDesc={};_invDescOrc={};
+    (inv||[]).forEach(function(r){_invDesc[r.cod]=r.descricao;_invDescOrc[r.cod]=r.descricao_orc||"";});
   }catch(e){/* fallback usa descricao salva */}
 }
 
@@ -590,6 +591,10 @@ function collectPreset(){
       sf1:g("o-sf1").checked,sf2:g("o-sf2").checked,sf3:g("o-sf3").checked,sf4:g("o-sf4").checked,sf5:g("o-sf5").checked,
       sb1:g("o-sb1").checked,sb2:g("o-sb2").checked,sb3:g("o-sb3").checked
     };
+    var _acCodMap={"acLoft":"000019","acCasa":"000006","acSuiteAss":"000022","acSf1":"000011","acSf2":"000012","acSf3":"000029","acSf4":"000030","acSf5":"000031","acSb1":"000013","acSb2":"000014","acSb3":"000015"};
+    var _acInfo={};
+    Object.entries(_acCodMap).forEach(function(e){var cod=e[1];_acInfo[e[0]]={nome:_invDesc[cod]||cod,desc:_invDescOrc[cod]||""};});
+    base.acomodacoesInfo=_acInfo;
   } else {
     base.nomeNoiva=v("o-noiva");
     base.nomeNoivo=v("o-noivo");
