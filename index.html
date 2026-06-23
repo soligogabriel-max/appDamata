@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.23h</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.23i</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1292,6 +1292,14 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <div class="iblbl">Observações / Nome</div>
       <div class="ibtext" id="evd-notes"></div>
     </div>
+    <div id="evd-obs-interna-wrap" style="display:none;background:#fffbeb;border-radius:11px;padding:12px;margin-bottom:10px;border:1px solid #fcd34d;">
+      <div class="iblbl" style="color:#92400e;">🔒 Observações Internas (Equipe)</div>
+      <textarea id="evd-obs-interna" rows="3" placeholder="Anotações internas sobre este evento..." style="width:100%;margin-top:6px;border:1px solid #fcd34d;border-radius:7px;padding:8px;font-size:13px;font-family:inherit;resize:vertical;background:#fff;box-sizing:border-box;"></textarea>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+        <button onclick="saveObsInterna()" style="font-size:12px;padding:6px 16px;border-radius:8px;background:#f59e0b;color:#fff;border:none;font-weight:700;cursor:pointer;">Salvar</button>
+        <span id="evd-obs-saved" style="font-size:11px;color:#16a34a;display:none;">Salvo ✓</span>
+      </div>
+    </div>
     <div id="evd-admin-btns" style="display:none;">
       <button class="btn-confirm" style="width:100%;margin-bottom:6px;background:var(--al);color:var(--dk);" onclick="editCurrentEvent()">✏️ Editar Evento</button>
       <button class="btn-confirm" style="width:100%;margin-bottom:6px;" onclick="downloadContract(currentEvId)">📄 Baixar Contrato</button>
@@ -2049,7 +2057,22 @@ function openEvDet(ev){
   else nb.style.display="none";
   document.getElementById("evd-admin-btns").style.display=effIsAdmin()?"block":"none";
   document.getElementById("evd-btn-pdf-assinado").style.display=effIsAdmin()&&currentEvPdfUrl?"block":"none";
+  const _obsWrap=document.getElementById("evd-obs-interna-wrap");
+  const _canObs=effIsAdmin()||effRole()==="equipe";
+  _obsWrap.style.display=_canObs?"block":"none";
+  if(_canObs){document.getElementById("evd-obs-interna").value=ev.obs_interna||"";document.getElementById("evd-obs-saved").style.display="none";}
   document.getElementById("m-evdet").classList.add("open");
+}
+async function saveObsInterna(){
+  if(!currentEvCod) return;
+  const val=document.getElementById("evd-obs-interna").value;
+  try{
+    await sbFetch("agenda?cod=eq."+encodeURIComponent(currentEvCod),{method:"PATCH",body:{obs_interna:val},prefer:"return=minimal"});
+    const ev=cachedEvts.find(e=>e.cod===currentEvCod);
+    if(ev) ev.obs_interna=val;
+    const sp=document.getElementById("evd-obs-saved");
+    sp.style.display="inline"; setTimeout(()=>{sp.style.display="none";},2000);
+  }catch(e){toast("Erro ao salvar obs.: "+e.message);}
 }
 function closeEvDet(){document.getElementById("m-evdet").classList.remove("open");}
 function editCurrentEvent(){closeEvDet();const ev=cachedEvts.find(e=>(e.id||e.cod)===currentEvId);if(ev)openNewEvent(ev);}
