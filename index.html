@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.23d</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.23e</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1737,7 +1737,7 @@ async function updateAcLabels(){
     });
   }catch(e){/* mantém labels estáticos em caso de erro */}
 }
-function openApp(u) {
+async function openApp(u) {
   updateAcLabels();
   document.getElementById("hname").textContent = u.name;
   document.getElementById("hrole").textContent = RL[u.role]||"";
