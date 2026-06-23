@@ -102,6 +102,7 @@ select.inp{cursor:pointer}
     <span class="lbl" style="margin-bottom:8px">Acomodações</span>
     <label class="cb"><input type="checkbox" id="o-loft"> Loft Flamboyant</label>
     <label class="cb"><input type="checkbox" id="o-casa"> Casa Flamboyant</label>
+    <label class="cb"><input type="checkbox" id="o-suiteass"> Suíte Assessoria</label>
     <label class="cb"><input type="checkbox" id="o-sf1"> Suíte Flamboyant 1 (king)</label>
     <label class="cb"><input type="checkbox" id="o-sf2"> Suíte Flamboyant 2 (king)</label>
     <label class="cb"><input type="checkbox" id="o-sf3"> Suíte Flamboyant 3 (4 solteiros)</label>
@@ -507,7 +508,7 @@ function salvarNoSistema(){
     acLoft:g("o-loft").checked,acCasa:g("o-casa").checked,
     acSf1:g("o-sf1").checked,acSf2:g("o-sf2").checked,acSf3:g("o-sf3").checked,
     acSf4:g("o-sf4").checked,acSf5:g("o-sf5").checked,
-    acSb1:g("o-sb1").checked,acSb2:g("o-sb2").checked,acSb3:g("o-sb3").checked,
+    acSb1:g("o-sb1").checked,acSb2:g("o-sb2").checked,acSb3:g("o-sb3").checked,acSuiteAss:g("o-suiteass").checked,
   };
   if(window.parent&&window.parent!==window){
     window.parent.postMessage({type:"damata_salvar_contrato",preset:preset},"*");
@@ -585,7 +586,7 @@ function collectPreset(){
     base.nomeLocatario=v("o-locatario");
     base.acomodacoes={
       loftFlamboyant:g("o-loft").checked,
-      casaDaFazenda:g("o-casa").checked,
+      casaFlamboyant:g("o-casa").checked,suiteAssessoria:g("o-suiteass").checked,
       sf1:g("o-sf1").checked,sf2:g("o-sf2").checked,sf3:g("o-sf3").checked,sf4:g("o-sf4").checked,sf5:g("o-sf5").checked,
       sb1:g("o-sb1").checked,sb2:g("o-sb2").checked,sb3:g("o-sb3").checked
     };
