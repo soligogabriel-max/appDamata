@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.23f</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.23g</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1972,7 +1972,10 @@ function renderGrid(fi){
   for(let i=0;i<fd;i++) gr.appendChild(document.createElement("div"));
   for(let d=1;d<=dim;d++){
     const dk=cy+"-"+String(cm+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
-    const de=evDay(dk,fi), it=dk===tk0;
+    const deAll=evDay(dk,null);
+    const de=fi!=null?evDay(dk,fi):deAll;
+    const dow=new Date(cy,cm,d).getDay();
+    const it=dk===tk0;
     const cell=document.createElement("div"); cell.className="dcell"+(it?" tod":"");
     const num=document.createElement("div"); num.className="dnum"; num.textContent=d; cell.appendChild(num);
     de.slice(0,3).forEach(ev=>{
@@ -1984,6 +1987,21 @@ function renderGrid(fi){
       cell.appendChild(ch);
     });
     if(de.length>3){const m=document.createElement("div");m.style.cssText="font-size:8px;color:#7A8F96;";m.textContent="+"+(de.length-3);cell.appendChild(m);}
+    if(fi!=null){
+      const deOther=deAll.filter(e=>!fi.includes(e.cod));
+      if(deOther.length>0){
+        const ch=document.createElement("div");
+        ch.style.cssText="font-size:9px;font-weight:700;background:#fee2e2;color:#dc2626;border-radius:5px 2px 2px 5px;padding:2px 5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;cursor:default;";
+        ch.textContent="✕ Indisponível";
+        cell.appendChild(ch);
+      }
+    }
+    if((dow===5||dow===6||dow===0)&&deAll.length===0){
+      const ch=document.createElement("div");
+      ch.style.cssText="font-size:9px;font-weight:700;background:#dcfce7;color:#16a34a;border-radius:5px 2px 2px 5px;padding:2px 5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;cursor:default;";
+      ch.textContent="✓ Disponível";
+      cell.appendChild(ch);
+    }
     gr.appendChild(cell);
   }
 }
@@ -4512,7 +4530,7 @@ async function renderInventario() {
   wr.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   try {
     if(!_inventario) {
-      _inventario = await dbGet("inventario","select=*&order=cod.asc&limit=200");
+      _inventario = await dbGet("inventario","select=*&order=descricao.asc&limit=200");
     }
     const busca = (document.getElementById("inv-busca")?.value||"").toLowerCase();
     const rows = busca ? _inventario.filter(r=>(r.descricao||"").toLowerCase().includes(busca)) : _inventario;
@@ -5738,7 +5756,7 @@ async function openPedidoModal(ped, readOnly) {
   try {
     const [evts, invItems, itens] = await Promise.all([
       dbGet("agenda","select=cod,nome_evento&order=data_evento.desc&limit=500"),
-      dbGet("inventario","select=cod,descricao,valor_unitario&order=cod.asc&limit=500"),
+      dbGet("inventario","select=cod,descricao,valor_unitario&order=descricao.asc&limit=500"),
       _pedidoId ? dbGet("itens_pedido","pedido_id=eq."+_pedidoId+"&select=id,cod_item,descricao,quantidade,valor_unitario,valor_subtotal&order=id.asc&limit=500") : Promise.resolve([])
     ]);
     _pmInvItems = invItems;
@@ -6143,7 +6161,7 @@ async function openTpModal(tp) {
   document.getElementById("tpm-grupos-wrap").innerHTML = "";
   document.getElementById("tpm-itens-body").innerHTML = "";
   document.getElementById("m-tp").classList.add("open");
-  try { _tpInvItems = await dbGet("inventario","select=cod,descricao,valor_unitario&order=cod.asc&limit=500"); } catch(e){ _tpInvItems=[]; }
+  try { _tpInvItems = await dbGet("inventario","select=cod,descricao,valor_unitario&order=descricao.asc&limit=500"); } catch(e){ _tpInvItems=[]; }
   if(tp) {
     const [grupos, itens] = await Promise.all([
       dbGet("tabelas_preco_grupos","tabela_id=eq."+tp.id+"&order=ordem.asc,id.asc&limit=100"),
