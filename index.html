@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.23g</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.23h</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1783,7 +1783,7 @@ function setTab(t) {
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
   const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos"};
   document.getElementById(map[t]).classList.add("on");
-  if(t==="agenda") renderCal(null);
+  if(t==="agenda") renderCal(cfilter);
   if(t==="receber") renderReceber();
   if(t==="pagar") renderPagar();
   if(t==="fluxo") renderFluxo();
