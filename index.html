@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.22g</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.22h</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -351,6 +351,10 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <label class="lbl">Senha</label>
       <input type="password" id="lpass" class="inp" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
       <button class="btn-p" id="btn-login" onclick="doLogin()">Entrar</button>
+      <button id="btn-bio" onclick="loginBiometric()" style="display:none;margin-top:8px;width:100%;align-items:center;justify-content:center;gap:8px;background:#f8fafc;border:1.5px solid #e2e8f0;color:#1e293b;padding:11px 16px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1e3a5f" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 11c0-1.1.9-2 2-2s2 .9 2 2v2m-8-2c0-3.3 2.7-6 6-6s6 2.7 6 6v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6zm6 4v-2"/><circle cx="12" cy="15" r="1" fill="#1e3a5f"/></svg>
+        <span id="bio-label">Entrar com biometria</span>
+      </button>
       <button class="btn-s" onclick="showSc('reg')">Solicitar acesso (equipe)</button>
       <button class="btn-s" style="margin-top:6px;" onclick="showSc('cadastro')">📋 Cadastro de cliente</button>
     </div>
@@ -1462,6 +1466,141 @@ function showSc(sc) {
   document.getElementById("sc-"+sc).classList.add("active");
 }
 
+
+// ═══════════════════════════════════════════════════════════
+// BIOMETRIA (WebAuthn)
+// ═══════════════════════════════════════════════════════════
+function bioSupported(){
+  return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create);
+}
+function bioGetStored(){
+  var em=localStorage.getItem('damata_bio_email');
+  if(!em) return null;
+  try{ return JSON.parse(localStorage.getItem('damata_bio_'+em)||'null'); }catch(e){ return null; }
+}
+function bioUpdateBtn(){
+  var btn=document.getElementById('btn-bio');
+  if(!btn) return;
+  var st=bioGetStored();
+  if(st && bioSupported()){
+    btn.style.display='flex';
+    var lbl=document.getElementById('bio-label');
+    if(lbl) lbl.textContent='Entrar como '+st.email;
+  } else {
+    btn.style.display='none';
+  }
+}
+async function loginBiometric(){
+  var st=bioGetStored();
+  if(!st) return;
+  var btn=document.getElementById('btn-bio');
+  var er=document.getElementById('lerr');
+  er.style.display='none';
+  if(btn){ btn.disabled=true; var lbl=document.getElementById('bio-label'); if(lbl)lbl.textContent='Aguardando biometria…'; }
+  try{
+    var credId=Uint8Array.from(atob(st.credId),function(c){return c.charCodeAt(0);});
+    var assertion=await navigator.credentials.get({
+      publicKey:{
+        challenge:crypto.getRandomValues(new Uint8Array(32)),
+        allowCredentials:[{id:credId,type:'public-key',transports:['internal']}],
+        userVerification:'required',
+        timeout:60000,
+      }
+    });
+    if(!assertion) throw new Error('cancelado');
+    var users=await dbGet('app_users','email=eq.'+encodeURIComponent(st.email)+'&bio_token=eq.'+encodeURIComponent(st.bioToken)+'&select=*');
+    if(!users.length){
+      localStorage.removeItem('damata_bio_'+st.email);
+      localStorage.removeItem('damata_bio_email');
+      er.style.display='block'; er.textContent='Biometria revogada. Faça login com senha.';
+      bioUpdateBtn(); return;
+    }
+    var u=users[0];
+    if(u.status==='pending'){ er.style.display='block'; er.textContent='Cadastro aguardando aprovação.'; return; }
+    if(u.status==='rejected'){ er.style.display='block'; er.textContent='Acesso negado. Contate a Damata.'; return; }
+    setCU(u); openApp(u); offerBiometric(u);
+  } catch(e){
+    if(e.name!=='NotAllowedError'){
+      er.style.display='block'; er.textContent='Erro na biometria. Use email e senha.';
+      console.error('WebAuthn auth:',e);
+    }
+  } finally {
+    bioUpdateBtn();
+    if(btn) btn.disabled=false;
+  }
+}
+function showBioModal(user){
+  var m=document.getElementById('bio-modal');
+  if(!m) return;
+  m.dataset.email=user.email;
+  m.dataset.uname=user.name||user.email;
+  m.style.display='flex';
+  // Restore inner if success message replaced it
+  document.getElementById('bio-modal-inner').innerHTML=
+    '<div style="font-size:44px;margin-bottom:12px">🔐</div>'+
+    '<div style="font-weight:700;font-size:17px;color:#1e293b;margin-bottom:8px">Habilitar login com biometria?</div>'+
+    '<div style="font-size:13px;color:#64748b;line-height:1.6;margin-bottom:24px">Na próxima visita, entre com sua digital ou Face ID — sem precisar digitar a senha.</div>'+
+    '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">'+
+    '<button onclick="hideBioModal()" style="background:white;border:1.5px solid #e2e8f0;color:#64748b;padding:10px 20px;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit">Agora não</button>'+
+    '<button id="btn-bio-reg" onclick="registerBiometric()" style="background:#1e3a5f;color:white;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Habilitar</button>'+
+    '</div>';
+}
+function hideBioModal(){
+  var m=document.getElementById('bio-modal');
+  if(m) m.style.display='none';
+}
+async function registerBiometric(){
+  var m=document.getElementById('bio-modal');
+  var email=m.dataset.email; var uname=m.dataset.uname;
+  var btnReg=document.getElementById('btn-bio-reg');
+  if(btnReg){ btnReg.disabled=true; btnReg.textContent='Aguardando biometria…'; }
+  try{
+    var uid=crypto.getRandomValues(new Uint8Array(16));
+    var rpId=location.hostname&&location.hostname!==''?location.hostname:undefined;
+    var rpOpts={name:'DAMATA'};
+    if(rpId) rpOpts.id=rpId;
+    var credential=await navigator.credentials.create({
+      publicKey:{
+        challenge:crypto.getRandomValues(new Uint8Array(32)),
+        rp:rpOpts,
+        user:{id:uid,name:email,displayName:uname},
+        pubKeyCredParams:[{alg:-7,type:'public-key'},{alg:-257,type:'public-key'}],
+        authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},
+        timeout:60000,
+      }
+    });
+    if(!credential){ hideBioModal(); return; }
+    // Gerar bio_token
+    var arr=crypto.getRandomValues(new Uint8Array(16));
+    var bioToken=Array.from(arr).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+    // Salvar no Supabase
+    await dbUpdate('app_users','email=eq.'+encodeURIComponent(email),{bio_token:bioToken});
+    // Salvar no localStorage
+    var credId=btoa(String.fromCharCode.apply(null,new Uint8Array(credential.rawId)));
+    localStorage.setItem('damata_bio_'+email,JSON.stringify({credId:credId,bioToken:bioToken,email:email}));
+    localStorage.setItem('damata_bio_email',email);
+    // Sucesso
+    document.getElementById('bio-modal-inner').innerHTML=
+      '<div style="font-size:44px;margin-bottom:12px">✅</div>'+
+      '<div style="font-weight:700;font-size:16px;color:#1e293b;margin-bottom:8px">Biometria habilitada!</div>'+
+      '<div style="font-size:13px;color:#64748b;margin-bottom:24px">Da próxima vez, use sua digital ou Face ID para entrar.</div>'+
+      '<button onclick="hideBioModal()" style="background:#1e3a5f;color:white;border:none;padding:10px 28px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">OK</button>';
+    bioUpdateBtn();
+  } catch(e){
+    if(e.name!=='NotAllowedError'){
+      console.error('WebAuthn register:',e);
+    }
+    hideBioModal();
+  }
+}
+async function offerBiometric(user){
+  if(!bioSupported()) return;
+  if(localStorage.getItem('damata_bio_'+user.email)) return;
+  setTimeout(function(){ showBioModal(user); },1200);
+}
+// Inicializa botão ao carregar a página
+(function(){ if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',bioUpdateBtn); } else { bioUpdateBtn(); } })();
+
 async function doLogin() {
   const em = document.getElementById("lemail").value.trim().toLowerCase();
   const pw = document.getElementById("lpass").value;
@@ -1477,7 +1616,7 @@ async function doLogin() {
     if (u.password !== pw) { er.style.display="block"; er.textContent="Senha incorreta."; return; }
     if (u.status === "pending") { er.style.display="block"; er.textContent="Cadastro aguardando aprovação."; return; }
     if (u.status === "rejected") { er.style.display="block"; er.textContent="Acesso negado. Contate a Damata."; return; }
-    setCU(u); openApp(u);
+    setCU(u); openApp(u); offerBiometric(u);
   } catch(e) {
     er.style.display="block"; er.textContent="Erro de conexão. Tente novamente.";
     console.error(e);
@@ -4238,6 +4377,19 @@ function _orcAbrirPDF(){
 </table>
 <div class="footer">Fazenda Damata · fazendadamata.com · (19) 99638-3386<br>Este orçamento é válido por 7 dias a partir da data de emissão. Os valores poderão ser reajustados após o prazo.</div>
 <script>window.onload=function(){window.print();}<\/script>
+
+<!-- MODAL BIOMETRIA -->
+<div id="bio-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div id="bio-modal-inner" style="background:white;border-radius:20px;padding:32px 28px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="font-size:44px;margin-bottom:12px">🔐</div>
+    <div style="font-weight:700;font-size:17px;color:#1e293b;margin-bottom:8px">Habilitar login com biometria?</div>
+    <div style="font-size:13px;color:#64748b;line-height:1.6;margin-bottom:24px">Na próxima visita, entre com sua digital ou Face ID — sem precisar digitar a senha.</div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button onclick="hideBioModal()" style="background:white;border:1.5px solid #e2e8f0;color:#64748b;padding:10px 20px;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit">Agora não</button>
+      <button id="btn-bio-reg" onclick="registerBiometric()" style="background:#1e3a5f;color:white;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Habilitar</button>
+    </div>
+  </div>
+</div>
 </body></html>`;
   const w=window.open('','_blank','width=750,height=900');
   if(!w){alert("Permita pop-ups para gerar o PDF.");return;}
@@ -6348,5 +6500,18 @@ async function bulkDeletePagar(){
   renderPagar();
 }
 </script>
+
+<!-- MODAL BIOMETRIA -->
+<div id="bio-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:20px">
+  <div id="bio-modal-inner" style="background:white;border-radius:20px;padding:32px 28px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)">
+    <div style="font-size:44px;margin-bottom:12px">🔐</div>
+    <div style="font-weight:700;font-size:17px;color:#1e293b;margin-bottom:8px">Habilitar login com biometria?</div>
+    <div style="font-size:13px;color:#64748b;line-height:1.6;margin-bottom:24px">Na próxima visita, entre com sua digital ou Face ID — sem precisar digitar a senha.</div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button onclick="hideBioModal()" style="background:white;border:1.5px solid #e2e8f0;color:#64748b;padding:10px 20px;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit">Agora não</button>
+      <button id="btn-bio-reg" onclick="registerBiometric()" style="background:#1e3a5f;color:white;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Habilitar</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
