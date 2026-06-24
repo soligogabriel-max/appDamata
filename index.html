@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24w</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24x</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3027,6 +3027,8 @@ async function renderReceber(){
 // ══════════════════════════════════════════
 // A PAGAR
 // ══════════════════════════════════════════
+let _pagSort = {col:'vencimento_real', dir:'asc'};
+
 async function renderPagar(){
   const wr=document.getElementById("pag-list"); wr.innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   const totWr=document.getElementById("pag-totais"); totWr.innerHTML="";
@@ -3041,9 +3043,14 @@ async function renderPagar(){
     if(st==="Pago") q+="&status=eq.Pago";
     else if(st==="Pendente"||st==="Atrasado") q+="&status=eq.NP";
     if(natFil) q+="&natureza=eq."+encodeURIComponent(natFil);
-    const rows=await dbGetAll("contas_a_pagar",q);
+    const [rows, extConc, fornecMap, naturezaMap] = await Promise.all([
+      dbGetAll("contas_a_pagar",q),
+      sbFetch("extrato_bancario?select=titulo_a_pagar&titulo_a_pagar=not.is.null&limit=5000"),
+      getFornecMap(),
+      getNaturezaMap()
+    ]);
+    const conciliadoSet=new Set((extConc||[]).map(r=>String(r.titulo_a_pagar)));
     const hoje=new Date(); hoje.setHours(0,0,0,0);
-    const [fornecMap, naturezaMap] = await Promise.all([getFornecMap(), getNaturezaMap()]);
     // Popula dropdown de naturezas na primeira carga
     const selNat=document.getElementById("pag-fil-natureza");
     if(selNat.options.length===1){
@@ -3059,6 +3066,16 @@ async function renderPagar(){
       const nomeForn=r.fornecedor_cod?(fornecMap[r.fornecedor_cod]||r.fornecedor_cod):(r.devolver_para||"");
       return nomeForn.toLowerCase().includes(busca)||(r.devolver_para||"").toLowerCase().includes(busca);
     });
+    // Sort client-side
+    const {col,dir}=_pagSort;
+    filtrado.sort((a,b)=>{
+      let va=a[col]??'', vb=b[col]??'';
+      if(col==='valor'){ return dir==='asc'?(Number(va)||0)-(Number(vb)||0):(Number(vb)||0)-(Number(va)||0); }
+      if(col==='vencimento_real'){ va=va||'9999-99-99'; vb=vb||'9999-99-99'; }
+      if(col==='fornecedor_cod'){ va=fornecMap[va]||va||''; vb=fornecMap[vb]||vb||''; }
+      va=String(va).toLowerCase(); vb=String(vb).toLowerCase();
+      return dir==='asc'?va.localeCompare(vb,'pt'):vb.localeCompare(va,'pt');
+    });
     const total=filtrado.reduce((a,r)=>a+(r.valor||0),0);
     const pago=filtrado.filter(r=>(r.status||"").toLowerCase()==="pago").reduce((a,r)=>a+(r.valor||0),0);
     const pendente=total-pago;
@@ -3068,6 +3085,7 @@ async function renderPagar(){
       <div class="tot-card"><div class="tot-lbl">Pendente</div><div class="tot-val red">${fmt(pendente)}</div></div>
       <div class="tot-card"><div class="tot-lbl">Títulos</div><div class="tot-val">${filtrado.length}</div></div>`;
     if(!filtrado.length){ wr.innerHTML='<div class="empty"><div class="eicon">💳</div>Nenhum título encontrado.</div>'; return; }
+    function thS(label,c){const a=_pagSort.col===c;const arr=a?(_pagSort.dir==='asc'?' ▲':' ▼'):'';return`<th style="cursor:pointer;user-select:none;white-space:nowrap;" onclick="_pagSetSort('${c}')">${label}${arr}</th>`;}
     wr.innerHTML=`
     <div id="pag-bulk-bar" style="display:none;align-items:center;gap:10px;padding:8px 12px;background:var(--al);border:1.5px solid var(--am);border-radius:10px;margin-bottom:8px;">
       <span id="pag-bulk-count" style="font-size:13px;font-weight:600;color:var(--dk);"></span>
@@ -3075,7 +3093,18 @@ async function renderPagar(){
       <button class="btn-cancel" style="padding:5px 14px;font-size:12px;" onclick="_pagClearSel()">Limpar seleção</button>
     </div>
     <div class="table-wrap"><table class="fin-table">
-      <thead><tr><th style="width:32px;"><input type="checkbox" id="pag-chk-all" onchange="_pagToggleAll(this)" style="cursor:pointer;"/></th><th>Vencimento</th><th>Fornecedor</th><th>Centro Custo</th><th>Natureza</th><th>Tipo</th><th>Valor</th><th>Status</th><th></th></tr></thead>
+      <thead><tr>
+        <th style="width:32px;"><input type="checkbox" id="pag-chk-all" onchange="_pagToggleAll(this)" style="cursor:pointer;"/></th>
+        ${thS('Vencimento','vencimento_real')}
+        ${thS('Fornecedor','fornecedor_cod')}
+        <th>C.Custo</th>
+        ${thS('Natureza','natureza')}
+        ${thS('Tipo/Origem','tipo')}
+        <th>Obs</th>
+        ${thS('Valor','valor')}
+        ${thS('Status','status')}
+        <th></th>
+      </tr></thead>
       <tbody>${filtrado.map(r=>{
         const nomeForn=r.fornecedor_cod?(fornecMap[r.fornecedor_cod]||r.fornecedor_cod):(r.devolver_para||"—");
         const natDescr=r.natureza?(naturezaMap[r.natureza]||r.natureza):"—";
@@ -3083,20 +3112,38 @@ async function renderPagar(){
         const isAtras=!isPago&&r.vencimento_real&&new Date(r.vencimento_real)<hoje;
         const badge=isPago?'<span class="stbadge pago">Pago</span>':(isAtras?'<span class="stbadge atras">Atrasado</span>':'<span class="stbadge pend">Pendente</span>');
         const rj=_esc(JSON.stringify(r));
-        return`<tr>
-          <td><input type="checkbox" class="pag-chk" data-id="${r.id}" onchange="_pagChkChange()" style="cursor:pointer;"/></td>
-          <td>${fmtDate(r.vencimento_real)}</td>
-          <td style="font-weight:600;">${nomeForn}</td>
-          <td style="color:var(--dm);">${r.centro_custo_cod||"—"}</td>
-          <td style="color:var(--dm);">${natDescr}</td>
-          <td style="color:var(--dm);">${r.tipo||"—"}</td>
-          <td style="font-weight:700;color:var(--er);">${fmt(r.valor)}</td>
-          <td>${badge}</td>
-          <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openCrud("contas_a_pagar",JSON.parse(this.dataset.r),renderPagar)' data-r="${rj}">✏️</button></div></td>
-        </tr>`;
+        const tipo=r.tipo||"";
+        let srcBadge;
+        if(tipo==="Extrato C6") srcBadge='<span style="font-size:11px;background:#dbeafe;color:#1d4ed8;padding:1px 6px;border-radius:4px;white-space:nowrap;">🏦 Extrato</span>';
+        else if(tipo==="Cartão C6") srcBadge='<span style="font-size:11px;background:#ede9fe;color:#6d28d9;padding:1px 6px;border-radius:4px;white-space:nowrap;">💳 Cartão</span>';
+        else if(tipo) srcBadge=\`<span style="font-size:11px;background:#f3f4f6;color:#374151;padding:1px 6px;border-radius:4px;white-space:nowrap;">\${_esc(tipo)}</span>\`;
+        else srcBadge='<span style="font-size:11px;background:#f3f4f6;color:#6b7280;padding:1px 6px;border-radius:4px;white-space:nowrap;">✏️ Manual</span>';
+        const isConcil=conciliadoSet.has(String(r.id));
+        const concilIcon=isConcil?'<span title="Conciliado com Extrato C6" style="margin-left:4px;color:#16a34a;font-size:13px;cursor:default;">🔗</span>':'';
+        const obsText=r.obs||"";
+        const obsPreview=obsText.length>35?obsText.substring(0,35)+"…":obsText;
+        const obsTd=obsText?\`<td style="font-size:12px;color:var(--dm);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:default;" title="\${_esc(obsText)}">\${_esc(obsPreview)}</td>\`:'<td style="color:var(--br);font-size:12px;">—</td>';
+        return\`<tr>
+          <td><input type="checkbox" class="pag-chk" data-id="\${r.id}" onchange="_pagChkChange()" style="cursor:pointer;"/></td>
+          <td>\${fmtDate(r.vencimento_real)}</td>
+          <td style="font-weight:600;">\${_esc(nomeForn)}</td>
+          <td style="color:var(--dm);">\${r.centro_custo_cod||"—"}</td>
+          <td style="color:var(--dm);">\${natDescr}</td>
+          <td style="white-space:nowrap;">\${srcBadge}\${concilIcon}</td>
+          \${obsTd}
+          <td style="font-weight:700;color:var(--er);">\${fmt(r.valor)}</td>
+          <td>\${badge}</td>
+          <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openCrud("contas_a_pagar",JSON.parse(this.dataset.r),renderPagar)' data-r="\${rj}">✏️</button></div></td>
+        </tr>\`;
       }).join("")}</tbody>
     </table></div>`;
   } catch(e){ wr.innerHTML='<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar: '+e.message+'</div>'; }
+}
+
+function _pagSetSort(col){
+  if(_pagSort.col===col) _pagSort.dir=_pagSort.dir==='asc'?'desc':'asc';
+  else { _pagSort.col=col; _pagSort.dir='asc'; }
+  renderPagar();
 }
 
 // ══════════════════════════════════════════
