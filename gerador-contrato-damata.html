@@ -693,26 +693,28 @@ function collectPreset(){
       acSf1:false,acSf2:false,acSf3:false,acSf4:false,acSf5:false,
       acSb1:false,acSb2:false,acSb3:false};
     itens.forEach(function(it){
-      var d=(it.descricao||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+      var c=it.cod||"";
       var q=Math.round(it.quantidade||1);
-      if(d.includes("tumberg"))_af.spTumb=true;
-      if(d.includes("peroba"))_af.spPeroba=true;
-      if(d.includes("bromel"))_af.spBrom=true;
-      if(d.includes("day use")||d.includes("piscina"))_af.dayQty=Math.max(_af.dayQty,q);
-      if(d.includes("desmontagem"))_af.exDesm+=q;
-      else if(d.includes("montagem"))_af.exMont+=q;
-      if(d.includes("hora")&&(d.includes("extra")||d.includes("adicional")))_af.exHoras+=q;
-      if(d.includes("balcao")||d.includes("balcão"))_af.fuBal=true;
-      if(d.includes("mesa")&&(d.includes("demoli")||d.includes("madeira")))_af.fuMesas+=q;
-      if(d.includes("tiffany")||d.includes("cadeira"))_af.fuCad+=q;
-      if(d.includes("banco")&&d.includes("mad"))_af.fuBan+=q;
-      if(d.includes("loft"))_af.acLoft=true;
-      if(d.includes("casa flamboy"))_af.acCasa=true;
-      if(d.includes("suite assesso"))_af.acSuiteAss=true;
-      var sfm=d.match(/flamboyant\s*(\d)/);
-      if(sfm){var n=parseInt(sfm[1]);if(n===1)_af.acSf1=true;else if(n===2)_af.acSf2=true;else if(n===3)_af.acSf3=true;else if(n===4)_af.acSf4=true;else if(n===5)_af.acSf5=true;}
-      var sbm=d.match(/bromel[^0-9]*(\d)/);
-      if(sbm){var n=parseInt(sbm[1]);if(n===1)_af.acSb1=true;else if(n===2)_af.acSb2=true;else if(n===3)_af.acSb3=true;}
+      if(c==="000004")_af.spTumb=true;
+      if(c==="000005")_af.spBrom=true;
+      if(c==="000007")_af.spPeroba=true;
+      if(c==="000028")_af.dayQty=Math.max(_af.dayQty,q);
+      if(c==="000032")_af.exMont+=q;
+      if(c==="000001")_af.fuMesas+=q;
+      if(c==="000003")_af.fuBal=true;
+      if(c==="000010")_af.fuBan+=q;
+      if(c==="000025")_af.fuCad+=q;
+      if(c==="000019")_af.acLoft=true;
+      if(c==="000006")_af.acCasa=true;
+      if(c==="000022")_af.acSuiteAss=true;
+      if(c==="000011")_af.acSf1=true;
+      if(c==="000012")_af.acSf2=true;
+      if(c==="000029")_af.acSf3=true;
+      if(c==="000030")_af.acSf4=true;
+      if(c==="000031")_af.acSf5=true;
+      if(c==="000013")_af.acSb1=true;
+      if(c==="000014")_af.acSb2=true;
+      if(c==="000015")_af.acSb3=true;
     });
     // Manuais complementam / sobrescrevem auto-detect
     base.spTumb=_af.spTumb||document.getElementById("o-spTumb").checked;
