@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24p</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24q</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -2331,11 +2331,15 @@ async function _syncGoogleCal(evData) {
       }),
     });
     const resp = await res.json();
+    if (resp.error) {
+      toast("⚠️ Google Calendar: " + (resp.detail?.message || resp.error));
+      return;
+    }
     if (resp.google_cal_id && resp.google_cal_id !== evData.google_cal_id) {
       await dbUpdate("agenda", "cod=eq."+encodeURIComponent(evData.cod), { google_cal_id: resp.google_cal_id });
     }
   } catch(e) {
-    console.warn("Google Calendar sync falhou:", e.message);
+    toast("⚠️ Google Calendar: " + e.message);
   }
 }
 
@@ -4772,6 +4776,12 @@ async function salvarContrato(preset) {
 
     // Invalida cache da agenda
     cachedEvts = null; _agendaMap = null; _contratosCache = null;
+
+    // Sincroniza com Google Calendar (não bloqueia alert)
+    dbGet("agenda", `select=*&cod=eq.${encodeURIComponent(cod)}&limit=1`).then(rows => {
+      if(rows.length) _syncGoogleCal(rows[0]);
+    }).catch(()=>{});
+
     alert(`✅ Contrato ${cod} salvo!\n${nomeEvento}`);
     setTab("contratos");
   } catch(e) {
