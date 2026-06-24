@@ -1,0 +1,20 @@
+#!/bin/bash
+# Auto-bump versão em index.html a cada commit
+
+TODAY=$(date +%Y.%m.%d)
+CURRENT=$(grep -o 'v[0-9]\{4\}\.[0-9]\{2\}\.[0-9]\{2\}[a-z]' /home/user/appDamata/index.html | head -1)
+CURRENT_DATE=$(echo "$CURRENT" | grep -o '[0-9]\{4\}\.[0-9]\{2\}\.[0-9]\{2\}')
+CURRENT_LETTER=$(echo "$CURRENT" | grep -o '[a-z]$')
+
+if [ "$CURRENT_DATE" = "$TODAY" ]; then
+  NEXT_LETTER=$(echo "$CURRENT_LETTER" | tr 'a-y' 'b-z')
+  NEW_VER="v${TODAY}${NEXT_LETTER}"
+else
+  NEW_VER="v${TODAY}a"
+fi
+
+if [ "$CURRENT" != "$NEW_VER" ]; then
+  sed -i "s/${CURRENT}/${NEW_VER}/g" /home/user/appDamata/index.html
+  git add /home/user/appDamata/index.html
+  echo "🔖 Versão atualizada: $CURRENT → $NEW_VER"
+fi

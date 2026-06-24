@@ -2,15 +2,16 @@
 
 ## Início de cada sessão
 
-Trabalhar sempre direto no `main`. Sincronizar antes de qualquer mudança:
+Trabalhar sempre direto no `main`. Sincronizar e ativar o hook de versão:
 
 ```bash
 git fetch origin
 git checkout main
 git pull origin main
+git config core.hooksPath .githooks
 ```
 
-Isso garante que partimos sempre da versão mais recente, evitando perder fixes anteriores.
+O `git config core.hooksPath .githooks` ativa o hook pre-commit que bumpa a versão automaticamente — **rodar sempre no início**, pois `.git/hooks/` não é versionado.
 
 ## Deploy
 
@@ -53,14 +54,14 @@ b64 = base64.b64encode(html.encode('utf-8')).decode('ascii')
 
 ## Versão na landing page
 
-A cada commit com mudanças funcionais, atualizar o número de versão na linha 338 do `index.html`:
+A versão é bumpa **automaticamente** pelo hook `.githooks/pre-commit` a cada commit — não precisa atualizar manualmente.
 
-```html
-<div id="ll-version" ...>v2026.06.22b</div>
+Formato: `v{ANO}.{MÊS}.{DIA}{letra}` — a letra distingue múltiplos deploys no mesmo dia.
+
+Se por algum motivo o hook não estiver ativo, rodar:
+```bash
+git config core.hooksPath .githooks
 ```
-
-Formato: `v{ANO}.{MÊS}.{DIA}{letra}` — a letra (`a`, `b`, `c`...) distingue múltiplos deploys no mesmo dia.
-Exemplo: segunda mudança em 22/06/2026 → `v2026.06.22b`
 
 ## Edições em massa
 
