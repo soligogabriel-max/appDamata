@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24r</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24s</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -563,7 +563,10 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       </div>
       <div class="sstrip" id="sstrip"></div>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:0 12px 10px;">
-        <button class="btn-a" onclick="openNewEvent()" id="btn-new-ev" style="display:none;font-size:12px;">+ Novo Evento</button>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="btn-a" onclick="openNewEvent()" id="btn-new-ev" style="display:none;font-size:12px;">+ Novo Evento</button>
+          <button id="btn-gcal-sync" onclick="openGCalSync()" style="display:none;font-size:12px;padding:7px 12px;background:#fff;color:#1e3a5f;border:1.5px solid #b0c4de;border-radius:8px;font-weight:600;cursor:pointer;" title="Sincronizar com Google Calendar">📅 Google</button>
+        </div>
         <div></div>
         <div class="vtog">
           <button class="vbtn on" onclick="setVw('cal')">Mês</button>
@@ -1332,6 +1335,44 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   </div>
 </div>
 
+<!-- ── Modal: Sincronizar Google Calendar ── -->
+<div class="moverlay" id="m-gcal-sync" onclick="if(event.target===this)closeGCalSync()">
+  <div class="mbox" style="max-width:480px;">
+    <div class="mtitle">📅 Sincronizar com Google Calendar</div>
+
+    <!-- Opção A -->
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:14px;border:2px solid #b0c4de;border-radius:10px;cursor:pointer;margin-bottom:10px;background:#f8fafc;" id="gcal-opt-a-wrap">
+      <input type="radio" name="gcal-mode" value="all" id="gcal-opt-a" onchange="gcalModeChange()" style="margin-top:3px;accent-color:var(--pr);cursor:pointer;">
+      <div>
+        <div style="font-weight:700;font-size:14px;color:var(--dk);">Todos os eventos futuros</div>
+        <div style="font-size:12px;color:var(--dl);margin-top:2px;">Espelha no Google Calendar todos os eventos com data a partir de hoje.</div>
+      </div>
+    </label>
+
+    <!-- Opção B -->
+    <label style="display:flex;align-items:flex-start;gap:10px;padding:14px;border:2px solid #b0c4de;border-radius:10px;cursor:pointer;margin-bottom:12px;background:#f8fafc;" id="gcal-opt-b-wrap">
+      <input type="radio" name="gcal-mode" value="pick" id="gcal-opt-b" onchange="gcalModeChange()" style="margin-top:3px;accent-color:var(--pr);cursor:pointer;">
+      <div>
+        <div style="font-weight:700;font-size:14px;color:var(--dk);">Evento específico</div>
+        <div style="font-size:12px;color:var(--dl);margin-top:2px;">Escolha um ou mais eventos futuros para sincronizar.</div>
+      </div>
+    </label>
+
+    <!-- Lista de eventos (só aparece quando "pick" selecionado) -->
+    <div id="gcal-ev-list" style="display:none;max-height:260px;overflow-y:auto;border:1.5px solid #e2e8f0;border-radius:10px;margin-bottom:12px;background:#fff;">
+      <div id="gcal-ev-items" style="padding:4px 0;"></div>
+    </div>
+
+    <!-- Progresso -->
+    <div id="gcal-progress" style="display:none;font-size:13px;color:var(--dl);text-align:center;padding:8px 0;font-weight:600;"></div>
+
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      <button onclick="runGCalSync()" id="btn-gcal-run" style="flex:1;padding:11px;background:var(--pr);color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;">Sincronizar</button>
+      <button onclick="closeGCalSync()" style="padding:11px 18px;background:transparent;color:var(--dm);border:1.5px solid var(--br);border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -1462,6 +1503,7 @@ async function openSimModal(){
   document.getElementById("sim-banner").style.display="";
   document.getElementById("sim-banner-role").textContent=picked.startsWith("fornecedor:")?picked.split(":")[1]:(RL[picked]||picked);
   document.getElementById("btn-new-ev").style.display="none";
+  document.getElementById("btn-gcal-sync").style.display="none";
   var adminBtns=document.getElementById("evd-admin-btns");
   if(adminBtns) adminBtns.style.display="none";
   await _setupUserAccess(simUser||{role:picked,event_ids:[],assessoria_cod:null});
@@ -1475,6 +1517,7 @@ function exitSim(){
   document.getElementById("sim-banner-role").textContent="";
   _applyNavForRole("admin");
   document.getElementById("btn-new-ev").style.display="inline-flex";
+  document.getElementById("btn-gcal-sync").style.display="inline-flex";
   var adminBtns=document.getElementById("evd-admin-btns");
   if(adminBtns) adminBtns.style.display="";
   setTab("agenda"); renderCal(null);
@@ -1761,7 +1804,7 @@ async function openApp(u) {
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
   const tn = document.getElementById("tnav");
   const bne = document.getElementById("btn-new-ev");
-  if (isAdmin(u)) { tn.style.display="block"; bne.style.display="inline-flex"; document.getElementById("btn-sim").style.display=""; setTab("agenda"); updBadge(); }
+  if (isAdmin(u)) { tn.style.display="block"; bne.style.display="inline-flex"; document.getElementById("btn-gcal-sync").style.display="inline-flex"; document.getElementById("btn-sim").style.display=""; setTab("agenda"); updBadge(); }
   else if (u.role==="cliente") { tn.style.display="none"; bne.style.display="none"; document.getElementById("p-client").classList.add("on"); renderCli(u); }
   else { tn.style.display="block"; bne.style.display="none"; await _setupUserAccess(u); }
   showSc("app");
@@ -2311,6 +2354,87 @@ async function saveEvent(){
   } finally {
     btn.disabled=false; btn.textContent="Salvar Evento";
   }
+}
+
+// ── Google Calendar: sync manual ──
+let _gcalFutEvts = [];
+
+async function openGCalSync() {
+  document.querySelectorAll('input[name="gcal-mode"]').forEach(r => r.checked = false);
+  document.getElementById("gcal-ev-list").style.display = "none";
+  document.getElementById("gcal-progress").style.display = "none";
+  document.getElementById("btn-gcal-run").disabled = false;
+  document.getElementById("gcal-ev-items").innerHTML = '<div style="padding:12px;color:var(--dl);font-size:13px;">Carregando eventos...</div>';
+
+  // Carrega eventos futuros em paralelo com abertura
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const hojeStr = hoje.toISOString().slice(0,10);
+  dbGet("agenda","select=*&data_evento=gte."+hojeStr+"&order=data_evento.asc&limit=500").then(rows => {
+    _gcalFutEvts = rows.filter(r => r.data_evento && parseInt(r.data_evento.slice(0,4)) <= 2100);
+    _gcalRenderEvList();
+  }).catch(() => { _gcalFutEvts = []; _gcalRenderEvList(); });
+
+  document.getElementById("m-gcal-sync").classList.add("open");
+}
+
+function closeGCalSync() {
+  document.getElementById("m-gcal-sync").classList.remove("open");
+}
+
+function gcalModeChange() {
+  const mode = document.querySelector('input[name="gcal-mode"]:checked')?.value;
+  const listEl = document.getElementById("gcal-ev-list");
+  listEl.style.display = mode === "pick" ? "block" : "none";
+  // Highlight borda do selecionado
+  document.getElementById("gcal-opt-a-wrap").style.borderColor = mode === "all" ? "var(--pr)" : "#b0c4de";
+  document.getElementById("gcal-opt-b-wrap").style.borderColor = mode === "pick" ? "var(--pr)" : "#b0c4de";
+}
+
+function _gcalRenderEvList() {
+  const el = document.getElementById("gcal-ev-items");
+  if(!_gcalFutEvts.length) { el.innerHTML = '<div style="padding:12px;color:var(--dl);font-size:13px;">Nenhum evento futuro encontrado.</div>'; return; }
+  const MESES_ABR=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+  el.innerHTML = _gcalFutEvts.map((ev,i) => {
+    const d = new Date(ev.data_evento+"T12:00:00");
+    const label = `${d.getDate()} ${MESES_ABR[d.getMonth()]} ${d.getFullYear()} — ${ev.nome_evento||ev.cod}`;
+    const gcIcon = ev.google_cal_id ? ' <span style="color:#16a34a;font-size:10px;">✓ no GCal</span>' : '';
+    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #f1f5f9;cursor:pointer;font-size:13px;color:var(--dk);">
+      <input type="checkbox" data-gcal-idx="${i}" style="accent-color:var(--pr);width:16px;height:16px;cursor:pointer;">
+      <span>${label}${gcIcon}</span>
+    </label>`;
+  }).join("");
+}
+
+async function runGCalSync() {
+  const mode = document.querySelector('input[name="gcal-mode"]:checked')?.value;
+  if(!mode) { toast("Escolha uma opção."); return; }
+
+  let evts = [];
+  if(mode === "all") {
+    evts = _gcalFutEvts;
+  } else {
+    const checked = document.querySelectorAll('#gcal-ev-items input[type="checkbox"]:checked');
+    checked.forEach(cb => { evts.push(_gcalFutEvts[parseInt(cb.dataset.gcalIdx)]); });
+    if(!evts.length) { toast("Selecione ao menos um evento."); return; }
+  }
+
+  const btn = document.getElementById("btn-gcal-run");
+  const prog = document.getElementById("gcal-progress");
+  btn.disabled = true;
+  prog.style.display = "block";
+
+  let ok = 0, errs = 0;
+  for(let i = 0; i < evts.length; i++) {
+    prog.textContent = `Sincronizando ${i+1}/${evts.length}…`;
+    try {
+      await _syncGoogleCal(evts[i]);
+      ok++;
+    } catch(_) { errs++; }
+  }
+
+  prog.textContent = "";
+  closeGCalSync();
+  toast(errs ? `📅 ${ok} sincronizado(s), ${errs} erro(s).` : `📅 ${ok} evento(s) sincronizado(s) com sucesso!`);
 }
 
 async function _syncGoogleCal(evData) {
