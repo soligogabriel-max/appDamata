@@ -114,6 +114,39 @@ select.inp{cursor:pointer}
   </div>
 </div>
 
+<!-- Espaços, Mobiliário e Extras (Evento) -->
+<div class="card" id="card-espacos-extras" style="display:none">
+  <div class="ctitle">🏛 Espaços, Mobiliário e Extras</div>
+  <div style="margin-bottom:12px">
+    <span class="lbl" style="margin-bottom:8px">Espaços Locados</span>
+    <label class="cb"><input type="checkbox" id="o-spTumb"> Salão Tumbérgia</label>
+    <label class="cb"><input type="checkbox" id="o-spPeroba"> Peroba Rosa</label>
+    <label class="cb"><input type="checkbox" id="o-spBrom"> Salão Bromélias</label>
+    <label class="cb"><input type="checkbox" id="o-dayuse"> Piscina "Day Use"</label>
+    <div id="o-dayuse-qty-wrap" style="display:none;margin-left:24px;margin-top:6px">
+      <span class="lbl">Qtd. diárias Day Use</span>
+      <input class="inp" type="number" id="o-dayqty" min="1" max="99" value="1" style="max-width:100px;">
+    </div>
+  </div>
+  <div style="margin-bottom:12px">
+    <span class="lbl" style="margin-bottom:8px">Mobiliário DAMATA</span>
+    <label class="cb"><input type="checkbox" id="o-fuBal"> Balcão Hexagonal</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+      <div><span class="lbl">Mesas de Demolição (qtd)</span><input class="inp" type="number" id="o-fuMesas" min="0" max="99" value="0"></div>
+      <div><span class="lbl">Cadeiras Tiffany (qtd)</span><input class="inp" type="number" id="o-fuCad" min="0" max="999" value="0"></div>
+      <div><span class="lbl">Bancos Madeira (qtd)</span><input class="inp" type="number" id="o-fuBan" min="0" max="99" value="0"></div>
+      <div><span class="lbl">Horas Extras Recepção (h)</span><input class="inp" type="number" id="o-exHoras" min="0" max="99" value="0"></div>
+    </div>
+  </div>
+  <div>
+    <span class="lbl" style="margin-bottom:8px">Diárias Extras</span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><span class="lbl">Diárias Montagem Extra</span><input class="inp" type="number" id="o-exMont" min="0" max="99" value="0"></div>
+      <div><span class="lbl">Diárias Desmontagem Extra</span><input class="inp" type="number" id="o-exDesm" min="0" max="99" value="0"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Itens -->
 <div class="card" id="card-itens">
   <div class="ctitle">📋 Itens do Contrato</div>
@@ -184,6 +217,12 @@ async function sbGet(path){
 
 // ── Tipo de contrato ──
 var _contractType = "evento";
+document.addEventListener("DOMContentLoaded",function(){
+  var dayUseCb=document.getElementById("o-dayuse");
+  if(dayUseCb) dayUseCb.addEventListener("change",function(){
+    document.getElementById("o-dayuse-qty-wrap").style.display=this.checked?"block":"none";
+  });
+});
 function setContractType(t) {
   _contractType = t;
   var isH = t === "hospedagem";
@@ -195,8 +234,9 @@ function setContractType(t) {
   document.getElementById("tipo-btn-hosp").style.color         = isH ? "#93c5fd" : "#64748b";
   document.getElementById("noivos-row").style.display    = isH ? "none" : "grid";
   document.getElementById("locatario-row").style.display = isH ? "block" : "none";
-  document.getElementById("card-hosp").style.display     = isH ? "block" : "none";
-  document.getElementById("card-itens").style.display    = isH ? "none" : "block";
+  document.getElementById("card-hosp").style.display          = isH ? "block" : "none";
+  document.getElementById("card-espacos-extras").style.display = isH ? "none" : "block";
+  document.getElementById("card-itens").style.display          = isH ? "none" : "block";
   if (isH) {
     var cin = document.getElementById("o-cin"); if(cin) cin.value = "13:00";
     var cout = document.getElementById("o-cout"); if(cout) cout.value = "13:00";
@@ -249,6 +289,19 @@ function autoNomeEvento(){
   var dStr="";
   if(d1){var dt=new Date(d1+"T12:00:00");dStr=" - "+dt.getDate()+MESES_PT[dt.getMonth()]+String(dt.getFullYear()).slice(2);}
   var nome="";
+  if(_contractType!=="hospedagem"){
+    base.spTumb=document.getElementById("o-spTumb").checked;
+    base.spPeroba=document.getElementById("o-spPeroba").checked;
+    base.spBrom=document.getElementById("o-spBrom").checked;
+    base.dayQty=document.getElementById("o-dayuse").checked?(parseInt(document.getElementById("o-dayqty").value)||1):0;
+    base.fuBal=document.getElementById("o-fuBal").checked;
+    base.fuMesas=parseInt(document.getElementById("o-fuMesas").value)||0;
+    base.fuCad=parseInt(document.getElementById("o-fuCad").value)||0;
+    base.fuBan=parseInt(document.getElementById("o-fuBan").value)||0;
+    base.exHoras=parseInt(document.getElementById("o-exHoras").value)||0;
+    base.exMont=parseInt(document.getElementById("o-exMont").value)||0;
+    base.exDesm=parseInt(document.getElementById("o-exDesm").value)||0;
+  }
   if(_contractType==="hospedagem"){
     var loc=_primeiroNome(v("o-locatario"));
     nome=(loc?"Hosp. "+loc:"Hospedagem")+dStr;
