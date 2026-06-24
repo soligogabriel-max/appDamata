@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24s</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24t</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -660,6 +660,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
             <div class="sec-t" style="margin-bottom:0;">Contas a Receber</div>
             <button class="btn-a" style="font-size:12px;" onclick="openCrud('contas_a_receber',null,renderReceber)">+ Novo</button>
             <button id="btn-wpp-lembretes" class="btn-a" style="font-size:12px;background:#25D366;display:none;" onclick="openWppLembretes()">📱 Lembretes WPP</button>
+            <button class="btn-cancel" style="font-size:12px;padding:5px 12px;" onclick="openDuplicados('receber')">🔍 Duplicados</button>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <input type="text" class="inp inp-inline" id="rec-busca" placeholder="Buscar evento/cód..." oninput="renderReceber()" style="width:200px;margin-bottom:0;"/>
@@ -685,6 +686,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <div style="display:flex;align-items:center;gap:10px;">
             <div class="sec-t" style="margin-bottom:0;">Contas a Pagar</div>
             <button class="btn-a" style="font-size:12px;" onclick="openCrud('contas_a_pagar',null,renderPagar)">+ Novo</button>
+            <button class="btn-cancel" style="font-size:12px;padding:5px 12px;" onclick="openDuplicados('pagar')">🔍 Duplicados</button>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <input type="text" class="inp inp-inline" id="pag-busca" placeholder="Buscar fornecedor..." oninput="renderPagar()" style="width:200px;margin-bottom:0;"/>
@@ -759,9 +761,15 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <div style="display:flex;gap:8px;align-items:center;">
             <input type="month" class="inp inp-inline" id="ext-fil-mes" onchange="renderExtrato()" style="width:150px;margin-bottom:0;"/>
             <button class="btn-a" onclick="openImport()">⬆ Importar Extrato</button>
+            <button class="btn-cancel" style="font-size:12px;padding:5px 12px;" onclick="openDuplicados('extrato')">🔍 Duplicados</button>
           </div>
         </div>
         <div id="ext-totais" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;"></div>
+        <div id="ext-bulk-bar" style="display:none;align-items:center;gap:10px;padding:8px 12px;background:var(--al);border:1.5px solid var(--am);border-radius:10px;margin-bottom:8px;">
+          <span id="ext-bulk-count" style="font-size:13px;font-weight:600;color:var(--dk);"></span>
+          <button class="btn-delete" style="padding:5px 14px;font-size:12px;" onclick="bulkDeleteExtrato()">🗑 Apagar selecionados</button>
+          <button class="btn-cancel" style="padding:5px 14px;font-size:12px;" onclick="_extClearSel()">Limpar</button>
+        </div>
         <div id="ext-list"></div>
       </div>
     </div>
@@ -1331,6 +1339,19 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <button onclick="editarOrcamento(_orcDetId)" style="flex:1;padding:10px;background:var(--a);color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;">✏ Editar</button>
       <button onclick="excluirOrcamento(_orcDetId)" style="padding:10px 16px;background:#fff;color:var(--er);border:1.5px solid var(--er);border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;">🗑 Excluir</button>
       <button onclick="closeOrcDet()" style="padding:10px 16px;background:transparent;color:var(--dm);border:1.5px solid var(--br);border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Duplicados ── -->
+<div class="moverlay" id="m-dupl" onclick="if(event.target===this)closeDuplicados()">
+  <div class="mbox" style="max-width:680px;max-height:88vh;display:flex;flex-direction:column;">
+    <div class="mtitle" id="dupl-title">🔍 Duplicados</div>
+    <div id="dupl-body" style="flex:1;overflow-y:auto;margin:12px 0;"></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button id="btn-dupl-del" onclick="bulkDeleteDuplicados()" style="padding:10px 18px;background:#dc2626;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;display:none;">🗑 Apagar selecionados</button>
+      <span id="dupl-sel-count" style="font-size:13px;color:var(--dl);font-weight:600;"></span>
+      <button onclick="closeDuplicados()" style="margin-left:auto;padding:10px 16px;background:transparent;color:var(--dm);border:1.5px solid var(--br);border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;">Fechar</button>
     </div>
   </div>
 </div>
@@ -3225,8 +3246,9 @@ async function renderExtrato(){
       <div class="tot-card"><div class="tot-lbl">Lançamentos</div><div class="tot-val">${rows.length}</div></div>`;
     if(!rows.length){ wr.innerHTML='<div class="empty"><div class="eicon">🏦</div>Nenhum lançamento neste mês.</div>'; return; }
     wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
-      <thead><tr><th>Data</th><th>Descrição</th><th style="color:#2A6644;">Entrada</th><th style="color:var(--er);">Saída</th><th>Saldo do Dia</th><th>Título Receber</th><th>Título Pagar</th><th></th></tr></thead>
+      <thead><tr><th style="width:32px;"><input type="checkbox" id="ext-chk-all" onchange="_extToggleAll(this)" style="cursor:pointer;"/></th><th>Data</th><th>Descrição</th><th style="color:#2A6644;">Entrada</th><th style="color:var(--er);">Saída</th><th>Saldo do Dia</th><th>Título Receber</th><th>Título Pagar</th><th></th></tr></thead>
       <tbody>${rows.map(r=>{const rj=_esc(JSON.stringify(r));return`<tr>
+        <td><input type="checkbox" class="ext-chk" data-id="${_esc(r.id_extrato_c6)}" onchange="_extChkChange()" style="cursor:pointer;"/></td>
         <td style="white-space:nowrap;">${fmtDate(r.data_lancamento)}</td>
         <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.titulo||r.descricao||"")}">${r.titulo||r.descricao||"—"}</td>
         <td style="font-weight:${r.entrada>0?700:400};color:${r.entrada>0?"#2A6644":"var(--dl)"};">${r.entrada>0?fmt(r.entrada):"—"}</td>
@@ -6762,6 +6784,167 @@ async function sendWppLembretes() {
   } finally {
     btn.disabled = false; btn.textContent = "📤 Enviar";
   }
+}
+
+// ── Bulk delete: Extrato C6 ──
+function _extChkChange(){
+  const chks=document.querySelectorAll(".ext-chk");
+  const sel=Array.from(chks).filter(c=>c.checked);
+  const bar=document.getElementById("ext-bulk-bar");
+  const all=document.getElementById("ext-chk-all");
+  if(bar){bar.style.display=sel.length?"flex":"none";}
+  const ct=document.getElementById("ext-bulk-count");
+  if(ct)ct.textContent=`${sel.length} selecionado${sel.length!==1?"s":""}`;
+  if(all)all.indeterminate=sel.length>0&&sel.length<chks.length, all.checked=sel.length===chks.length;
+}
+function _extToggleAll(chkAll){
+  document.querySelectorAll(".ext-chk").forEach(c=>c.checked=chkAll.checked);
+  _extChkChange();
+}
+function _extClearSel(){
+  document.querySelectorAll(".ext-chk").forEach(c=>c.checked=false);
+  const all=document.getElementById("ext-chk-all"); if(all){all.checked=false;all.indeterminate=false;}
+  _extChkChange();
+}
+async function bulkDeleteExtrato(){
+  const ids=Array.from(document.querySelectorAll(".ext-chk:checked")).map(c=>c.dataset.id);
+  if(!ids.length)return;
+  if(!confirm(`Apagar ${ids.length} lançamento${ids.length!==1?"s":""}?\n\nEsta ação não pode ser desfeita.`))return;
+  for(let i=0;i<ids.length;i+=50){
+    const batch=ids.slice(i,i+50);
+    await sbFetch(`extrato_bancario?id_extrato_c6=in.(${batch.map(x=>encodeURIComponent(x)).join(",")})`,{method:"DELETE"});
+  }
+  toast(`${ids.length} lançamento${ids.length!==1?"s":""} apagado${ids.length!==1?"s":""}`);
+  renderExtrato();
+}
+
+// ── Busca de Duplicados ──
+let _duplSection = null, _duplRows = [];
+
+async function openDuplicados(secao) {
+  _duplSection = secao;
+  const titles = {receber:"Duplicados — Contas a Receber", pagar:"Duplicados — Contas a Pagar", extrato:"Duplicados — Extrato C6"};
+  document.getElementById("dupl-title").textContent = "🔍 " + (titles[secao]||"Duplicados");
+  document.getElementById("dupl-body").innerHTML = '<div class="empty"><div class="eicon">⏳</div>Buscando duplicados...</div>';
+  document.getElementById("btn-dupl-del").style.display = "none";
+  document.getElementById("dupl-sel-count").textContent = "";
+  document.getElementById("m-dupl").classList.add("open");
+
+  try {
+    let rows = [], groups = [];
+    if(secao === "receber") {
+      rows = await dbGetAll("contas_a_receber","select=id,cod_evento,parcela,valor,vencimento,status&order=vencimento.asc&limit=5000");
+      groups = _groupDuplicados(rows, r=>`${r.cod_evento}||${r.valor}||${r.vencimento}`);
+    } else if(secao === "pagar") {
+      rows = await dbGetAll("contas_a_pagar","select=id,fornecedor_cod,natureza,valor,vencimento_real,status&order=vencimento_real.asc&limit=5000");
+      groups = _groupDuplicados(rows, r=>`${r.fornecedor_cod||""}||${r.valor}||${r.vencimento_real}`);
+    } else {
+      rows = await sbFetch("extrato_bancario?select=id_extrato_c6,titulo,descricao,entrada,saida,data_lancamento&order=data_lancamento.asc&limit=10000");
+      if(!Array.isArray(rows)) rows = [];
+      groups = _groupDuplicados(rows, r=>`${r.titulo||r.descricao||""}||${r.entrada||0}||${r.saida||0}||${r.data_lancamento}`);
+    }
+
+    _duplRows = rows;
+    _renderDuplGroups(groups, secao);
+  } catch(e) {
+    document.getElementById("dupl-body").innerHTML = `<div class="empty"><div class="eicon">⚠️</div>Erro: ${e.message}</div>`;
+  }
+}
+
+function _groupDuplicados(rows, keyFn) {
+  const map = {};
+  rows.forEach(r => {
+    const k = keyFn(r);
+    if(!map[k]) map[k] = [];
+    map[k].push(r);
+  });
+  return Object.values(map).filter(g => g.length > 1);
+}
+
+function _renderDuplGroups(groups, secao) {
+  const body = document.getElementById("dupl-body");
+  if(!groups.length) {
+    body.innerHTML = '<div class="empty"><div class="eicon">✅</div>Nenhum duplicado encontrado.</div>';
+    return;
+  }
+  const total = groups.reduce((a,g)=>a+g.length-1,0);
+  let html = `<div style="font-size:13px;color:var(--dl);margin-bottom:12px;">${groups.length} grupo${groups.length!==1?"s":""} com duplicados — ${total} registro${total!==1?"s":""} podem ser removidos</div>`;
+
+  groups.forEach((grp, gi) => {
+    const isExt = secao === "extrato";
+    const pkFn = r => isExt ? r.id_extrato_c6 : r.id;
+    const labelFn = r => {
+      if(secao==="receber")  return `Evento ${r.cod_evento} | Parcela ${r.parcela||"—"} | ${fmtDate(r.vencimento)} | ${fmt(r.valor)} | ${r.status||"—"}`;
+      if(secao==="pagar")    return `Fornec. ${r.fornecedor_cod||"—"} | ${fmtDate(r.vencimento_real)} | ${fmt(r.valor)} | ${r.status||"—"}`;
+      return `${fmtDate(r.data_lancamento)} | ${r.titulo||r.descricao||"—"} | E: ${fmt(r.entrada||0)} S: ${fmt(r.saida||0)}`;
+    };
+
+    html += `<div class="dupl-grp" style="border:1.5px solid #e2e8f0;border-radius:10px;margin-bottom:10px;overflow:hidden;">
+      <div style="background:#f8fafc;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <span style="font-size:12px;font-weight:700;color:var(--dk);">Grupo ${gi+1} — ${grp.length} registros idênticos</span>
+        <button onclick="_duplSelGrp(${gi},true)" style="font-size:11px;padding:3px 10px;background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;border-radius:6px;cursor:pointer;font-weight:700;">Marcar excedentes</button>
+      </div>
+      ${grp.map((r,ri)=>{
+        const pk = pkFn(r);
+        const label = labelFn(r);
+        const isFirst = ri===0;
+        return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid #f1f5f9;cursor:pointer;background:${isFirst?"#f0fdf4":"#fff"};">
+          <input type="checkbox" class="dupl-chk" data-pk="${_esc(String(pk))}" data-sec="${secao}" onchange="_duplChkChange()" style="accent-color:#dc2626;width:15px;height:15px;cursor:pointer;" ${isFirst?"disabled title='Primeiro registro — mantido'":""}>
+          <span style="font-size:12px;color:var(--dk);">${isFirst?"<strong>✓ Manter</strong> — ":""} ${label}</span>
+        </label>`;
+      }).join("")}
+    </div>`;
+  });
+
+  body.innerHTML = html;
+}
+
+function _duplSelGrp(gi, markExcedentes) {
+  const grpEls = document.querySelectorAll("#dupl-body .dupl-grp");
+  const grpEl = grpEls[gi];
+  if(!grpEl) return;
+  grpEl.querySelectorAll(".dupl-chk:not([disabled])").forEach(c=>c.checked=markExcedentes);
+  _duplChkChange();
+}
+
+function _duplChkChange() {
+  const sel = document.querySelectorAll(".dupl-chk:checked");
+  const btn = document.getElementById("btn-dupl-del");
+  const ct = document.getElementById("dupl-sel-count");
+  btn.style.display = sel.length ? "block" : "none";
+  ct.textContent = sel.length ? `${sel.length} selecionado${sel.length!==1?"s":""} para apagar` : "";
+}
+
+async function bulkDeleteDuplicados() {
+  const chks = Array.from(document.querySelectorAll(".dupl-chk:checked"));
+  if(!chks.length) return;
+  if(!confirm(`Apagar ${chks.length} registro${chks.length!==1?"s":""} duplicado${chks.length!==1?"s":""}?\n\nO primeiro de cada grupo será mantido.`)) return;
+
+  const secao = chks[0].dataset.sec;
+  const ids = chks.map(c=>c.dataset.pk);
+
+  if(secao==="extrato") {
+    for(let i=0;i<ids.length;i+=50){
+      const batch=ids.slice(i,i+50);
+      await sbFetch(`extrato_bancario?id_extrato_c6=in.(${batch.map(x=>encodeURIComponent(x)).join(",")})`,{method:"DELETE"});
+    }
+    toast(`${ids.length} duplicado${ids.length!==1?"s":""} removido${ids.length!==1?"s":""}`);
+    closeDuplicados(); renderExtrato();
+  } else {
+    const table = secao==="receber" ? "contas_a_receber" : "contas_a_pagar";
+    const now = new Date().toISOString();
+    for(let i=0;i<ids.length;i+=50){
+      const batch=ids.slice(i,i+50);
+      await sbFetch(`${table}?id=in.(${batch.join(",")})`,{method:"PATCH",body:{deleted_at:now},prefer:"return=minimal"});
+    }
+    toast(`${ids.length} duplicado${ids.length!==1?"s":""} removido${ids.length!==1?"s":""}`);
+    closeDuplicados();
+    if(secao==="receber") renderReceber(); else renderPagar();
+  }
+}
+
+function closeDuplicados() {
+  document.getElementById("m-dupl").classList.remove("open");
 }
 
 // ── Bulk delete: A Pagar ──
