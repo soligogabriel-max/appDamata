@@ -129,6 +129,20 @@ select.inp{cursor:pointer}
     </div>
   </div>
   <div style="margin-bottom:12px">
+    <span class="lbl" style="margin-bottom:8px">Acomodações</span>
+    <label class="cb"><input type="checkbox" id="o-acLoft"> <span id="ge-loft">Loft Flamboyant</span></label>
+    <label class="cb"><input type="checkbox" id="o-acCasa"> <span id="ge-casa">Casa Flamboyant</span></label>
+    <label class="cb"><input type="checkbox" id="o-acSuiteAss"> <span id="ge-suiteass">Suíte Assessoria</span></label>
+    <label class="cb"><input type="checkbox" id="o-acSf1"> <span id="ge-sf1">Suíte Flamboyant 1 (king)</span></label>
+    <label class="cb"><input type="checkbox" id="o-acSf2"> <span id="ge-sf2">Suíte Flamboyant 2 (king)</span></label>
+    <label class="cb"><input type="checkbox" id="o-acSf3"> <span id="ge-sf3">Suíte Flamboyant 3 (4 solteiros)</span></label>
+    <label class="cb"><input type="checkbox" id="o-acSf4"> <span id="ge-sf4">Suíte Flamboyant 4 (3 solteiros)</span></label>
+    <label class="cb"><input type="checkbox" id="o-acSf5"> <span id="ge-sf5">Suíte Flamboyant 5 (3 solteiros)</span></label>
+    <label class="cb"><input type="checkbox" id="o-acSb1"> <span id="ge-sb1">Suíte Bromélias 1 (casal + solteiro)</span></label>
+    <label class="cb"><input type="checkbox" id="o-acSb2"> <span id="ge-sb2">Suíte Bromélias 2 (casal)</span></label>
+    <label class="cb"><input type="checkbox" id="o-acSb3"> <span id="ge-sb3">Suíte Bromélias 3 (2 casais)</span></label>
+  </div>
+  <div style="margin-bottom:12px">
     <span class="lbl" style="margin-bottom:8px">Mobiliário DAMATA</span>
     <label class="cb"><input type="checkbox" id="o-fuBal"> Balcão Hexagonal</label>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
@@ -294,6 +308,17 @@ function autoNomeEvento(){
     base.spPeroba=document.getElementById("o-spPeroba").checked;
     base.spBrom=document.getElementById("o-spBrom").checked;
     base.dayQty=document.getElementById("o-dayuse").checked?(parseInt(document.getElementById("o-dayqty").value)||1):0;
+    base.acLoft=document.getElementById("o-acLoft").checked;
+    base.acCasa=document.getElementById("o-acCasa").checked;
+    base.acSuiteAss=document.getElementById("o-acSuiteAss").checked;
+    base.acSf1=document.getElementById("o-acSf1").checked;
+    base.acSf2=document.getElementById("o-acSf2").checked;
+    base.acSf3=document.getElementById("o-acSf3").checked;
+    base.acSf4=document.getElementById("o-acSf4").checked;
+    base.acSf5=document.getElementById("o-acSf5").checked;
+    base.acSb1=document.getElementById("o-acSb1").checked;
+    base.acSb2=document.getElementById("o-acSb2").checked;
+    base.acSb3=document.getElementById("o-acSb3").checked;
     base.fuBal=document.getElementById("o-fuBal").checked;
     base.fuMesas=parseInt(document.getElementById("o-fuMesas").value)||0;
     base.fuCad=parseInt(document.getElementById("o-fuCad").value)||0;
@@ -301,6 +326,10 @@ function autoNomeEvento(){
     base.exHoras=parseInt(document.getElementById("o-exHoras").value)||0;
     base.exMont=parseInt(document.getElementById("o-exMont").value)||0;
     base.exDesm=parseInt(document.getElementById("o-exDesm").value)||0;
+    var _acCodMapEv={"acLoft":"000019","acCasa":"000006","acSuiteAss":"000022","acSf1":"000011","acSf2":"000012","acSf3":"000029","acSf4":"000030","acSf5":"000031","acSb1":"000013","acSb2":"000014","acSb3":"000015"};
+    var _acInfoEv={};
+    Object.entries(_acCodMapEv).forEach(function(e){var cod=e[1];_acInfoEv[e[0]]={nome:_invDesc[cod]||cod,desc:_invDescOrc[cod]||""};});
+    base.acomodacoesInfo=_acInfoEv;
   }
   if(_contractType==="hospedagem"){
     var loc=_primeiroNome(v("o-locatario"));
@@ -346,7 +375,10 @@ async function loadInventarioDesc(){
   }catch(e){/* fallback usa descricao salva */}
   // Atualizar labels dos checkboxes
   var _ACG={loft:"000019",casa:"000006",suiteass:"000022",sf1:"000011",sf2:"000012",sf3:"000029",sf4:"000030",sf5:"000031",sb1:"000013",sb2:"000014",sb3:"000015"};
-  Object.entries(_ACG).forEach(function(e){var sp=document.getElementById("g-"+e[0]);if(sp&&_invDesc[e[1]])sp.textContent=_invDesc[e[1]];});
+  Object.entries(_ACG).forEach(function(e){
+    var sp=document.getElementById("g-"+e[0]);if(sp&&_invDesc[e[1]])sp.textContent=_invDesc[e[1]];
+    var sp2=document.getElementById("ge-"+e[0]);if(sp2&&_invDesc[e[1]])sp2.textContent=_invDesc[e[1]];
+  });
 }
 
 async function loadTabelasPreco(){
