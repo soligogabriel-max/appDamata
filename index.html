@@ -2480,48 +2480,48 @@ async function runGCalSync() {
   btn.disabled = true;
   prog.style.display = "block";
 
-  let ok = 0, errs = 0;
+  let ok = 0, errs = 0, lastErr = "";
   for(let i = 0; i < evts.length; i++) {
     prog.textContent = `Sincronizando ${i+1}/${evts.length}…`;
     try {
       await _syncGoogleCal(evts[i]);
       ok++;
-    } catch(_) { errs++; }
+    } catch(e) { errs++; lastErr = e.message; }
   }
 
   prog.textContent = "";
   closeGCalSync();
-  toast(errs ? `📅 ${ok} sincronizado(s), ${errs} erro(s).` : `📅 ${ok} evento(s) sincronizado(s) com sucesso!`);
+  if(errs) {
+    toast("⚠️ Google Calendar: " + lastErr + (errs > 1 ? ` (${errs} evento(s) com erro)` : ""));
+  } else {
+    toast(`📅 ${ok} evento(s) sincronizado(s) com sucesso!`);
+  }
 }
 
 async function _syncGoogleCal(evData) {
-  try {
-    const res = await fetch(SB_URL + "/functions/v1/sync-google-calendar", {
-      method: "POST",
-      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "upsert",
-        cod: evData.cod,
-        nome_evento: evData.nome_evento,
-        data_evento: evData.data_evento,
-        data_fim: evData.data_fim,
-        tipo_evento: evData.tipo_evento,
-        local_evento: evData.local_evento,
-        status: evData.status,
-        google_cal_id: evData.google_cal_id || null,
-      }),
-    });
-    const resp = await res.json();
-    if (resp.error) {
-      toast("⚠️ Google Calendar: " + (resp.detail?.message || resp.error));
-      return;
-    }
-    if (resp.google_cal_id && resp.google_cal_id !== evData.google_cal_id) {
-      await dbUpdate("agenda", "cod=eq."+encodeURIComponent(evData.cod), { google_cal_id: resp.google_cal_id });
-    }
-  } catch(e) {
-    toast("⚠️ Google Calendar: " + e.message);
+  const res = await fetch(SB_URL + "/functions/v1/sync-google-calendar", {
+    method: "POST",
+    headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "upsert",
+      cod: evData.cod,
+      nome_evento: evData.nome_evento,
+      data_evento: evData.data_evento,
+      data_fim: evData.data_fim,
+      tipo_evento: evData.tipo_evento,
+      local_evento: evData.local_evento,
+      status: evData.status,
+      google_cal_id: evData.google_cal_id || null,
+    }),
+  });
+  const resp = await res.json();
+  if (resp.error) {
+    throw new Error(resp.detail?.message || resp.error);
   }
+  if (resp.google_cal_id && resp.google_cal_id !== evData.google_cal_id) {
+    await dbUpdate("agenda", "cod=eq."+encodeURIComponent(evData.cod), { google_cal_id: resp.google_cal_id });
+  }
+  return resp;
 }
 
 // ══════════════════════════════════════════
@@ -5329,7 +5329,7 @@ async function salvarContrato(preset) {
 
     // Sincroniza com Google Calendar (não bloqueia alert)
     dbGet("agenda", `select=*&cod=eq.${encodeURIComponent(cod)}&limit=1`).then(rows => {
-      if(rows.length) _syncGoogleCal(rows[0]);
+      if(rows.length) _syncGoogleCal(rows[0]).catch(e => toast("⚠️ Google Calendar: " + e.message));
     }).catch(()=>{});
 
     alert(`✅ Contrato ${cod} salvo!\n${nomeEvento}`);
