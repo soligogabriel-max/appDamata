@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24v</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24w</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -761,7 +761,8 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <div class="sec-t" style="margin-bottom:0;">Extrato C6</div>
           <div style="display:flex;gap:8px;align-items:center;">
             <input type="month" class="inp inp-inline" id="ext-fil-mes" onchange="renderExtrato()" style="width:150px;margin-bottom:0;"/>
-            <button class="btn-a" onclick="openImport()">⬆ Importar Extrato</button>
+            <button class="btn-a" onclick="openImport()">⬆ Extrato C6</button>
+            <button class="btn-a" style="background:#7c3aed;" onclick="openImportCartao()">💳 Fatura Cartão</button>
             <button class="btn-cancel" style="font-size:12px;padding:5px 12px;" onclick="openDuplicados('extrato')">🔍 Duplicados</button>
           </div>
         </div>
@@ -1048,6 +1049,20 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div style="height:1px;background:var(--br);margin-bottom:14px;"></div>
     <div id="import-body" style="flex:1;overflow-y:auto;min-height:0;"></div>
     <div class="macts" style="margin-top:14px;flex-shrink:0;" id="import-acts"></div>
+  </div>
+</div>
+
+<!-- MODAL: IMPORTAR FATURA CARTÃO -->
+<div class="moverlay" id="m-import-cartao" onclick="if(event.target===this)closeImportCartao()">
+  <div class="mbox" style="max-width:960px;width:100%;max-height:90vh;display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div class="mtitle" id="icc-title" style="margin-bottom:0;">💳 Importar Fatura Cartão C6</div>
+      <button onclick="closeImportCartao()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--dm);">×</button>
+    </div>
+    <div id="icc-steps-bar" style="display:flex;gap:6px;margin:14px 0 4px;"></div>
+    <div style="height:1px;background:var(--br);margin-bottom:14px;"></div>
+    <div id="icc-body" style="flex:1;overflow-y:auto;min-height:0;"></div>
+    <div class="macts" style="margin-top:14px;flex-shrink:0;" id="icc-acts"></div>
   </div>
 </div>
 
@@ -3664,6 +3679,288 @@ async function _executeImport(){
     if(btn){btn.disabled=false;btn.textContent="Importar";}
     alert("Erro na importação: "+e.message);
   }
+}
+
+// ══════════════════════════════════════════
+// IMPORTAR FATURA CARTÃO C6
+// ══════════════════════════════════════════
+let _iccRows = [], _iccStep = 0, _iccMesFatura = "";
+
+function _iccStepsBar(active) {
+  const steps = ["1. Upload","2. Classificar","3. Confirmar"];
+  document.getElementById("icc-steps-bar").innerHTML = steps.map((s,i) =>
+    `<span class="imp-step ${i<active?"done":i===active?"active":""}">${i<active?"✓ ":""} ${s}</span>`
+  ).join('<span style="color:var(--br);padding:0 2px;">›</span>');
+}
+
+function _parseCartaoC6CSV(text) {
+  const lines = text.split(/\r?\n/);
+  // Encontra cabeçalho (linha com "Nome no Cart")
+  let headerIdx = -1;
+  for(let i=0;i<lines.length;i++){
+    if(lines[i].includes("Nome no Cart")){headerIdx=i;break;}
+  }
+  if(headerIdx===-1) throw new Error("Formato inválido — cabeçalho 'Nome no Cartão' não encontrado.");
+  function parseBR(s){if(!s)return null;const p=s.split("/");if(p.length!==3)return null;return`${p[2]}-${p[1].padStart(2,"0")}-${p[0].padStart(2,"0")}`;}
+  function parseN(s){return parseFloat((s||"0").replace(",","."))||0;}
+  const rows=[];const keyCount={};
+  for(let i=headerIdx+1;i<lines.length;i++){
+    const line=lines[i].trim(); if(!line) continue;
+    const c=line.split(";"); if(c.length<9) continue;
+    const data=parseBR(c[0]); if(!data) continue;
+    const nomeCartao=c[1]||""; const finalCartao=c[2]||"";
+    const categoria=c[3]||""; const descricao=c[4]||""; const parcela=c[5]||"";
+    const valorUsd=parseN(c[6]); const cotacao=parseN(c[7]); const valorBrl=parseN(c[8]);
+    if(valorBrl<=0) continue; // skip pagamentos (valores negativos) e zeros
+    const key=`${data}||${finalCartao}||${descricao}||${valorBrl}||${parcela}`;
+    keyCount[key]=(keyCount[key]||0);
+    const idx=keyCount[key]++;
+    const id="CC_"+_djb2(key+"||"+idx);
+    rows.push({id_item_cartao:id,mes_fatura:_iccMesFatura,data_transacao:data,nome_cartao:nomeCartao,final_cartao:finalCartao,categoria,descricao,parcela,valor_usd:valorUsd,cotacao,valor_brl:valorBrl});
+  }
+  return rows;
+}
+
+async function _dedupCartao(rows){
+  if(!rows.length) return [];
+  const existing=new Set();
+  const ids=rows.map(r=>r.id_item_cartao);
+  for(let i=0;i<ids.length;i+=200){
+    const batch=ids.slice(i,i+200);
+    const res=await sbFetch(`cartao_c6?select=id_item_cartao&id_item_cartao=in.(${batch.join(",")})`);
+    if(Array.isArray(res)) res.forEach(r=>existing.add(r.id_item_cartao));
+  }
+  return rows.filter(r=>!existing.has(r.id_item_cartao));
+}
+
+function openImportCartao(){
+  _iccRows=[];_iccStep=0;_iccMesFatura="";
+  _iccRenderStep0();
+  document.getElementById("m-import-cartao").classList.add("open");
+}
+function closeImportCartao(){document.getElementById("m-import-cartao").classList.remove("open");}
+
+function _iccRenderStep0(){
+  _iccStep=0; _iccStepsBar(0);
+  document.getElementById("icc-title").textContent="💳 Importar Fatura Cartão C6";
+  const hoje=new Date();
+  const mesPadrao=hoje.getFullYear()+"-"+String(hoje.getMonth()+1).padStart(2,"0");
+  document.getElementById("icc-body").innerHTML=`
+    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-end;">
+      <div style="flex:1;min-width:200px;">
+        <label class="lbl">Mês de vencimento da fatura</label>
+        <input type="month" class="inp" id="icc-mes" value="${mesPadrao}" style="margin-bottom:0;"/>
+        <div style="font-size:11px;color:var(--dl);margin-top:4px;">Ex: fatura que vence em Fevereiro → selecione 2026-02</div>
+      </div>
+    </div>
+    <p style="color:var(--dm);font-size:13px;margin-bottom:16px;">Exporte a fatura no app C6 → Cartão → Fatura → Exportar CSV. Arraste ou selecione o arquivo <strong>.csv</strong>.</p>
+    <label class="imp-drop" id="icc-drop-zone">
+      <div style="font-size:40px;margin-bottom:8px;">💳</div>
+      <div style="font-weight:600;margin-bottom:4px;">Clique ou arraste o CSV da fatura aqui</div>
+      <input type="file" id="icc-file-input" accept=".csv,.txt" style="display:none;" onchange="_iccOnFile(this)"/>
+    </label>
+    <div id="icc-err" style="color:var(--er);font-size:13px;margin-top:10px;display:none;"></div>`;
+  document.getElementById("icc-acts").innerHTML=`<button class="btn-cancel" onclick="closeImportCartao()">Cancelar</button>`;
+  const dz=document.getElementById("icc-drop-zone");
+  dz.addEventListener("dragover",e=>{e.preventDefault();dz.classList.add("drag");});
+  dz.addEventListener("dragleave",()=>dz.classList.remove("drag"));
+  dz.addEventListener("drop",e=>{e.preventDefault();dz.classList.remove("drag");const f=e.dataTransfer.files[0];if(f)_iccProcessFile(f);});
+}
+
+async function _iccOnFile(inp){if(inp.files[0]) await _iccProcessFile(inp.files[0]);}
+
+async function _iccProcessFile(file){
+  const mesEl=document.getElementById("icc-mes");
+  _iccMesFatura=mesEl?mesEl.value:"";
+  if(!_iccMesFatura){alert("Selecione o mês de vencimento da fatura antes de continuar.");return;}
+  document.getElementById("icc-body").innerHTML='<div class="empty"><div class="eicon">⏳</div>Processando arquivo...</div>';
+  document.getElementById("icc-acts").innerHTML="";
+  try{
+    const text=await file.text();
+    const allRows=_parseCartaoC6CSV(text);
+    if(!allRows.length) throw new Error("Nenhuma despesa encontrada no arquivo (valores negativos/zero são ignorados).");
+    const newRows=await _dedupCartao(allRows);
+    _iccRows=newRows;
+    if(!newRows.length){
+      document.getElementById("icc-body").innerHTML=`<div class="empty"><div class="eicon">✅</div>Todos os ${allRows.length} itens já estão na base.</div>`;
+      document.getElementById("icc-acts").innerHTML=`<button class="btn-cancel" onclick="closeImportCartao()">Fechar</button>`;
+      return;
+    }
+    toast(`${newRows.length} itens novos encontrados`);
+    await _iccRenderStep1();
+  }catch(e){
+    document.getElementById("icc-body").innerHTML=`<div class="empty"><div class="eicon">⚠️</div>${_esc(e.message)}</div>`;
+    document.getElementById("icc-acts").innerHTML=`<button class="btn-cancel" onclick="closeImportCartao()">Cancelar</button><button class="btn-confirm" onclick="_iccRenderStep0()">Tentar novamente</button>`;
+  }
+}
+
+async function _iccRenderStep1(){
+  _iccStep=1; _iccStepsBar(1);
+  document.getElementById("icc-title").textContent=`💳 Classificar Despesas (${_iccRows.length})`;
+  document.getElementById("icc-body").innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando fornecedores...</div>';
+  document.getElementById("icc-acts").innerHTML="";
+
+  if(!_allFornecedores) _allFornecedores=await dbGet("fornecedores","order=nome.asc&limit=500");
+  if(!_impNaturezas||!_impNaturezas.length) _impNaturezas=await dbGet("naturezas","select=cod,descricao&order=cod.asc&limit=500");
+
+  const pagHistory=await dbGetAll("contas_a_pagar","select=fornecedor_cod,natureza&natureza=not.is.null&fornecedor_cod=not.is.null");
+  const natByFornec={};
+  pagHistory.forEach(r=>{
+    if(!natByFornec[r.fornecedor_cod])natByFornec[r.fornecedor_cod]={};
+    natByFornec[r.fornecedor_cod][r.natureza]=(natByFornec[r.fornecedor_cod][r.natureza]||0)+1;
+  });
+  function bestNat(fCod){if(!fCod||!natByFornec[fCod])return"";return Object.entries(natByFornec[fCod]).sort((a,b)=>b[1]-a[1])[0]?.[0]||"";}
+
+  _iccRows=_iccRows.map(r=>({...r,_sugFornec:_suggestFornecedor(r.descricao,_allFornecedores)}));
+
+  const fornecOpts=`<option value="">— Sem fornecedor —</option>`+(_allFornecedores||[]).map(f=>`<option value="${_esc(f.codigo)}">${_esc(f.nome)}</option>`).join("");
+  const natOpts=`<option value="">— Sem natureza —</option>`+(_impNaturezas||[]).map(n=>`<option value="${_esc(n.cod)}">${_esc(n.descricao)}</option>`).join("");
+
+  const rows=_iccRows.map((r,i)=>{
+    const sf=r._sugFornec;
+    const sugNat=sf?bestNat(sf.codigo):"";
+    const fornecSel=fornecOpts.replace(`value="${_esc(sf?sf.codigo:"")}"`,`value="${_esc(sf?sf.codigo:"")}" selected`);
+    const natSel=natOpts.replace(`value="${_esc(sugNat)}"`,`value="${_esc(sugNat)}" selected`);
+    return`<tr>
+      <td style="white-space:nowrap;font-size:12px;">${fmtDate(r.data_transacao)}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.descricao)}">${_esc(r.descricao)}</td>
+      <td style="font-size:11px;color:var(--dl);">${_esc(r.final_cartao)}</td>
+      <td style="font-size:11px;color:var(--dl);">${_esc(r.parcela)}</td>
+      <td style="color:var(--er);font-weight:700;white-space:nowrap;">${fmt(r.valor_brl)}</td>
+      <td>${sf?`<span class="imp-badge-match">✓ ${_esc(sf.nome)}</span>`:`<span class="imp-badge-no">—</span>`}</td>
+      <td style="min-width:180px;"><select class="imp-sel" id="icc-forn-${i}" onchange="_iccSelChange(${i})">${fornecSel}</select></td>
+      <td style="min-width:160px;"><select class="imp-sel" id="icc-nat-${i}">${natSel}</select></td>
+      <td style="text-align:center;"><input type="checkbox" id="icc-chk-${i}" checked title="Criar A Pagar"/></td>
+    </tr>`;
+  }).join("");
+
+  document.getElementById("icc-body").innerHTML=`
+    <p style="font-size:13px;color:var(--dm);margin-bottom:10px;">Classifique cada despesa. Desmarque as que não devem gerar título a pagar.</p>
+    <div class="table-wrap"><table class="imp-table">
+      <thead><tr><th>Data</th><th>Descrição</th><th>Cartão</th><th>Parcela</th><th>Valor</th><th>Sugestão</th><th>Fornecedor</th><th>Natureza</th><th title="Criar A Pagar">✓</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  document.getElementById("icc-acts").innerHTML=`<button class="btn-cancel" onclick="closeImportCartao()">Cancelar</button><button class="btn-confirm" onclick="_iccRenderStep2()">Avançar → Confirmar</button>`;
+}
+
+function _iccSelChange(i){
+  const sel=document.getElementById(`icc-forn-${i}`);
+  if(sel)_iccRows[i]._selFornec=sel.value||null;
+}
+
+function _iccRenderStep2(){
+  // Captura seleções
+  _iccRows.forEach((r,i)=>{
+    r._selFornec=(document.getElementById(`icc-forn-${i}`)?.value)||null;
+    r._selNat=(document.getElementById(`icc-nat-${i}`)?.value)||null;
+    r._criar=(document.getElementById(`icc-chk-${i}`)?.checked)!==false;
+  });
+  _iccStep=2; _iccStepsBar(2);
+  const totalBrl=_iccRows.reduce((a,r)=>a+r.valor_brl,0);
+  const criar=_iccRows.filter(r=>r._criar).length;
+  const ign=_iccRows.length-criar;
+  const [fy,fm]=_iccMesFatura.split("-");
+  const MESES=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+  const mesFmt=MESES[parseInt(fm)-1]+" "+fy;
+  document.getElementById("icc-body").innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
+      <div class="tot-card"><div class="tot-lbl">Itens novos</div><div class="tot-val">${_iccRows.length}</div></div>
+      <div class="tot-card"><div class="tot-lbl">Total da fatura</div><div class="tot-val red">${fmt(totalBrl)}</div></div>
+      <div class="tot-card"><div class="tot-lbl">A Pagar a criar</div><div class="tot-val red">${criar}</div></div>
+      <div class="tot-card"><div class="tot-lbl">Ignorados</div><div class="tot-val">${ign}</div></div>
+    </div>
+    <p style="font-size:13px;color:var(--dm);">Fatura de vencimento: <strong>${mesFmt}</strong>. Clique em <strong>Importar</strong> para salvar. Esta ação não pode ser desfeita.</p>`;
+  document.getElementById("icc-acts").innerHTML=`<button class="btn-cancel" onclick="closeImportCartao()">Cancelar</button><button class="btn-confirm" id="icc-btn-exec" onclick="_iccExecute()">Importar</button>`;
+}
+
+async function _iccExecute(){
+  const btn=document.getElementById("icc-btn-exec");
+  if(btn){btn.disabled=true;btn.textContent="Importando...";}
+  try{
+    // 1. Inserir itens na cartao_c6
+    const criar=_iccRows.filter(r=>r._criar);
+    const PAGE=200;
+    for(let i=0;i<_iccRows.length;i+=PAGE){
+      await sbFetch("cartao_c6",{method:"POST",body:_iccRows.slice(i,i+PAGE),prefer:"return=minimal"});
+    }
+
+    // 2. Criar contas_a_pagar para itens marcados
+    for(const r of criar){
+      const created=await sbFetch("contas_a_pagar",{method:"POST",body:[{
+        vencimento_real:r.data_transacao,
+        valor:r.valor_brl,
+        status:"Pago",
+        fornecedor_cod:r._selFornec||null,
+        natureza:r._selNat||null,
+        tipo:"Cartão C6",
+        obs:`${r.descricao||""}${r.parcela&&r.parcela!=="Única"?" (parc. "+r.parcela+")":""}`,
+      }],prefer:"return=representation"});
+      const pagId=Array.isArray(created)?created[0]?.id:created?.id;
+      if(pagId){
+        await sbFetch(`cartao_c6?id_item_cartao=eq.${encodeURIComponent(r.id_item_cartao)}`,{method:"PATCH",body:{titulo_a_pagar:pagId},prefer:"return=minimal"});
+      }
+    }
+
+    closeImportCartao();
+    toast(`✅ ${_iccRows.length} itens importados, ${criar.length} títulos a pagar criados`);
+
+    // 3. Busca saída correspondente no extrato para popup
+    const totalBrl=_iccRows.reduce((a,r)=>a+r.valor_brl,0);
+    _iccBuscarSaidaExtrato(totalBrl, _iccMesFatura);
+
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent="Importar";}
+    alert("Erro na importação: "+e.message);
+  }
+}
+
+async function _iccBuscarSaidaExtrato(totalFatura, mesFatura){
+  try{
+    const tol=totalFatura*0.02; // tolerância de 2%
+    const min=(totalFatura-tol).toFixed(2);
+    const max=(totalFatura+tol).toFixed(2);
+    // Busca no mês da fatura e no mês anterior (pagamento pode cair em qualquer um)
+    const [fy,fm]=mesFatura.split("-").map(Number);
+    const mesAnt=fm===1?(fy-1)+"-12":(fy)+"-"+String(fm-1).padStart(2,"0");
+    const rows=await sbFetch(`extrato_bancario?saida=gte.${min}&saida=lte.${max}&data_lancamento=gte.${mesAnt}-01&data_lancamento=lte.${mesFatura}-31&order=data_lancamento.desc&limit=10`);
+    if(!Array.isArray(rows)||!rows.length) return;
+    // Exibe popup para cada candidato encontrado
+    _iccPopupSaida(rows, totalFatura);
+  }catch(_){}
+}
+
+function _iccPopupSaida(candidatos, totalFatura){
+  const el=document.createElement("div");
+  el.id="popup-icc-saida";
+  el.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;";
+  const lista=candidatos.map((r,i)=>`
+    <label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:8px;margin-bottom:6px;cursor:pointer;background:#fff;">
+      <input type="checkbox" id="icc-pop-chk-${i}" data-id="${_esc(r.id_extrato_c6)}" style="accent-color:#dc2626;width:16px;height:16px;" checked>
+      <span style="font-size:13px;color:var(--dk);">${fmtDate(r.data_lancamento)} — <strong>${_esc(r.titulo||r.descricao||"—")}</strong> — <span style="color:var(--er);font-weight:700;">${fmt(r.saida)}</span></span>
+    </label>`).join("");
+  el.innerHTML=`<div style="background:#fff;border-radius:16px;padding:28px;max-width:520px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.25);">
+    <div style="font-size:17px;font-weight:800;color:var(--dk);margin-bottom:8px;">🔍 Possível pagamento da fatura no extrato</div>
+    <p style="font-size:13px;color:var(--dm);margin-bottom:16px;">Encontrei ${candidatos.length===1?"uma saída que parece ser o pagamento":"saídas que podem ser o pagamento"} desta fatura (total ${fmt(totalFatura)}). Marque as que deseja apagar do extrato para evitar duplicidade:</p>
+    ${lista}
+    <div style="display:flex;gap:8px;margin-top:18px;">
+      <button onclick="_iccConfirmDelSaida()" style="flex:1;padding:11px;background:#dc2626;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;">🗑 Apagar selecionadas</button>
+      <button onclick="document.getElementById('popup-icc-saida').remove()" style="padding:11px 18px;background:transparent;color:var(--dm);border:1.5px solid var(--br);border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;">Manter no extrato</button>
+    </div>
+  </div>`;
+  document.body.appendChild(el);
+}
+
+async function _iccConfirmDelSaida(){
+  const chks=document.querySelectorAll("#popup-icc-saida input[type=checkbox]:checked");
+  const ids=Array.from(chks).map(c=>c.dataset.id).filter(Boolean);
+  document.getElementById("popup-icc-saida").remove();
+  if(!ids.length) return;
+  for(let i=0;i<ids.length;i+=50){
+    const batch=ids.slice(i,i+50);
+    await sbFetch(`extrato_bancario?id_extrato_c6=in.(${batch.map(x=>encodeURIComponent(x)).join(",")})`,{method:"DELETE"});
+  }
+  toast(`${ids.length} lançamento${ids.length!==1?"s":""} removido${ids.length!==1?"s":""} do extrato`);
+  renderExtrato();
 }
 
 // ══════════════════════════════════════════
