@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24k</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24l</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -4590,8 +4590,9 @@ async function toggleInvOrcamento(cod, val, el){
 // ══════════════════════════════════════════
 async function salvarContrato(preset) {
   // preset vem do gerador via postMessage
+  let cod, nomeEvento;
+  let _parcelasInseridas = false, _pedidoCriadoId = null, _despesaCriada = false;
   try {
-    let cod, nomeEvento;
     const d1 = preset.date1;
     const d2 = preset.date2;
     const fmtNome = d => {
@@ -4649,6 +4650,7 @@ async function salvarContrato(preset) {
       if(agExist.length && !agExist[0].deleted_at) {
         // Registro ativo já existe — apenas notifica, não sobrescreve
         toast("Evento "+cod+" já existe no sistema.");
+        return;
       } else if(agExist.length && agExist[0].deleted_at) {
         // Registro soft-deleted — ressuscita com novos dados
         await sbFetch(`agenda?cod=eq.${encodeURIComponent(cod)}`, {method:"PATCH",
@@ -4699,6 +4701,7 @@ async function salvarContrato(preset) {
         obs: p.desc||null,
       }));
       await sbFetch("contas_a_receber", {method:"POST", body: parcelas, prefer:"return=minimal"});
+      _parcelasInseridas = true;
     }
 
     // 5. Criar pedido de locação
@@ -4708,12 +4711,12 @@ async function salvarContrato(preset) {
       body: {numero_pedido: numPedido, cod_evento: cod, total_pedido: preset.total ? parseFloat(preset.total) : null},
       prefer:"return=representation"
     });
-    const pedidoId = Array.isArray(pedido) ? pedido[0]?.id : pedido?.id;
+    _pedidoCriadoId = Array.isArray(pedido) ? pedido[0]?.id : pedido?.id;
 
     // 6. Criar itens do pedido
-    if(preset.itens && preset.itens.length && pedidoId) {
+    if(preset.itens && preset.itens.length && _pedidoCriadoId) {
       const itens = preset.itens.map(it=>({
-        pedido_id: pedidoId,
+        pedido_id: _pedidoCriadoId,
         cod_item: it.cod,
         descricao: it.descricao,
         quantidade: it.quantidade,
@@ -4736,6 +4739,7 @@ async function salvarContrato(preset) {
         tipo: "Despesa Prevista",
         obs: `Despesas variáveis previstas — ${nomeEvento}`,
       }], prefer:"return=minimal"});
+      _despesaCriada = true;
     }
 
     // 8. Marcar contrato como gerado (arquivo gerado para o cliente)
@@ -4752,6 +4756,15 @@ async function salvarContrato(preset) {
     alert(`✅ Contrato ${cod} salvo!\n${nomeEvento}`);
     setTab("contratos");
   } catch(e) {
+    // Rollback: remove registros criados antes do ponto de falha
+    try {
+      if(_despesaCriada && cod) await sbFetch(`contas_a_pagar?cod_evento=eq.${encodeURIComponent(cod)}&tipo=eq.Despesa%20Prevista`, {method:"DELETE"});
+      if(_pedidoCriadoId) {
+        await sbFetch(`itens_pedido?pedido_id=eq.${_pedidoCriadoId}`, {method:"DELETE"});
+        await sbFetch(`pedidos?id=eq.${_pedidoCriadoId}`, {method:"DELETE"});
+      }
+      if(_parcelasInseridas && cod) await sbFetch(`contas_a_receber?cod_evento=eq.${encodeURIComponent(cod)}`, {method:"DELETE"});
+    } catch(_) {}
     alert("❌ Erro ao salvar contrato:\n" + e.message);
   }
 }
