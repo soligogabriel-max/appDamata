@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24o</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24p</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -2292,10 +2292,10 @@ async function saveEvent(){
       toast("✅ Evento criado — "+code);
     }
     closeMEF(); renderCal(null);
-    // Salva celular na ficha_do_evento em background
+    // Salva celular na ficha_do_evento em background (upsert)
     const celular = document.getElementById("mef-celular").value.trim();
     if(celular && code){
-      sbFetch("ficha_do_evento?cod=eq."+encodeURIComponent(code), {method:"PATCH", body:{celular}, prefer:"return=minimal"})
+      sbFetch("ficha_do_evento?on_conflict=cod",{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body:{cod:code, celular}})
         .catch(()=>{});
     }
     // Salva status em background (silencioso se coluna ainda não existir)
@@ -3751,11 +3751,11 @@ async function _ccSalvar(){
   const btn=document.getElementById("cc-btn"); btn.disabled=true; btn.textContent="Enviando…";
   try{
     await sbFetch(`agenda?cod=eq.${encodeURIComponent(_ccEvt.cod)}`,{method:"PATCH",body:{cliente_json:c,assinatura_status:"dados_preenchidos"}});
-    // Retroalimenta ficha_do_evento com os dados preenchidos pelo cliente
-    sbFetch(`ficha_do_evento?cod=eq.${encodeURIComponent(_ccEvt.cod)}`,{method:"PATCH",body:{
-      nome_contratante:c.nome, cpf:c.cpf, rg:c.rg||null,
+    // Retroalimenta ficha_do_evento com os dados preenchidos pelo cliente (upsert)
+    sbFetch(`ficha_do_evento?on_conflict=cod`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body:{
+      cod:_ccEvt.cod, nome_contratante:c.nome, cpf:c.cpf, rg:c.rg||null,
       endereco:c.endereco, celular:c.whatsapp, email:c.email||null
-    }, prefer:"return=minimal"}).catch(()=>{});
+    }}).catch(()=>{});
     // Fase B: aqui a Edge Function enviará o contrato ao Autentique p/ assinatura por WhatsApp
     document.getElementById("cc-body").innerHTML=`<div class="orc-card" style="text-align:center;padding:40px 24px;">
       <div style="font-size:48px;margin-bottom:16px">✅</div>
