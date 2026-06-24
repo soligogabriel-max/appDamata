@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24l</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24m</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -901,6 +901,11 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
             <option value="proposta">Proposta</option>
             <option value="confirmado">Confirmado</option>
             <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+        <div style="grid-column:1/-1;"><label class="lbl">Assessoria</label>
+          <select class="inp inp-inline" id="mef-assessoria">
+            <option value="">— Nenhuma —</option>
           </select>
         </div>
       </div>
@@ -1895,7 +1900,7 @@ async function updBadge() {
 // ══════════════════════════════════════════
 const todayD = new Date();
 let cy=todayD.getFullYear(), cm=todayD.getMonth(), cvm="cal", cfilter=null;
-let cachedEvts = [], _assMap = {};
+let cachedEvts = [], _assMap = {}, _assAll = [];
 
 function pd(s){if(!s)return new Date();const[y,mo,d]=s.split("-").map(Number);return new Date(y,mo-1,d);}
 function tk(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
@@ -1940,7 +1945,7 @@ async function renderCal(fi) {
       dbGet("agenda","order=data_evento.asc.nullslast&select=*&limit=1000"),
       dbGet("assessorias","select=cod,nome&limit=500")
     ]);
-    _assRows.forEach(a=>{ _assMap[a.cod]=a.nome; });
+    _assRows.forEach(a=>{ _assMap[a.cod]=a.nome; }); _assAll=_assRows;
     cachedEvts = _evtsRaw;
     // Filter to events overlapping this month (exclude null dates and invalid dates like 3000-01-01)
     const mStart = new Date(cy, cm, 1);
@@ -2075,6 +2080,7 @@ async function saveObsInterna(){
   }catch(e){toast("Erro ao salvar obs.: "+e.message);}
 }
 function closeEvDet(){document.getElementById("m-evdet").classList.remove("open");}
+function openEventDetail(ev){openEvDet(ev);}
 function editCurrentEvent(){closeEvDet();const ev=cachedEvts.find(e=>(e.id||e.cod)===currentEvId);if(ev)openNewEvent(ev);}
 
 async function deleteEventCascade() {
@@ -2151,6 +2157,12 @@ function openNewEvent(existing){
   document.querySelectorAll(".cbtog").forEach(l=>{l.classList.remove("on");const cb=l.querySelector("input[type=checkbox]");if(cb)cb.checked=false;});
   renderPmts();
   document.getElementById("mef-celular").value="";
+  // Popula dropdown de assessoria
+  const assEl=document.getElementById("mef-assessoria");
+  assEl.innerHTML='<option value="">— Nenhuma —</option>';
+  const _fillAss=(rows)=>{rows.forEach(a=>{const o=document.createElement("option");o.value=a.cod;o.textContent=a.nome;if(existing&&a.cod===existing.assessoria_cod)o.selected=true;assEl.appendChild(o);});};
+  if(_assAll.length){_fillAss(_assAll);}
+  else{dbGet("assessorias","select=cod,nome&limit=500").then(r=>{_assAll=r;_fillAss(r);}).catch(()=>{});}
   if(existing){
     document.getElementById("mef-title").textContent="Editar Evento";
     document.getElementById("mef-id").value=existing.cod||existing.id||"";
@@ -2235,6 +2247,7 @@ async function saveEvent(){
     spTumb:document.getElementById("mef-tumb").checked,spPeroba:document.getElementById("mef-peroba").checked,
     spBrom:document.getElementById("mef-brom").checked,dayQty:cvals.day,
     acLoft:document.getElementById("mef-loft").checked,acCasa:document.getElementById("mef-casa").checked,
+    acSuiteAss:document.getElementById("mef-suiteass").checked,
     acSf1:document.getElementById("mef-sf1").checked,acSf2:document.getElementById("mef-sf2").checked,
     acSf3:document.getElementById("mef-sf3").checked,acSf4:document.getElementById("mef-sf4").checked,
     acSf5:document.getElementById("mef-sf5").checked,acSb1:document.getElementById("mef-sb1").checked,
@@ -2257,6 +2270,7 @@ async function saveEvent(){
     spaces_json: JSON.stringify(extras),
     payments_json: JSON.stringify(pmts),
     obs: document.getElementById("mef-desc").value,
+    assessoria_cod: document.getElementById("mef-assessoria").value || null,
   };
 
   const btn=document.getElementById("btn-save-ev");
@@ -4912,7 +4926,8 @@ async function renderFuturos() {
         const dias = Math.round((df-d)/(1000*60*60*24))+1;
         if(dias > 1) duracao = `<span style="font-size:10px;color:var(--dl);">${dias} dias</span>`;
       }
-      return `<div class="lcard" onclick="openEventDetail(${JSON.stringify(ev).replace(/"/g,'&quot;')})">
+      const _evJ = JSON.stringify(ev).replace(/"/g,'&quot;');
+      return `<div class="lcard" onclick="openEvDet(${_evJ})">
         <div class="dbadge">
           <div class="dbig">${dia}</div>
           <div class="dmon">${mes}</div>
@@ -4928,7 +4943,10 @@ async function renderFuturos() {
           ${ev.responsavel?`<div style="font-size:11px;color:var(--dl);margin-top:2px;">${ev.responsavel}</div>`:""}
           ${(()=>{const l=ev.local_evento?`📍 ${ev.local_evento}`:"";const a=ev.assessoria_cod?`🎗 ${_futAssMap[ev.assessoria_cod]||ev.assessoria_cod}`:"";const x=[l,a].filter(Boolean).join(" · ");return x?`<div style="font-size:10px;color:var(--dl);margin-top:2px;">${x}</div>`:""})()}
         </div>
-        <div style="font-size:18px;color:var(--br);">›</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:5px;">
+          <div style="font-size:18px;color:var(--br);">›</div>
+          ${effIsAdmin()?`<button onclick="event.stopPropagation();openNewEvent(${_evJ})" title="Editar evento" style="font-size:11px;padding:3px 8px;border:1px solid var(--a);background:var(--al);color:var(--dk);border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;">✏️</button>`:""}
+        </div>
       </div>`;
     }).join("");
   } catch(e) {
@@ -4983,14 +5001,20 @@ async function renderAgendaTabela(){
   if(!rows.length){ wr.innerHTML='<div class="empty"><div class="eicon">📅</div>Nenhum evento encontrado.</div>'; return; }
 
   const _showValor = effIsAdmin();
+  const _tblAdmin = effIsAdmin();
   wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
     <thead><tr>
-      <th>Cód.</th><th>Evento</th><th>Tipo</th><th>Data Início</th><th>Data Fim</th>
+      <th>Ações</th><th>Cód.</th><th>Evento</th><th>Tipo</th><th>Data Início</th><th>Data Fim</th>
       <th>Check-in</th><th>Check-out</th>${_showValor?`<th>Valor Locação</th>`:""}<th>Responsável</th><th>Obs</th>
     </tr></thead>
     <tbody>${rows.map(r=>{
       const st=getEvStyle(r);
-      return`<tr style="cursor:pointer;" onclick="openEventDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+      const _rJ=JSON.stringify(r).replace(/"/g,'&quot;');
+      return`<tr style="cursor:pointer;" onclick="openEvDet(${_rJ})">
+        <td style="white-space:nowrap;" onclick="event.stopPropagation()">
+          <button onclick="openEvDet(${_rJ})" title="Visualizar" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">👁️</button>
+          ${_tblAdmin?`<button onclick="openNewEvent(${_rJ})" title="Editar" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 5px;">✏️</button>`:""}
+        </td>
         <td style="font-size:11px;color:var(--dl);white-space:nowrap;">${r.cod||"—"}</td>
         <td style="font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.nome_evento||"—"}</td>
         <td><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:${st.bg};color:${st.color};">${st.label}</span></td>
