@@ -622,7 +622,7 @@ async function generateFile(){
   if(!v("o-code")&&!_gcEvt){
     try{
       var ano=new Date().getFullYear();
-      var rows=await sbGet("agenda?select=cod&cod=like."+ano+"%25&order=cod.desc&limit=1");
+      var rows=await sbGet("agenda?select=cod&cod=like."+ano+"%25&deleted_at=is.null&order=cod.desc&limit=1");
       var seq=1;
       if(rows.length) seq=parseInt(rows[0].cod.slice(4))+1;
       g("o-code").value=String(ano)+String(seq).padStart(2,"0");
