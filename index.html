@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24m</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24n</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1095,14 +1095,18 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <div><label class="lbl">Evento</label><select class="inp" id="pm-evento" style="margin-bottom:0;" onchange="_pmUpdateTotais()"></select></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-      <div><label class="lbl">Total do Pedido (R$)</label><input class="inp" id="pm-total" type="number" step="0.01" style="margin-bottom:0;"/></div>
+      <div><label class="lbl">Total do Pedido (R$)</label><input class="inp" id="pm-total" type="number" step="0.01" style="margin-bottom:0;" oninput="_pmUpdateTotais()"/></div>
     </div>
     <!-- PAINEL DE TOTAIS -->
     <div id="pm-totais-panel" style="display:none;border:1px solid var(--br);border-radius:10px;padding:12px;margin-bottom:14px;">
       <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
         <div style="flex:1;min-width:130px;">
-          <div style="font-size:10px;color:var(--dl);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Soma dos itens</div>
+          <div style="font-size:10px;color:var(--dl);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Soma de tabela</div>
           <div id="pm-soma-itens" style="font-size:18px;font-weight:800;color:var(--dk);">—</div>
+        </div>
+        <div id="pm-desconto-wrap" style="display:none;flex:1;min-width:130px;">
+          <div style="font-size:10px;color:var(--dl);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Desconto negociado</div>
+          <div id="pm-desconto" style="font-size:18px;font-weight:800;color:#dc2626;">—</div>
         </div>
         <div style="flex:1;min-width:130px;">
           <div style="font-size:10px;color:var(--dl);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Parcelas a receber</div>
@@ -1130,6 +1134,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <button class="btn-cancel" style="font-size:12px;padding:5px 14px;" onclick="_pmAddItem()">+ Adicionar item</button>
     <div class="macts" style="margin-top:16px;">
       <button class="btn-cancel" onclick="closePedidoModal()">Cancelar</button>
+      <button id="pm-btn-delete" onclick="deletePedidoAtual()" style="display:none;background:#fee2e2;color:#dc2626;border:1.5px solid #fca5a5;border-radius:8px;padding:8px 16px;font-weight:700;font-size:13px;cursor:pointer;">🗑 Apagar</button>
       <button class="btn-confirm" id="pm-btn-save" onclick="savePedido()">Salvar</button>
     </div>
   </div>
@@ -5674,12 +5679,13 @@ async function renderPedidos() {
 
     const showVals = effIsAdmin();
     wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
-      <thead><tr><th>Nº Pedido</th><th>Evento</th><th>Data Evento</th>${showVals?`<th style="text-align:right;">Soma Itens</th><th style="text-align:right;">A Receber</th><th style="text-align:right;">Total Pedido</th><th></th>`:``}</tr></thead>
+      <thead><tr><th>Nº Pedido</th><th>Evento</th><th>Data Evento</th>${showVals?`<th style="text-align:right;">Soma Tabela</th><th style="text-align:right;">Desconto</th><th style="text-align:right;">A Receber</th><th style="text-align:right;">Total Pedido</th><th></th>`:``}</tr></thead>
       <tbody>${rows.map(r=>{
         const rj      = _esc(JSON.stringify(r));
         const dataEv  = evDateMap[r.cod_evento];
         const isFut   = dataEv && dataEv >= hojeStr;
         const dv      = divergMap[r.id];
+        const descontoVal = dv?.somaItens && r.total_pedido && dv.somaItens > r.total_pedido + 0.01 ? dv.somaItens - r.total_pedido : null;
         const divBadge = showVals && dv && dv.diff != null && Math.abs(dv.diff) > 0.01
           ? `<span title="Divergência: ${fmt(Math.abs(dv.diff))}" style="display:inline-block;background:#F0AD4E;color:#7A5C00;font-size:10px;font-weight:700;border-radius:6px;padding:1px 6px;margin-left:6px;">⚠️ ${fmt(Math.abs(dv.diff))}</span>`
           : (showVals && dv && dv.somaRec != null ? `<span style="color:#2A6644;font-size:10px;font-weight:700;margin-left:6px;">✓</span>` : "");
@@ -5688,9 +5694,10 @@ async function renderPedidos() {
           <td>${evMap[r.cod_evento]||r.cod_evento||"—"}</td>
           <td style="color:${isFut?"#2A6644":"var(--dl)"};">${dataEv?fmtDate(dataEv):"—"}</td>
           ${showVals?`<td style="text-align:right;">${dv?.somaItens ? fmt(dv.somaItens) : "—"}</td>
+          <td style="text-align:right;color:#dc2626;font-weight:700;">${descontoVal ? "−"+fmt(descontoVal) : "—"}</td>
           <td style="text-align:right;color:#2A6644;">${dv?.somaRec != null ? fmt(dv.somaRec) : "—"}</td>
           <td style="text-align:right;font-weight:700;">${r.total_pedido?fmt(r.total_pedido):"—"}</td>
-          <td><div class="row-acts"><button class="act-btn" title="Ver itens" onclick='openPedidoModal(JSON.parse(this.dataset.r),true)' data-r="${rj}">👁</button><button class="act-btn" title="Editar" onclick='openPedidoModal(JSON.parse(this.dataset.r),false)' data-r="${rj}">✏️</button></div></td>`
+          <td><div class="row-acts"><button class="act-btn" title="Ver itens" onclick='openPedidoModal(JSON.parse(this.dataset.r),true)' data-r="${rj}">👁</button><button class="act-btn" title="Editar" onclick='openPedidoModal(JSON.parse(this.dataset.r),false)' data-r="${rj}">✏️</button><button class="act-btn" title="Apagar pedido" onclick='if(confirm("Apagar pedido "+JSON.parse(this.dataset.r).numero_pedido+"?"))_deletePedidoById(JSON.parse(this.dataset.r))' data-r="${rj}">🗑</button></div></td>`
           :`<td><div class="row-acts"><button class="act-btn" title="Ver itens" onclick='openPedidoModal(JSON.parse(this.dataset.r),true)' data-r="${rj}">👁</button></div></td>`}
         </tr>`;
       }).join("")}</tbody>
@@ -5699,6 +5706,23 @@ async function renderPedidos() {
 }
 
 function closePedidoModal() { document.getElementById("m-pedido").classList.remove("open"); }
+
+async function deletePedidoAtual(){
+  if(!_pedidoId||!confirm("Apagar este pedido e seus itens?")) return;
+  try{
+    await sbFetch("itens_pedido?pedido_id=eq."+_pedidoId,{method:"DELETE",prefer:"return=minimal"});
+    await sbFetch("pedidos?id=eq."+_pedidoId,{method:"PATCH",body:{deleted_at:new Date().toISOString()},prefer:"return=minimal"});
+    closePedidoModal(); renderPedidos(); toast("Pedido apagado.");
+  }catch(e){toast("Erro ao apagar: "+e.message);}
+}
+async function _deletePedidoById(ped){
+  if(!effIsAdmin()) return;
+  try{
+    await sbFetch("itens_pedido?pedido_id=eq."+ped.id,{method:"DELETE",prefer:"return=minimal"});
+    await sbFetch("pedidos?id=eq."+ped.id,{method:"PATCH",body:{deleted_at:new Date().toISOString()},prefer:"return=minimal"});
+    renderPedidos(); toast("Pedido apagado.");
+  }catch(e){toast("Erro ao apagar: "+e.message);}
+}
 
 let _pmInvItems = []; // cache do inventário para o modal
 
@@ -5769,6 +5793,16 @@ async function _pmUpdateTotais() {
   }, 0);
   document.getElementById("pm-soma-itens").textContent = somaItens ? fmt(somaItens) : "—";
 
+  // Desconto = preços de tabela − total negociado no contrato
+  const _totalPed = parseFloat(document.getElementById("pm-total").value)||0;
+  const _descEl = document.getElementById("pm-desconto-wrap");
+  if(somaItens && _totalPed && somaItens > _totalPed + 0.01) {
+    document.getElementById("pm-desconto").textContent = fmt(somaItens - _totalPed);
+    _descEl.style.display = "";
+  } else {
+    _descEl.style.display = "none";
+  }
+
   // Busca parcelas a receber do evento (só se mudou de evento)
   if(_pmSomaReceber === null || _pmSomaReceber._cod !== cod_evento) {
     try {
@@ -5805,12 +5839,14 @@ async function openPedidoModal(ped, readOnly) {
   sel.innerHTML = '<option value="">— Selecione —</option>';
   // modo leitura: oculta campos de valor e ações
   document.getElementById("pm-total").closest("div").parentElement.style.display = ro ? "none" : "";
-  document.getElementById("pm-totais-panel").style.display = ro ? "none" : "";
+  document.getElementById("pm-totais-panel").style.display = "none"; // revelado após carga dos itens
+  document.getElementById("pm-desconto-wrap").style.display = "none";
   document.getElementById("pm-itens-table").querySelectorAll("th")[2].style.display = ro ? "none" : "";
   document.getElementById("pm-itens-table").querySelectorAll("th")[3].style.display = ro ? "none" : "";
   document.getElementById("pm-itens-table").querySelectorAll("th")[4].style.display = ro ? "none" : "";
   document.querySelector("#m-pedido .btn-cancel[onclick*='_pmAddItem']") && (document.querySelector("#m-pedido .btn-cancel[onclick*='_pmAddItem']").style.display = ro ? "none" : "");
   document.getElementById("pm-btn-save").style.display = ro ? "none" : "";
+  document.getElementById("pm-btn-delete").style.display = !ro && ped ? "" : "none";
   document.querySelector("#m-pedido .macts .btn-cancel").textContent = ro ? "Fechar" : "Cancelar";
   document.getElementById("m-pedido").classList.add("open");
   try {
@@ -5823,11 +5859,22 @@ async function openPedidoModal(ped, readOnly) {
     _pmSomaReceber = null;
     evts.forEach(e=>{ const o=document.createElement("option"); o.value=e.cod; o.textContent=(e.nome_evento||e.cod); if(ped&&e.cod===ped.cod_evento)o.selected=true; sel.appendChild(o); });
     document.getElementById("pm-itens-body").innerHTML = "";
+    let _somaLoad = 0;
     if(itens.length) {
-      itens.forEach(it=>_pmAddItem(it, ro));
+      itens.forEach(it=>{ _pmAddItem(it, ro); _somaLoad += (it.quantidade||0)*(it.valor_unitario||0); });
     } else {
       document.getElementById("pm-itens-body").innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--dl);">Nenhum item cadastrado neste pedido.</td></tr>';
     }
+    // Painel de totais — sempre visível após carga
+    const _totPanel = document.getElementById("pm-totais-panel");
+    document.getElementById("pm-soma-itens").textContent = _somaLoad ? fmt(_somaLoad) : "—";
+    document.getElementById("pm-soma-receber").textContent = "—";
+    const _totalPedLoad = parseFloat(ped?.total_pedido)||0;
+    if(_somaLoad && _totalPedLoad && _somaLoad > _totalPedLoad + 0.01) {
+      document.getElementById("pm-desconto").textContent = fmt(_somaLoad - _totalPedLoad);
+      document.getElementById("pm-desconto-wrap").style.display = "";
+    }
+    if(_somaLoad || _totalPedLoad) _totPanel.style.display = "block";
     if(!ro) await _pmUpdateTotais();
   } catch(e) {
     document.getElementById("pm-itens-body").innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;color:#A03030;">Erro ao carregar itens: '+e.message+'</td></tr>';
