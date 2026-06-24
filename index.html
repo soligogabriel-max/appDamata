@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24i</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24j</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -4637,29 +4637,21 @@ async function salvarContrato(preset) {
       nomeEvento = `${nomes} - ${dStr}`;
       const agExistRaw = await sbFetch(`agenda?select=cod,deleted_at&cod=eq.${encodeURIComponent(cod)}&limit=1`);
       const agExist = Array.isArray(agExistRaw) ? agExistRaw : [];
-      if(agExist.length && agExist[0].deleted_at) {
-        // Código pertencia a evento deletado — remove o registro antigo para liberar o PK
-        await sbFetch(`agenda?cod=eq.${encodeURIComponent(cod)}`, {method:"DELETE", prefer:"return=minimal"});
-      }
-      if(agExist.length && !agExist[0].deleted_at) {
-        // Registro ativo já existe (duplo clique?) — só atualiza
-        await sbFetch(`agenda?cod=eq.${cod}`, {method:"PATCH", body:{
-          valor_locacao: preset.total ? parseFloat(preset.total) : null,
-          cin: preset.cin||null, cout: preset.cout||null,
-          tipo_evento: preset.tipoEvento||"Casamento",
-          obs: preset.obs||null,
-          payments_json: paymentsJson, spaces_json: spacesJson,
-        }, prefer:"return=minimal"});
+      const eventoBody = {
+        nome_evento: nomeEvento,
+        data_evento: d1||null, data_fim: d2||null,
+        cin: preset.cin||null, cout: preset.cout||null,
+        tipo_evento: preset.tipoEvento||"Casamento",
+        valor_locacao: preset.total ? parseFloat(preset.total) : null,
+        obs: preset.obs||null,
+        payments_json: paymentsJson, spaces_json: spacesJson,
+      };
+      if(agExist.length) {
+        // Registro existe (ativo ou soft-deleted) — PATCH para atualizar/ressuscitar
+        await sbFetch(`agenda?cod=eq.${encodeURIComponent(cod)}`, {method:"PATCH",
+          body:{...eventoBody, deleted_at: null}, prefer:"return=minimal"});
       } else {
-        await sbFetch("agenda", {method:"POST", body:{
-          cod, nome_evento: nomeEvento,
-          data_evento: d1||null, data_fim: d2||null,
-          cin: preset.cin||null, cout: preset.cout||null,
-          tipo_evento: preset.tipoEvento||"Casamento",
-          valor_locacao: preset.total ? parseFloat(preset.total) : null,
-          obs: preset.obs||null,
-          payments_json: paymentsJson, spaces_json: spacesJson,
-        }, prefer:"return=minimal"});
+        await sbFetch("agenda", {method:"POST", body:{cod, ...eventoBody}, prefer:"return=minimal"});
       }
     } else {
       // Fallback: gera código no servidor
