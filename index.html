@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24u</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.24v</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -820,7 +820,12 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <div class="uwrap" style="max-width:1100px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
           <div class="sec-t" style="margin-bottom:0;">Fluxo de Caixa</div>
-          <span id="flx-periodo" style="font-size:12px;color:var(--dl);"></span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <label class="lbl" style="margin:0;white-space:nowrap;">De</label>
+            <input type="month" class="inp inp-inline" id="flx-de" onchange="renderFluxo()" style="width:150px;margin-bottom:0;"/>
+            <label class="lbl" style="margin:0;white-space:nowrap;">Até</label>
+            <input type="month" class="inp inp-inline" id="flx-ate" onchange="renderFluxo()" style="width:150px;margin-bottom:0;"/>
+          </div>
         </div>
         <div id="flx-resumo" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;"></div>
         <div id="flx-table"></div>
@@ -3085,16 +3090,27 @@ async function renderPagar(){
 async function renderFluxo(){
   const wr=document.getElementById("flx-table"); wr.innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   const resWr=document.getElementById("flx-resumo"); resWr.innerHTML="";
-  // Janela: mês atual -3 até +24 (28 meses total)
   const hoje=new Date(); hoje.setDate(1); hoje.setHours(0,0,0,0);
-  const inicio=new Date(hoje); inicio.setMonth(inicio.getMonth()-3);
-  const fim=new Date(hoje); fim.setMonth(fim.getMonth()+24);
-  const iniStr=inicio.getFullYear()+"-"+String(inicio.getMonth()+1).padStart(2,"0")+"-01";
-  // último dia real do mês fim
-  const lastDay=new Date(fim.getFullYear(),fim.getMonth()+1,0).getDate();
-  const fimStr=fim.getFullYear()+"-"+String(fim.getMonth()+1).padStart(2,"0")+"-"+String(lastDay).padStart(2,"0");
-  const periEl=document.getElementById("flx-periodo");
-  if(periEl) periEl.textContent=String(inicio.getMonth()+1).padStart(2,"0")+"/"+inicio.getFullYear()+" → "+String(fim.getMonth()+1).padStart(2,"0")+"/"+fim.getFullYear();
+  const deEl=document.getElementById("flx-de");
+  const ateEl=document.getElementById("flx-ate");
+  // Preenche defaults na primeira abertura: -3 meses até +24 meses
+  if(!deEl.value){
+    const d=new Date(hoje); d.setMonth(d.getMonth()-3);
+    deEl.value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+  }
+  if(!ateEl.value){
+    const d=new Date(hoje); d.setMonth(d.getMonth()+24);
+    ateEl.value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+  }
+  const [iniY,iniM]=deEl.value.split("-").map(Number);
+  const [fimY,fimM]=ateEl.value.split("-").map(Number);
+  const inicio=new Date(iniY,iniM-1,1);
+  const fim=new Date(fimY,fimM-1,1);
+  if(fim<inicio){ wr.innerHTML='<div class="empty"><div class="eicon">⚠️</div>Mês final deve ser igual ou posterior ao inicial.</div>'; return; }
+  const iniStr=deEl.value+"-01";
+  const lastDay=new Date(fimY,fimM,0).getDate();
+  const fimStr=ateEl.value+"-"+String(lastDay).padStart(2,"0");
+  const totalMeses=((fimY-iniY)*12+(fimM-iniM))+1;
   try {
     const [recRows, pagRows] = await Promise.all([
       dbGet("contas_a_receber","vencimento=gte."+iniStr+"&vencimento=lte."+fimStr+"&limit=10000"),
@@ -3102,7 +3118,7 @@ async function renderFluxo(){
     ]);
     const MESES_ABREV=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
     const meses=[];
-    for(let i=0;i<28;i++){
+    for(let i=0;i<totalMeses;i++){
       const d=new Date(inicio); d.setMonth(d.getMonth()+i);
       meses.push({ano:d.getFullYear(), mes:d.getMonth()+1, label:MESES_ABREV[d.getMonth()]+" "+d.getFullYear()});
     }
@@ -3120,8 +3136,8 @@ async function renderFluxo(){
     const totPag=dados.reduce((a,d)=>a+d.pagTotal,0);
     const totSaldo=totRec-totPag;
     resWr.innerHTML=`
-      <div class="tot-card"><div class="tot-lbl">Total a Receber (28 meses)</div><div class="tot-val green">${fmt(totRec)}</div></div>
-      <div class="tot-card"><div class="tot-lbl">Total a Pagar (28 meses)</div><div class="tot-val red">${fmt(totPag)}</div></div>
+      <div class="tot-card"><div class="tot-lbl">Total a Receber (${totalMeses} ${totalMeses===1?"mês":"meses"})</div><div class="tot-val green">${fmt(totRec)}</div></div>
+      <div class="tot-card"><div class="tot-lbl">Total a Pagar (${totalMeses} ${totalMeses===1?"mês":"meses"})</div><div class="tot-val red">${fmt(totPag)}</div></div>
       <div class="tot-card"><div class="tot-lbl">Resultado Previsto</div><div class="tot-val ${totSaldo>=0?"green":"red"}">${fmt(totSaldo)}</div></div>`;
     wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
       <thead><tr>
