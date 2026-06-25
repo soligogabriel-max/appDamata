@@ -340,7 +340,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25w</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25x</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -932,6 +932,19 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
             <button onclick="flvSalvar()" style="padding:10px 24px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px">Salvar vídeos</button>
             <span id="flv-status" style="align-self:center;font-size:13px;color:var(--dl)"></span>
           </div>
+        </div>
+        <div style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px">
+          <div class="sec-t">📄 PDFs de Informações (Landing Page)</div>
+          <p style="color:var(--dl);font-size:13px;margin-bottom:16px">Faça upload dos PDFs exibidos como pano contínuo na landing page. A ordem aqui define a ordem de exibição.</p>
+          <div id="flp-lista" style="margin-bottom:12px"></div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <label style="display:inline-flex;align-items:center;gap:8px;padding:9px 18px;background:var(--a);color:#fff;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">
+              <input type="file" id="flp-file-input" accept="application/pdf" style="display:none" onchange="flpUpload()">
+              + Upload PDF
+            </label>
+            <span id="flp-upload-status" style="font-size:13px;color:var(--dl)"></span>
+          </div>
+          <p style="color:var(--dl);font-size:11px;margin-top:8px;margin-bottom:0">⚠️ Requer bucket <strong>landing-pdfs</strong> público no Supabase Storage.</p>
         </div>
       </div>
     </div>
@@ -1964,6 +1977,8 @@ async function renderFotosLanding(){
   _flUrls=(row&&Array.isArray(row.valor))?[...row.valor]:["","","",""];
   _flRender();
   _flvRender();
+  await _flpLoad();
+  _flpRender();
 }
 /* ── Vídeos Landing ── */
 let _flvUrls=["","",""];
@@ -2026,6 +2041,78 @@ async function flSalvar(){
   document.getElementById("fl-status").textContent="✓ Salvo!";
   setTimeout(()=>document.getElementById("fl-status").textContent="",3000);
   _flRender();
+}
+
+/* ── PDFs Landing ───────────────────────────────────────────── */
+let _flpList=[]; // [{url,name}]
+async function _flpLoad(){
+  try{
+    const res=await sbFetch("app_config?chave=eq.landing_pdfs&select=valor");
+    const v=res&&res[0]&&res[0].valor;
+    _flpList=Array.isArray(v)?v:[];
+  }catch(_){_flpList=[];}
+}
+async function _flpSave(){
+  const existing=await sbFetch("app_config?chave=eq.landing_pdfs&select=chave");
+  if(existing&&existing.length){
+    await sbFetch("app_config?chave=eq.landing_pdfs",{method:"PATCH",body:{valor:_flpList}});
+  } else {
+    await sbFetch("app_config",{method:"POST",body:{chave:"landing_pdfs",valor:_flpList}});
+  }
+}
+function _flpRender(){
+  const c=document.getElementById("flp-lista");
+  if(!c) return;
+  if(!_flpList.length){c.innerHTML='<p style="color:var(--dl);font-size:13px">Nenhum PDF cadastrado.</p>';return;}
+  c.innerHTML=_flpList.map((p,i)=>`
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:8px 10px;background:#faf9f6;border:1px solid var(--br);border-radius:8px">
+      <span style="font-size:18px">📄</span>
+      <span style="flex:1;font-size:13px;color:var(--dm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(p.url||'').replace(/"/g,'&quot;')}">${p.name||p.url}</span>
+      <button onclick="flpMove(${i},-1)" ${i===0?"disabled":""} style="padding:3px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff">↑</button>
+      <button onclick="flpMove(${i},1)" ${i===_flpList.length-1?"disabled":""} style="padding:3px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff">↓</button>
+      <button onclick="flpRemove(${i})" style="padding:3px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff;color:#e74c3c">✕</button>
+    </div>`).join("");
+}
+async function flpRemove(i){
+  _flpList.splice(i,1);
+  _flpRender();
+  await _flpSave();
+  document.getElementById("flp-upload-status").textContent="✓ Lista atualizada";
+  setTimeout(()=>document.getElementById("flp-upload-status").textContent="",2500);
+}
+async function flpMove(i,dir){
+  const j=i+dir;
+  if(j<0||j>=_flpList.length) return;
+  [_flpList[i],_flpList[j]]=[_flpList[j],_flpList[i]];
+  _flpRender();
+  await _flpSave();
+}
+async function flpUpload(){
+  const inp=document.getElementById("flp-file-input");
+  const file=inp&&inp.files&&inp.files[0];
+  if(!file){return;}
+  const st=document.getElementById("flp-upload-status");
+  st.textContent="⏳ Enviando…";
+  try{
+    const fd=new FormData();
+    fd.append("file",file);
+    fd.append("name",file.name);
+    const res=await fetch(SB_URL+"/functions/v1/upload-landing-pdf",{
+      method:"POST",
+      headers:{"Authorization":"Bearer "+SB_KEY},
+      body:fd
+    });
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error||"Erro desconhecido");
+    _flpList.push({url:data.url,name:data.name||file.name});
+    await _flpSave();
+    _flpRender();
+    st.textContent="✓ "+file.name+" enviado!";
+    setTimeout(()=>st.textContent="",4000);
+  }catch(e){
+    st.textContent="❌ Erro: "+e.message;
+  }
+  inp.value="";
 }
 
 async function updBadge() {
