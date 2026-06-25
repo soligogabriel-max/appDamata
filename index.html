@@ -340,7 +340,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25n</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25o</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -764,14 +764,20 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <!-- EXTRATO C6 -->
     <div id="p-extrato" class="panel">
       <div class="uwrap" style="max-width:1100px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:10px;">
           <div class="sec-t" style="margin-bottom:0;">Extrato C6</div>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <input type="month" class="inp inp-inline" id="ext-fil-mes" onchange="renderExtrato()" style="width:150px;margin-bottom:0;"/>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <button class="btn-a" onclick="openImport()">⬆ Extrato C6</button>
             <button class="btn-a" style="background:#7c3aed;" onclick="openImportCartao()">💳 Fatura Cartão</button>
             <button class="btn-cancel" style="font-size:12px;padding:5px 12px;" onclick="openDuplicados('extrato')">🔍 Duplicados</button>
           </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+          <input type="month" class="inp inp-inline" id="ext-fil-mes" onchange="_extMesChange()" style="width:150px;margin-bottom:0;" title="Filtrar por mês"/>
+          <span style="color:var(--dm);font-size:12px;">ou período:</span>
+          <input type="date" class="inp inp-inline" id="ext-fil-de" onchange="_extRangeChange()" style="width:145px;margin-bottom:0;" placeholder="De"/>
+          <input type="date" class="inp inp-inline" id="ext-fil-ate" onchange="_extRangeChange()" style="width:145px;margin-bottom:0;" placeholder="Até"/>
+          <input type="text" class="inp inp-inline" id="ext-fil-desc" oninput="_extApplyDescFilter()" style="width:200px;margin-bottom:0;" placeholder="🔍 Descrição..."/>
         </div>
         <div id="ext-totais" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;"></div>
         <div id="ext-bulk-bar" style="display:none;align-items:center;gap:10px;padding:8px 12px;background:var(--al);border:1.5px solid var(--am);border-radius:10px;margin-bottom:8px;">
@@ -3346,44 +3352,99 @@ async function renderFluxoReal(){
 // ══════════════════════════════════════════
 // EXTRATO C6
 // ══════════════════════════════════════════
+let _extAllRows=[];
+
+function _extMesChange(){
+  const de=document.getElementById("ext-fil-de");
+  const ate=document.getElementById("ext-fil-ate");
+  if(de)de.value="";
+  if(ate)ate.value="";
+  renderExtrato();
+}
+function _extRangeChange(){
+  const mesEl=document.getElementById("ext-fil-mes");
+  if(mesEl)mesEl.value="";
+  renderExtrato();
+}
+function _extApplyDescFilter(){
+  const desc=(document.getElementById("ext-fil-desc")||{}).value||"";
+  const term=desc.trim().toLowerCase();
+  const wr=document.getElementById("ext-list");
+  if(!wr)return;
+  if(!term){
+    _extRenderTable(_extAllRows);
+    return;
+  }
+  const filtered=_extAllRows.filter(r=>(r.titulo||r.descricao||"").toLowerCase().includes(term));
+  _extRenderTable(filtered,true);
+}
+function _extRenderTable(rows,filtered){
+  const wr=document.getElementById("ext-list");
+  const totWr=document.getElementById("ext-totais");
+  if(!rows.length){
+    wr.innerHTML='<div class="empty"><div class="eicon">🏦</div>'+(filtered?"Nenhum resultado para esse filtro.":"Nenhum lançamento neste período.")+'</div>';
+    return;
+  }
+  const totalEnt=rows.reduce((a,r)=>a+(r.entrada||0),0);
+  const totalSai=rows.reduce((a,r)=>a+(r.saida||0),0);
+  const saldoFinal=rows[rows.length-1].saldo_do_dia;
+  if(totWr)totWr.innerHTML=`
+    <div class="tot-card"><div class="tot-lbl">Entradas</div><div class="tot-val green">${fmt(totalEnt)}</div></div>
+    <div class="tot-card"><div class="tot-lbl">Saídas</div><div class="tot-val red">${fmt(totalSai)}</div></div>
+    <div class="tot-card"><div class="tot-lbl">Saldo Final</div><div class="tot-val ${saldoFinal>=0?"blue":"red"}">${fmt(saldoFinal)}</div></div>
+    <div class="tot-card"><div class="tot-lbl">Lançamentos</div><div class="tot-val">${rows.length}</div></div>`;
+  wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
+    <thead><tr><th style="width:32px;"><input type="checkbox" id="ext-chk-all" onchange="_extToggleAll(this)" style="cursor:pointer;"/></th><th>Data</th><th>Descrição</th><th style="color:#2A6644;">Entrada</th><th style="color:var(--er);">Saída</th><th>Saldo do Dia</th><th>Título Receber</th><th>Título Pagar</th><th></th></tr></thead>
+    <tbody>${rows.map(r=>{const rj=_esc(JSON.stringify(r));return`<tr>
+      <td><input type="checkbox" class="ext-chk" data-id="${_esc(r.id_extrato_c6)}" onchange="_extChkChange()" style="cursor:pointer;"/></td>
+      <td style="white-space:nowrap;">${fmtDate(r.data_lancamento)}</td>
+      <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.titulo||r.descricao||"")}">${r.titulo||r.descricao||"—"}</td>
+      <td style="font-weight:${r.entrada>0?700:400};color:${r.entrada>0?"#2A6644":"var(--dl)"};">${r.entrada>0?fmt(r.entrada):"—"}</td>
+      <td style="font-weight:${r.saida>0?700:400};color:${r.saida>0?"var(--er)":"var(--dl)"};">${r.saida>0?fmt(r.saida):"—"}</td>
+      <td style="color:var(--dm);">${fmt(r.saldo_do_dia)}</td>
+      <td style="color:var(--dl);font-size:11px;">${r.titulo_a_receber||"—"}</td>
+      <td style="color:var(--dl);font-size:11px;">${r.titulo_a_pagar||"—"}</td>
+      <td><div class="row-acts"><button class="act-btn" title="Associar título" onclick='openCrud("extrato_bancario",JSON.parse(this.dataset.r),renderExtrato)' data-r="${rj}">🔗</button></div></td>
+    </tr>`}).join("")}</tbody>
+  </table></div>`;
+}
+
 async function renderExtrato(){
   const wr=document.getElementById("ext-list"); wr.innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   const totWr=document.getElementById("ext-totais"); totWr.innerHTML="";
   const mesEl=document.getElementById("ext-fil-mes");
-  if(!mesEl.value){ const n=new Date(); mesEl.value=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0"); }
-  const mes=mesEl.value;
-  const [y,m]=mes.split("-");
-  const prox=m==="12"?(parseInt(y)+1)+"-01":(y+"-"+String(parseInt(m)+1).padStart(2,"0"));
+  const deEl=document.getElementById("ext-fil-de");
+  const ateEl=document.getElementById("ext-fil-ate");
+  const descEl=document.getElementById("ext-fil-desc");
+
+  let dateFilter="";
+  const deVal=deEl?deEl.value:"";
+  const ateVal=ateEl?ateEl.value:"";
+
+  if(deVal||ateVal){
+    // Período específico
+    if(deVal) dateFilter+="&data_lancamento=gte."+deVal;
+    if(ateVal) dateFilter+="&data_lancamento=lte."+ateVal;
+    if(!deVal&&ateVal&&mesEl) mesEl.value="";
+  } else {
+    // Mês
+    if(!mesEl.value){ const n=new Date(); mesEl.value=n.getFullYear()+"-"+String(n.getMonth()+1).padStart(2,"0"); }
+    const mes=mesEl.value;
+    const [y,m]=mes.split("-");
+    const prox=m==="12"?(parseInt(y)+1)+"-01":(y+"-"+String(parseInt(m)+1).padStart(2,"0"));
+    dateFilter="&data_lancamento=gte."+y+"-"+m+"-01&data_lancamento=lt."+prox+"-01";
+  }
+
   try {
     const rawRows=await dbGet("extrato_bancario",
-      "data_lancamento=gte."+y+"-"+m+"-01&data_lancamento=lt."+prox+"-01&order=data_lancamento.asc,id_extrato_c6.asc&limit=2000"
+      "order=data_lancamento.asc,id_extrato_c6.asc&limit=5000"+dateFilter
     );
-    // Deduplica por id_extrato_c6 (sync pode ter rodado mais de uma vez)
     const seen=new Set();
-    const rows=rawRows.filter(r=>{ if(seen.has(r.id_extrato_c6)){return false;} seen.add(r.id_extrato_c6); return true; });
-    const totalEnt=rows.reduce((a,r)=>a+(r.entrada||0),0);
-    const totalSai=rows.reduce((a,r)=>a+(r.saida||0),0);
-    const saldoFinal=rows.length?rows[rows.length-1].saldo_do_dia:0;
-    totWr.innerHTML=`
-      <div class="tot-card"><div class="tot-lbl">Entradas</div><div class="tot-val green">${fmt(totalEnt)}</div></div>
-      <div class="tot-card"><div class="tot-lbl">Saídas</div><div class="tot-val red">${fmt(totalSai)}</div></div>
-      <div class="tot-card"><div class="tot-lbl">Saldo Final</div><div class="tot-val ${saldoFinal>=0?"blue":"red"}">${fmt(saldoFinal)}</div></div>
-      <div class="tot-card"><div class="tot-lbl">Lançamentos</div><div class="tot-val">${rows.length}</div></div>`;
-    if(!rows.length){ wr.innerHTML='<div class="empty"><div class="eicon">🏦</div>Nenhum lançamento neste mês.</div>'; return; }
-    wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
-      <thead><tr><th style="width:32px;"><input type="checkbox" id="ext-chk-all" onchange="_extToggleAll(this)" style="cursor:pointer;"/></th><th>Data</th><th>Descrição</th><th style="color:#2A6644;">Entrada</th><th style="color:var(--er);">Saída</th><th>Saldo do Dia</th><th>Título Receber</th><th>Título Pagar</th><th></th></tr></thead>
-      <tbody>${rows.map(r=>{const rj=_esc(JSON.stringify(r));return`<tr>
-        <td><input type="checkbox" class="ext-chk" data-id="${_esc(r.id_extrato_c6)}" onchange="_extChkChange()" style="cursor:pointer;"/></td>
-        <td style="white-space:nowrap;">${fmtDate(r.data_lancamento)}</td>
-        <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.titulo||r.descricao||"")}">${r.titulo||r.descricao||"—"}</td>
-        <td style="font-weight:${r.entrada>0?700:400};color:${r.entrada>0?"#2A6644":"var(--dl)"};">${r.entrada>0?fmt(r.entrada):"—"}</td>
-        <td style="font-weight:${r.saida>0?700:400};color:${r.saida>0?"var(--er)":"var(--dl)"};">${r.saida>0?fmt(r.saida):"—"}</td>
-        <td style="color:var(--dm);">${fmt(r.saldo_do_dia)}</td>
-        <td style="color:var(--dl);font-size:11px;">${r.titulo_a_receber||"—"}</td>
-        <td style="color:var(--dl);font-size:11px;">${r.titulo_a_pagar||"—"}</td>
-        <td><div class="row-acts"><button class="act-btn" title="Associar título" onclick='openCrud("extrato_bancario",JSON.parse(this.dataset.r),renderExtrato)' data-r="${rj}">🔗</button></div></td>
-      </tr>`}).join("")}</tbody>
-    </table></div>`;
+    _extAllRows=rawRows.filter(r=>{ if(seen.has(r.id_extrato_c6)){return false;} seen.add(r.id_extrato_c6); return true; });
+
+    const desc=(descEl?descEl.value:"").trim().toLowerCase();
+    const rows=desc?_extAllRows.filter(r=>(r.titulo||r.descricao||"").toLowerCase().includes(desc)):_extAllRows;
+    _extRenderTable(rows,!!desc);
   } catch(e){ wr.innerHTML='<div class="empty"><div class="eicon">⚠️</div>Erro: '+e.message+'</div>'; }
 }
 
