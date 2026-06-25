@@ -73,7 +73,9 @@ Deno.serve(async (req) => {
   const doc = auteData?.data?.document;
   if (!doc) return json({ error: "Documento não encontrado no Autentique." }, 404);
 
-  const signatures: any[] = doc.signatures || [];
+  const allSignatures: any[] = doc.signatures || [];
+  // ignora signatários sem nome (entradas internas do Autentique não exibidas na UI)
+  const signatures = allSignatures.filter((s: any) => s.name);
   const total    = signatures.length;
   const assinados = signatures.filter((s: any) => s.signed?.created_at).length;
   const todosAssinaram = total > 0 && assinados === total;
