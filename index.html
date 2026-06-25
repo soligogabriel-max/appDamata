@@ -196,6 +196,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 .imp-chk{width:16px;height:16px;cursor:pointer;}
 .imp-badge-match{background:#e8f5ee;color:#2A6644;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:600;}
 .imp-badge-no{background:#f5f5f5;color:var(--dm);border-radius:6px;padding:2px 7px;font-size:11px;}
+.imp-badge-hist{background:#e8f0fd;color:#1a4db5;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:600;}
 .imp-badge-new{background:#fff8e1;color:#7a5f00;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:600;}
 .mtitle{font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:4px;}
 .msub{font-size:12px;color:var(--dl);margin-bottom:16px;}
@@ -335,7 +336,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25k</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25l</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3378,7 +3379,7 @@ async function renderExtrato(){
 // IMPORTAÇÃO DE EXTRATO C6
 // ══════════════════════════════════════════
 let _impRows = [], _impEntradas = [], _impSaidas = [], _impStep = 0;
-let _impNaturezas = [], _impFornecList = [];
+let _impNaturezas = [], _impFornecList = [], _impNatByFornec = {};
 const C6_ZIP_PASS = "356027";
 
 function _djb2(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h)^s.charCodeAt(i);return(h>>>0).toString(36);}
@@ -3615,40 +3616,50 @@ async function _renderImportStep2(){
     return;
   }
 
-  // Load fornecedores + naturezas (sempre recarrega para evitar cache desatualizado)
+  // Load fornecedores + naturezas
   _allFornecedores=await dbGet("fornecedores","order=nome.asc&limit=500");
   _impFornecList=_allFornecedores||[];
   const natsImp=await dbGet("naturezas","select=cod,descricao&order=cod.asc&limit=500");
   _impNaturezas=natsImp||[];
 
-  // Load natureza history per fornecedor (most common)
-  const pagHistory=await dbGetAll("contas_a_pagar","select=fornecedor_cod,natureza&natureza=not.is.null&fornecedor_cod=not.is.null");
-  const natByFornec={};
+  // Load history most-recent-first: match by obs (título) → {fornecedor, natureza}
+  const pagHistory=await dbGetAll("contas_a_pagar","select=obs,fornecedor_cod,natureza&obs=not.is.null&natureza=not.is.null&fornecedor_cod=not.is.null&order=created_at.desc");
+  const histByTitle={};
+  _impNatByFornec={};
   pagHistory.forEach(r=>{
-    if(!natByFornec[r.fornecedor_cod])natByFornec[r.fornecedor_cod]={};
-    natByFornec[r.fornecedor_cod][r.natureza]=(natByFornec[r.fornecedor_cod][r.natureza]||0)+1;
+    const key=_normalize(r.obs||"");
+    if(key&&!histByTitle[key])histByTitle[key]={fornecedor_cod:r.fornecedor_cod,natureza:r.natureza};
+    if(r.fornecedor_cod&&!_impNatByFornec[r.fornecedor_cod])_impNatByFornec[r.fornecedor_cod]=r.natureza;
   });
-  function bestNat(fCod){
-    if(!fCod||!natByFornec[fCod])return"";
-    return Object.entries(natByFornec[fCod]).sort((a,b)=>b[1]-a[1])[0]?.[0]||"";
-  }
 
-  // Suggest fornecedor for each saída
-  _impSaidas=_impSaidas.map(r=>({...r,_sugFornec:_suggestFornecedor(r.titulo,_impFornecList)}));
+  // Suggest: history match first, text match fallback
+  _impSaidas=_impSaidas.map(r=>{
+    const key=_normalize(r.titulo||r.descricao||"");
+    const hist=key?histByTitle[key]||null:null;
+    if(hist){return{...r,_sugSource:"hist",_sugFornecCod:hist.fornecedor_cod,_sugNat:hist.natureza};}
+    const sf=_suggestFornecedor(r.titulo,_impFornecList);
+    const sugNat=sf?(_impNatByFornec[sf.codigo]||""):"";
+    return{...r,_sugSource:sf?"nome":null,_sugFornecCod:sf?sf.codigo:null,_sugNat:sugNat};
+  });
 
   const fornecOpts=`<option value="">— Sem fornecedor —</option>`+_impFornecList.map(f=>`<option value="${_esc(f.codigo)}">${_esc(f.nome)}</option>`).join("");
   const natOpts=`<option value="">— Sem natureza —</option>`+_impNaturezas.map(n=>`<option value="${_esc(n.cod)}">${_esc(n.descricao)}</option>`).join("");
 
   const rows=_impSaidas.map((r,i)=>{
-    const sf=r._sugFornec;
-    const sugNat=sf?bestNat(sf.codigo):"";
-    return`<tr id="imp-sai-row-${i}" class="${""}">
+    const fCod=r._sugFornecCod||"";
+    const nat=r._sugNat||"";
+    const badge=r._sugSource==="hist"
+      ?`<span class="imp-badge-hist">📋 Histórico</span>`
+      :r._sugSource==="nome"
+      ?`<span class="imp-badge-match">✓ Nome</span>`
+      :`<span class="imp-badge-no">Não identificado</span>`;
+    return`<tr id="imp-sai-row-${i}" class="">
       <td style="white-space:nowrap;font-size:12px;">${fmtDate(r.data_lancamento)}</td>
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.titulo)}">${_esc(r.titulo||r.descricao||"—")}</td>
       <td style="color:var(--er);font-weight:700;white-space:nowrap;">${fmt(r.saida)}</td>
-      <td>${sf?`<span class="imp-badge-match">✓ ${_esc(sf.nome)}</span>`:`<span class="imp-badge-no">Não identificado</span>`}</td>
-      <td><select class="imp-sel" id="imp-sai-forn-${i}" onchange="_impSaiChange(${i})">${fornecOpts.replace(`value="${_esc(sf?sf.codigo:"")}"`,`value="${_esc(sf?sf.codigo:"")}" selected`)}</select></td>
-      <td><select class="imp-sel" id="imp-sai-nat-${i}">${natOpts.replace(`value="${_esc(sugNat)}"`,`value="${_esc(sugNat)}" selected`)}</select></td>
+      <td>${badge}</td>
+      <td><select class="imp-sel" id="imp-sai-forn-${i}" onchange="_impSaiFornChange(${i})">${fornecOpts.replace(`value="${_esc(fCod)}"`,`value="${_esc(fCod)}" selected`)}</select></td>
+      <td><select class="imp-sel" id="imp-sai-nat-${i}">${natOpts.replace(`value="${_esc(nat)}"`,`value="${_esc(nat)}" selected`)}</select></td>
       <td style="text-align:center;"><input type="checkbox" class="imp-chk" id="imp-sai-chk-${i}" checked title="Criar A Pagar" onchange="_impSaiChkChange(${i})"/></td>
     </tr>`;
   }).join("");
@@ -3662,9 +3673,13 @@ async function _renderImportStep2(){
   document.getElementById("import-acts").innerHTML=`<button class="btn-cancel" onclick="closeImport()">Cancelar</button><button class="btn-confirm" onclick="_renderImportStep3()">Avançar → Confirmar</button>`;
 }
 
-function _impSaiChange(i){
-  const sel=document.getElementById(`imp-sai-forn-${i}`);
-  if(sel)_impSaidas[i]._selFornec=sel.value||null;
+function _impSaiFornChange(i){
+  const fSel=document.getElementById(`imp-sai-forn-${i}`);
+  const nSel=document.getElementById(`imp-sai-nat-${i}`);
+  const fCod=fSel?fSel.value||null:null;
+  if(fSel)_impSaidas[i]._selFornec=fCod;
+  // Auto-fill natureza from history when fornecedor changes and natureza not yet picked
+  if(nSel&&fCod&&!nSel.value&&_impNatByFornec[fCod])nSel.value=_impNatByFornec[fCod];
 }
 function _impSaiChkChange(i){
   const chk=document.getElementById(`imp-sai-chk-${i}`);
