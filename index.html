@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25c</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25d</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -2453,7 +2453,7 @@ function _gcalRenderEvList() {
   const MESES_ABR=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
   el.innerHTML = _gcalFutEvts.map((ev,i) => {
     const d = new Date(ev.data_evento+"T12:00:00");
-    const label = `${d.getDate()} ${MESES_ABR[d.getMonth()]} ${d.getFullYear()} — ${ev.nome_evento||ev.cod}`;
+    const label = `${d.getDate()} ${MESES_ABR[d.getMonth()]} ${d.getFullYear()} — ${ev.nome_evento||ev.cod} <span style="color:var(--dl);font-size:11px;">[${ev.cod}]</span>`;
     const gcIcon = ev.google_cal_id ? ' <span style="color:#16a34a;font-size:10px;">✓ no GCal</span>' : '';
     return `<label style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #f1f5f9;cursor:pointer;font-size:13px;color:var(--dk);">
       <input type="checkbox" data-gcal-idx="${i}" style="accent-color:var(--pr);width:16px;height:16px;cursor:pointer;">
