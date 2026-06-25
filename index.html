@@ -77,23 +77,24 @@
     #media-section .sec-label{
       font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#E8A52A;
     }
-    /* carrossel placeholder */
-    #carousel-ph{
-      width:100%;max-width:700px;height:400px;
-      background:#1a252d;border-radius:12px;
-      display:flex;align-items:center;justify-content:center;
-      color:rgba(255,255,255,.3);font-size:13px;letter-spacing:1px;
-    }
-    /* vídeos */
-    #videos-ph{
+    #ll-media-grid{
       width:100%;max-width:900px;
-      display:grid;grid-template-columns:repeat(3,1fr);gap:16px;
+      display:grid;grid-template-columns:1fr 1fr;gap:12px;
     }
-    .vid-ph{
-      aspect-ratio:16/9;background:#1a252d;border-radius:8px;
-      display:flex;align-items:center;justify-content:center;
-      color:rgba(255,255,255,.25);font-size:12px;
+    #ll-carousel-cell{display:flex;flex-direction:column;gap:8px;}
+    #ll-carousel-wrap{
+      width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;
+      position:relative;box-shadow:0 12px 40px rgba(0,0,0,.2);background:rgba(0,0,0,.15);
     }
+    .ll-slide{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1s;}
+    .ll-slide.on{opacity:1;}
+    #ll-dots{display:flex;gap:6px;justify-content:center;}
+    .ll-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.4);cursor:pointer;transition:background .3s;}
+    .ll-dot.on{background:#fff;}
+    .ll-vid{width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.2);background:rgba(0,0,0,.15);}
+    .ll-vid iframe{width:100%;height:100%;border:none;display:block;}
+    .ll-vid-empty{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.45);font-size:12px;}
+    @media(max-width:640px){#ll-media-grid{grid-template-columns:1fr;}}
 
     /* ── FOOTER ──────────────────────────────────── */
     #footer{
@@ -151,11 +152,16 @@
 <!-- ④ CARROSSEL + VÍDEOS -->
 <section id="media-section">
   <p class="sec-label">Fotos & Vídeos</p>
-  <div id="carousel-ph">[ carrossel de fotos ]</div>
-  <div id="videos-ph">
-    <div class="vid-ph">[ vídeo 1 ]</div>
-    <div class="vid-ph">[ vídeo 2 ]</div>
-    <div class="vid-ph">[ vídeo 3 ]</div>
+  <div id="ll-media-grid">
+    <div id="ll-carousel-cell">
+      <div id="ll-carousel-wrap">
+        <div id="ll-no-photo" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.4);font-size:13px">Carregando fotos…</div>
+      </div>
+      <div id="ll-dots"></div>
+    </div>
+    <div class="ll-vid" id="ll-vid-0"></div>
+    <div class="ll-vid" id="ll-vid-1"></div>
+    <div class="ll-vid" id="ll-vid-2"></div>
   </div>
 </section>
 
@@ -225,9 +231,90 @@ async function renderPdf(pdfEntry, container) {
   }
 }
 
+let _llTimer = null, _llIdx = 0;
+
+async function loadLandingCarousel() {
+  let urls = [];
+  try {
+    const res = await fetch(SB_URL + "/rest/v1/app_config?chave=eq.fotos_landing&select=valor", {
+      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY }
+    });
+    const data = await res.json();
+    const arr = (data && data[0] && Array.isArray(data[0].valor)) ? data[0].valor.filter(u => u && u.trim()) : [];
+    if (arr.length) urls = arr.map(u => /^https?:\/\//i.test(u) ? u : ('./' + u.replace(/^\.?\//,'')));
+  } catch(_) {}
+
+  const wrap = document.getElementById("ll-carousel-wrap");
+  const dots = document.getElementById("ll-dots");
+  const noPhoto = document.getElementById("ll-no-photo");
+  if (noPhoto) noPhoto.remove();
+  if (!urls.length) {
+    wrap.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.3);font-size:13px">Fotos em breve</div>';
+    return;
+  }
+  wrap.innerHTML = "";
+  dots.innerHTML = "";
+  urls.forEach((u, i) => {
+    const img = document.createElement("img");
+    img.src = u; img.className = "ll-slide" + (i === 0 ? " on" : "");
+    wrap.appendChild(img);
+    const d = document.createElement("div");
+    d.className = "ll-dot" + (i === 0 ? " on" : ""); d.onclick = () => llGoto(i);
+    dots.appendChild(d);
+  });
+  if (urls.length > 1) {
+    clearInterval(_llTimer);
+    _llTimer = setInterval(() => llGoto((_llIdx + 1) % urls.length), 4000);
+  }
+}
+
+function llGoto(i) {
+  const slides = document.querySelectorAll(".ll-slide");
+  const dotEls = document.querySelectorAll(".ll-dot");
+  if (!slides.length) return;
+  slides[_llIdx].classList.remove("on");
+  dotEls[_llIdx]?.classList.remove("on");
+  _llIdx = i;
+  slides[_llIdx].classList.add("on");
+  dotEls[_llIdx]?.classList.add("on");
+}
+
+function _ytId(url) {
+  if (!url) return null;
+  const m = String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([\w-]{11})/);
+  if (m) return m[1];
+  const m2 = String(url).match(/[?&]v=([\w-]{11})/);
+  return m2 ? m2[1] : null;
+}
+
+async function loadLandingVideos() {
+  let urls = [];
+  try {
+    const res = await fetch(SB_URL + "/rest/v1/app_config?chave=eq.videos_landing&select=valor", {
+      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY }
+    });
+    const data = await res.json();
+    if (data && data[0] && Array.isArray(data[0].valor)) urls = data[0].valor;
+  } catch(_) {}
+  for (let i = 0; i < 3; i++) {
+    const cell = document.getElementById("ll-vid-" + i);
+    if (!cell) continue;
+    const id = _ytId(urls[i]);
+    if (id) {
+      cell.innerHTML = `<iframe src="https://www.youtube.com/embed/${id}" title="Vídeo Fazenda Damata" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    } else {
+      cell.innerHTML = `<div class="ll-vid-empty">Vídeo em breve</div>`;
+    }
+  }
+}
+
 async function init() {
   const infoArea = document.getElementById("info-area");
   const loading = document.getElementById("pdf-loading");
+
+  // Carrossel e vídeos carregam em paralelo
+  loadLandingCarousel();
+  loadLandingVideos();
 
   const pdfList = await loadPdfList();
 
