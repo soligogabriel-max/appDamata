@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25g</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25h</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -5419,9 +5419,32 @@ function _renderContratosTabela(rows) {
           ${adm?`<button onclick="_contratoEditar('${r.cod}')" title="Editar evento" style="padding:4px 8px;border:1px solid #3b82f6;border-radius:6px;background:#fff;color:#3b82f6;font-size:12px;cursor:pointer;">✏️</button>`:""}
           ${adm?`<button onclick="downloadContract('${r.cod}')" title="Baixar contrato HTML" style="padding:4px 8px;border:1px solid var(--a);border-radius:6px;background:#fff;color:var(--a);font-size:12px;cursor:pointer;">📄</button>`:""}
           ${adm?`<button onclick="_contratoApagar('${r.cod}')" title="Apagar evento" style="padding:4px 8px;border:1px solid var(--er);border-radius:6px;background:#fff;color:var(--er);font-size:12px;cursor:pointer;">🗑</button>`:""}
+          ${adm&&r.assinatura_doc_id&&!r.contrato_ok?`<button onclick="_verificarAutentique('${r.cod}',this)" title="Verificar assinatura no Autentique" style="padding:4px 8px;border:1px solid #7c3aed;border-radius:6px;background:#fff;color:#7c3aed;font-size:12px;cursor:pointer;">🔄</button>`:""}
         </td>
       </tr>`).join("")}
     </tbody></table>`;
+}
+
+async function _verificarAutentique(cod, btn) {
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = "⏳";
+  try {
+    const res = await fetch(SB_URL + "/functions/v1/check-autentique-status", {
+      method: "POST",
+      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ cod }),
+    });
+    const data = await res.json();
+    if (data.error) { toast("❌ " + data.error); btn.disabled=false; btn.textContent=orig; return; }
+    if (data.todosAssinaram) {
+      toast("✅ Contrato " + cod + " assinado por todos! Status atualizado.");
+      renderContratos();
+    } else {
+      const detalhes = (data.signatures||[]).map(s => s.name + (s.signed ? " ✅" : " ⏳")).join(", ");
+      toast("🔄 " + data.assinados + "/" + data.total + " assinaturas: " + detalhes);
+      btn.disabled=false; btn.textContent=orig;
+    }
+  } catch(e) { toast("❌ Erro: " + e.message); btn.disabled=false; btn.textContent=orig; }
 }
 
 async function _contratoGetEv(cod) {
@@ -5466,7 +5489,7 @@ async function renderContratos() {
   if (!el) return;
   el.innerHTML = `<div style="color:var(--dl);padding:20px;text-align:center;font-size:13px;">Carregando…</div>`;
   try {
-    _contratosRows = await dbGet("agenda", "select=cod,nome_evento,data_evento,assinatura_status,contrato_ok,assinatura_pdf_url&order=cod.desc&limit=200");
+    _contratosRows = await dbGet("agenda", "select=cod,nome_evento,data_evento,assinatura_status,contrato_ok,assinatura_pdf_url,assinatura_doc_id&order=cod.desc&limit=200");
     if(_userEventIds) _contratosRows = _contratosRows.filter(r=>_userEventIds.includes(r.cod));
     const q = (document.getElementById("contratos-filtro")?.value || "").trim();
     if (q) filtrarContratos(); else _renderContratosTabela(_contratosRows);
