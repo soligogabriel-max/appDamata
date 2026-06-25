@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
     description: descParts.join(" · ") || undefined,
     location: local_evento || "Fazenda Damata, Campinas - SP",
     start: { date: data_evento },
-    end: { date: addOneDay(data_fim || data_evento) },
+    end: { date: addOneDay((data_fim && data_fim >= data_evento) ? data_fim : data_evento) },
   };
 
   let gcalId = google_cal_id;
