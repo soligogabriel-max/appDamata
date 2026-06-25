@@ -1,10 +1,8 @@
 // Supabase Edge Function: upload-landing-pdf
-// Receives multipart/form-data with field "file" (PDF) + optional "name".
-// Uploads to Storage bucket "landing-pdfs" and returns public URL.
-//
-// Secrets required:
-//   SUPABASE_URL            = project URL (auto-injected)
-//   SUPABASE_SERVICE_ROLE_KEY = service role key (set in Edge Function secrets)
+// Recebe multipart/form-data com campo "file" (PDF).
+// Usa service role key (auto-injetada) para salvar no bucket landing-pdfs.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -23,12 +21,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-  if (!supabaseUrl || !serviceKey) {
-    return json({ error: "SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY são obrigatórios." }, 500);
-  }
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
 
   let formData: FormData;
   try {
@@ -40,31 +36,24 @@ Deno.serve(async (req) => {
   const file = formData.get("file");
   if (!(file instanceof File)) return json({ error: "Campo 'file' ausente ou inválido." }, 400);
 
-  const customName = (formData.get("name") as string | null)?.trim();
-  const safeName   = customName || file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const timestamp  = Date.now();
-  const objectPath = `${timestamp}_${safeName}`;
-
+  const safeName  = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const objectPath = `${Date.now()}_${safeName}`;
   const bytes = await file.arrayBuffer();
 
-  const storageRes = await fetch(
-    `${supabaseUrl}/storage/v1/object/landing-pdfs/${objectPath}`,
-    {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${serviceKey}`,
-        "Content-Type": file.type || "application/pdf",
-        "x-upsert": "true",
-      },
-      body: bytes,
-    }
-  );
+  const { error } = await supabase.storage
+    .from("landing-pdfs")
+    .upload(objectPath, bytes, {
+      contentType: file.type || "application/pdf",
+      upsert: true,
+    });
 
-  if (!storageRes.ok) {
-    const err = await storageRes.text();
-    return json({ error: "Falha ao salvar no Storage.", detail: err }, 502);
+  if (error) {
+    return json({ error: "Falha ao salvar no Storage.", detail: error.message }, 502);
   }
 
-  const publicUrl = `${supabaseUrl}/storage/v1/object/public/landing-pdfs/${objectPath}`;
-  return json({ ok: true, url: publicUrl, name: safeName });
+  const { data: { publicUrl } } = supabase.storage
+    .from("landing-pdfs")
+    .getPublicUrl(objectPath);
+
+  return json({ ok: true, url: publicUrl, name: file.name });
 });
