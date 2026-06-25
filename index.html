@@ -340,7 +340,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25p</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25q</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -542,6 +542,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div class="tgrp" id="grp-cadastros">
       <button class="tgrp-btn" onclick="toggleGrp('grp-cadastros')">📦 Cadastros</button>
       <div class="tgrp-drop">
+        <button class="tab" onclick="setTab('assessorias');closeGrps()" id="t-assessorias">🎗 Assessorias</button>
         <button class="tab" onclick="setTab('fornec');closeGrps()" id="t-fornec">🏢 Fornecedores</button>
         <button class="tab" onclick="setTab('inventario');closeGrps()" id="t-inventario">📦 Inventário</button>
         <button class="tab" onclick="setTab('naturezas');closeGrps()" id="t-naturezas">🏷 Naturezas</button>
@@ -800,6 +801,20 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <input type="text" class="inp inp-inline" id="fornec-busca" placeholder="Buscar por nome..." oninput="renderFornecedores()" style="width:220px;margin-bottom:0;"/>
         </div>
         <div id="fornec-list"></div>
+      </div>
+    </div>
+
+    <!-- ASSESSORIAS -->
+    <div id="p-assessorias" class="panel">
+      <div class="uwrap" style="max-width:800px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="sec-t" style="margin-bottom:0;">Assessorias</div>
+            <button class="btn-a" style="font-size:12px;" onclick="openCrud('assessorias',null,()=>{_allAssessorias=null;_lkCache['assessorias']=null;renderAssessorias()})">+ Nova</button>
+          </div>
+          <input type="text" class="inp inp-inline" id="ass-busca" placeholder="Buscar por nome..." oninput="renderAssessorias()" style="width:220px;margin-bottom:0;"/>
+        </div>
+        <div id="ass-list"></div>
       </div>
     </div>
 
@@ -1890,7 +1905,7 @@ async function openApp(u) {
 const TAB_GRP={
   contratos:"grp-eventos", pedidos:"grp-eventos", vt:"grp-eventos", orcamentos:"grp-eventos",
   receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro",
-  fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros", naturezas:"grp-cadastros",
+  fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros", naturezas:"grp-cadastros", assessorias:"grp-cadastros",
   relatorio:"grp-admin", pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin"
 };
 function toggleGrp(id){
@@ -1918,7 +1933,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas"};
+  const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(cfilter);
   if(t==="receber") renderReceber();
@@ -1926,6 +1941,7 @@ function setTab(t) {
   if(t==="fluxo") renderFluxo();
   if(t==="extrato") renderExtrato();
   if(t==="fornec") renderFornecedores();
+  if(t==="assessorias") renderAssessorias();
   if(t==="inventario") renderInventario();
   if(t==="fluxoreal") renderFluxoReal();
   if(t==="relatorio") renderRelatorio();
@@ -4121,6 +4137,7 @@ async function _iccConfirmDelSaida(){
 // ══════════════════════════════════════════
 let _allFornecedores = null;
 let _allNaturezas = null;
+let _allAssessorias = null;
 
 async function renderNaturezas() {
   const wr = document.getElementById("nat-list");
@@ -4142,6 +4159,26 @@ async function renderNaturezas() {
         <td style="font-weight:600;color:var(--dk);">${n.descricao||"—"}</td>
         <td><div class="row-acts">
           <button class="act-btn" title="Editar" onclick='openCrud("naturezas",JSON.parse(this.dataset.r),()=>{_allNaturezas=null;_naturezaMap=null;_lkCache["naturezas"]=null;renderNaturezas()})' data-r="${rj}">✏️</button>
+        </div></td>
+      </tr>`}).join("")}</tbody>
+    </table></div>`;
+  } catch(e){ wr.innerHTML='<div class="empty"><div class="eicon">⚠️</div>Erro: '+e.message+'</div>'; }
+}
+
+async function renderAssessorias(){
+  const wr=document.getElementById("ass-list"); wr.innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  try {
+    if(!_allAssessorias) _allAssessorias=await dbGet("assessorias","order=nome.asc&limit=500");
+    const busca=(document.getElementById("ass-busca").value||"").toLowerCase().trim();
+    const lista=busca?_allAssessorias.filter(a=>(a.nome||"").toLowerCase().includes(busca)||(a.cod||"").toLowerCase().includes(busca)):_allAssessorias;
+    if(!lista.length){ wr.innerHTML='<div class="empty"><div class="eicon">🎗</div>Nenhuma assessoria encontrada.</div>'; return; }
+    wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
+      <thead><tr><th>Código</th><th>Nome</th><th></th></tr></thead>
+      <tbody>${lista.map(a=>{const rj=_esc(JSON.stringify(a));return`<tr>
+        <td style="color:var(--dl);font-size:11px;">${a.cod||"—"}</td>
+        <td style="font-weight:600;">${a.nome||"—"}</td>
+        <td><div class="row-acts">
+          <button class="act-btn" title="Editar" onclick='openCrud("assessorias",JSON.parse(this.dataset.r),()=>{_allAssessorias=null;_lkCache["assessorias"]=null;renderAssessorias()})' data-r="${rj}">✏️</button>
         </div></td>
       </tr>`}).join("")}</tbody>
     </table></div>`;
@@ -5943,6 +5980,13 @@ const CRUD_CFG = {
       {n:"status",          l:"Status",          t:"select", opts:["NP","Pago"]},
       {n:"tipo",            l:"Tipo",            t:"text"},
       {n:"obs",             l:"Observação",      t:"text"},
+    ]
+  },
+  assessorias: {
+    title:"Assessoria", pk:"cod",
+    fields:[
+      {n:"cod",  l:"Código", t:"text", req:true},
+      {n:"nome", l:"Nome",   t:"text", req:true},
     ]
   },
   fornecedores: {
