@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25e</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25f</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -598,6 +598,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
             <input type="date" class="inp inp-inline" id="tab-de" onchange="renderAgendaTabela()" style="width:140px;margin-bottom:0;" placeholder="De"/>
             <input type="date" class="inp inp-inline" id="tab-ate" onchange="renderAgendaTabela()" style="width:140px;margin-bottom:0;" placeholder="Até"/>
             <button class="btn-cancel" style="font-size:12px;padding:5px 12px;" onclick="limparFiltrosTabela()">Limpar</button>
+            <button style="font-size:12px;padding:5px 14px;background:var(--dk);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;" onclick="exportAgendaFuturaPDF()">📄 Exportar PDF</button>
             <span id="tab-count" style="font-size:12px;color:var(--dl);margin-left:4px;"></span>
           </div>
           <div id="tab-list"></div>
@@ -5540,6 +5541,72 @@ async function renderFuturos() {
 // AGENDA TABELA
 // ══════════════════════════════════════════
 let _agendaTabelaCache = null;
+
+async function exportAgendaFuturaPDF() {
+  const hoje = new Date().toISOString().slice(0,10);
+  let evts = _agendaTabelaCache ? _agendaTabelaCache.filter(e => e.data_evento && e.data_evento >= hoje) : [];
+  if(!evts.length) {
+    const rows = await dbGet("agenda","select=cod,nome_evento,data_evento,data_fim,local_evento,assessoria_cod&data_evento=gte."+hoje+"&order=data_evento.asc&limit=500");
+    evts = rows;
+  } else {
+    evts = evts.filter(e => e.data_evento >= hoje).sort((a,b)=>a.data_evento.localeCompare(b.data_evento));
+  }
+  if(!evts.length) { toast("Nenhum evento futuro encontrado."); return; }
+
+  // monta mapa de assessorias
+  const assMap = Object.assign({}, _assMap||{});
+  if(!Object.keys(assMap).length) {
+    try { const r = await dbGet("assessorias","select=cod,nome&limit=500"); r.forEach(a=>assMap[a.cod]=a.nome); } catch(e){}
+  }
+
+  const MONTHS = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  function fmtDate(s) {
+    if(!s) return "—";
+    const [y,m,d] = s.split("-");
+    return d+"/"+m+"/"+y;
+  }
+  function fmtPeriodo(ev) {
+    if(!ev.data_fim || ev.data_fim === ev.data_evento) return fmtDate(ev.data_evento);
+    return fmtDate(ev.data_evento) + " → " + fmtDate(ev.data_fim);
+  }
+
+  const rows = evts.map(ev => {
+    const ass = ev.assessoria_cod ? (assMap[ev.assessoria_cod] || ev.assessoria_cod) : "—";
+    const local = ev.local_evento || "—";
+    const periodo = fmtPeriodo(ev);
+    return '<tr>'
+      +'<td>'+fmtDate(ev.data_evento)+'</td>'
+      +'<td style="font-weight:600;">'+(ev.nome_evento||ev.cod||"—")+'</td>'
+      +'<td>'+ass+'</td>'
+      +'<td>'+local+'</td>'
+      +'<td style="color:#555;">'+(ev.data_fim && ev.data_fim !== ev.data_evento ? fmtDate(ev.data_fim) : "—")+'</td>'
+      +'</tr>';
+  }).join("");
+
+  const html = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+    +'<title>Eventos Futuros — Fazenda Damata</title>'
+    +'<style>'
+    +'body{font-family:Arial,sans-serif;font-size:12px;color:#222;margin:32px;}'
+    +'h1{font-size:18px;margin-bottom:4px;color:#2E3C44;}'
+    +'p.sub{font-size:11px;color:#666;margin-bottom:20px;}'
+    +'table{width:100%;border-collapse:collapse;}'
+    +'th{background:#2E3C44;color:#fff;padding:8px 10px;text-align:left;font-size:11px;letter-spacing:.5px;}'
+    +'td{padding:7px 10px;border-bottom:1px solid #e5e5e5;vertical-align:top;}'
+    +'tr:nth-child(even) td{background:#f9f9f7;}'
+    +'@media print{body{margin:16px;}}'
+    +'</style></head><body>'
+    +'<h1>📅 Eventos Futuros — Fazenda Damata</h1>'
+    +'<p class="sub">Gerado em '+new Date().toLocaleDateString("pt-BR")+' · '+evts.length+' evento(s)</p>'
+    +'<table><thead><tr><th>Data início</th><th>Evento</th><th>Assessoria</th><th>Local</th><th>Data fim</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody></table>'
+    +'</body></html>';
+
+  const w = window.open("","_blank");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  setTimeout(()=>w.print(), 400);
+}
 
 function limparFiltrosTabela(){
   ["tab-busca","tab-de","tab-ate"].forEach(id=>document.getElementById(id).value="");
