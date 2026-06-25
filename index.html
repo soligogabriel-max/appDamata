@@ -335,7 +335,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -2490,19 +2490,20 @@ async function runGCalSync() {
   prog.style.display = "block";
   prog.style.color = "var(--dm)";
 
-  let ok = 0, errs = 0, lastErr = "";
+  let ok = 0, errs = 0, lastErr = "", lastErrEvt = null;
   for(let i = 0; i < evts.length; i++) {
     prog.textContent = `Sincronizando ${i+1}/${evts.length}…`;
     try {
       await _syncGoogleCal(evts[i]);
       ok++;
-    } catch(e) { errs++; lastErr = e.message; }
+    } catch(e) { errs++; lastErr = e.message; lastErrEvt = evts[i]; }
   }
 
   // Mostra resultado dentro do modal antes de fechar
   if(errs) {
     prog.style.color = "var(--er)";
-    prog.textContent = `❌ ${ok} sincronizado(s), ${errs} com erro. Erro: ${lastErr}`;
+    const evtDebug = lastErrEvt ? ` [cod:${lastErrEvt.cod} data:${lastErrEvt.data_evento} fim:${lastErrEvt.data_fim}]` : "";
+    prog.textContent = `❌ ${ok} sincronizado(s), ${errs} com erro. Erro: ${lastErr}${evtDebug}`;
     btn.disabled = false;
     btn.textContent = "Fechar";
     btn.onclick = closeGCalSync;
