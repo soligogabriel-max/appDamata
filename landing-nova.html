@@ -46,19 +46,16 @@
     .cta-btn.portal{background:rgba(232,165,42,.15);border-color:rgba(232,165,42,.5);color:#E8A52A;}
     .cta-btn.portal:hover{background:#E8A52A;color:#2E3C44;}
 
-    /* ── ÁREA DE INFORMAÇÕES (PDFs) ──────────────── */
+    /* ── ÁREA DE INFORMAÇÕES (PDFs em sequência) ─── */
     #info-area{
       width:100%;background:#fff;
       display:flex;flex-direction:column;align-items:center;
     }
-    /* cada "página" é um bloco sem gap entre si */
+    /* pano contínuo — sem divisórias, sem padding entre blocos */
     .info-page{
       width:100%;max-width:900px;
       padding:60px 72px;
-      border-bottom:1px solid #ede8df;
-      page-break-after:always;
     }
-    .info-page:last-child{border-bottom:none;}
 
     /* placeholder — representa o conteúdo de cada PDF */
     .ph-label{
@@ -164,7 +161,6 @@
 
   <!-- PLACEHOLDER: representando a primeira página do PDF -->
   <div class="info-page">
-    <span class="ph-label">Página 1</span>
     <h2 class="ph-title">Bem-vindos à Fazenda Damata</h2>
     <div class="ph-img">[ imagem do PDF ]</div>
     <p class="ph-body">
@@ -185,7 +181,6 @@
 
   <!-- PLACEHOLDER: segunda página -->
   <div class="info-page">
-    <span class="ph-label">Página 2</span>
     <h2 class="ph-title">Espaços e Estrutura</h2>
     <p class="ph-body">
       Conteúdo da segunda página do PDF — pode incluir tabelas, imagens, descrição dos salões,
@@ -199,7 +194,6 @@
 
   <!-- PLACEHOLDER: terceira página -->
   <div class="info-page">
-    <span class="ph-label">Página 3</span>
     <h2 class="ph-title">Cardápio e Serviços</h2>
     <p class="ph-body">
       Terceira página. Pode conter imagens de pratos, tabelas de preços, informações de parceiros, etc.
