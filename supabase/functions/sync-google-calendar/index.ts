@@ -65,11 +65,12 @@ const SPACES_LABELS: Record<string, string> = {
   fuBal:     "Balneário",
 };
 
-function buildDescription(tipo_evento?: string, status?: string, spaces_json?: string): string {
+function buildDescription(tipo_evento?: string, status?: string, spaces_json?: string, assessoria_nome?: string): string {
   const parts: string[] = [];
 
   if (tipo_evento) parts.push(tipo_evento);
   if (status) parts.push(`Status: ${status}`);
+  if (assessoria_nome) parts.push(`Assessoria: ${assessoria_nome}`);
 
   if (spaces_json) {
     try {
@@ -112,6 +113,7 @@ Deno.serve(async (req) => {
     status?: string;
     spaces_json?: string;
     google_cal_id?: string;
+    assessoria_nome?: string;
   } = {};
 
   try {
@@ -120,7 +122,7 @@ Deno.serve(async (req) => {
     return json({ error: "JSON inválido." }, 400);
   }
 
-  const { action = "upsert", cod, nome_evento, data_evento, data_fim, tipo_evento, local_evento, status, spaces_json, google_cal_id } = body;
+  const { action = "upsert", cod, nome_evento, data_evento, data_fim, tipo_evento, local_evento, status, spaces_json, google_cal_id, assessoria_nome } = body;
 
   if (!data_evento) return json({ error: "data_evento obrigatório." }, 400);
 
@@ -148,7 +150,7 @@ Deno.serve(async (req) => {
 
   const event = {
     summary: title,
-    description: buildDescription(tipo_evento, status, spaces_json) || undefined,
+    description: buildDescription(tipo_evento, status, spaces_json, assessoria_nome) || undefined,
     location: local_evento || "Fazenda Damata, Mogi Mirim - SP",
     start: { date: data_evento },
     end: { date: addOneDay((data_fim && data_fim >= data_evento) ? data_fim : data_evento) },

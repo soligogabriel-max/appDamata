@@ -340,7 +340,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25q</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25r</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -2565,6 +2565,7 @@ async function _syncGoogleCal(evData) {
       status: evData.status,
       spaces_json: evData.spaces_json || null,
       google_cal_id: evData.google_cal_id || null,
+      assessoria_nome: evData.assessoria_cod ? (_assMap[evData.assessoria_cod] || evData.assessoria_cod) : null,
     }),
   });
   const resp = await res.json();
