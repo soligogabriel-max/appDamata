@@ -53,6 +53,9 @@ button{cursor:pointer;}
 .orc-nav{display:flex;gap:10px;margin-top:20px;}
 .orc-btn-next{flex:1;padding:13px;background:var(--a);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;}
 .orc-btn-back{padding:13px 20px;background:transparent;color:var(--dm);border:1.5px solid var(--br);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;}
+#sc-login.portal-mode #login-landing{display:none!important;}
+#sc-login.portal-mode #login-form-wrap{flex:1;width:100%;min-width:unset;min-height:100vh;}
+#sc-login.portal-mode #btn-back-portal{display:block!important;}
 @media(max-width:768px){#sc-login{flex-direction:column;}#login-landing{min-height:unset;padding:24px 20px 32px;}#ll-logo{position:static;transform:none;margin:0 auto 6px;}#ll-main{flex-direction:column;gap:16px;}#ll-buttons{width:100%;order:-1;}#ll-carousel-area{width:100%;}#ll-media-grid{grid-template-columns:1fr;}#login-form-wrap .acard{min-height:auto;}#login-form-wrap{width:100%;min-width:unset;padding:16px 20px 28px;}#ll-version{position:static;margin-top:8px;}}
 .acard{background:#fff;border-radius:24px;padding:32px 26px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(46,60,68,.22);}
 .logo-w{display:flex;flex-direction:column;align-items:center;margin-bottom:20px;}
@@ -317,6 +320,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     </div>
     <div id="ll-main">
       <div id="ll-buttons">
+        <button class="ll-btn" onclick="abrirPortal()">🔐 Portal</button>
         <button class="ll-btn" onclick="abrirOrcamento()">📋 Fazer Orçamento</button>
         <a class="ll-btn" href="https://wa.me/5519996383386" target="_blank">💬 WhatsApp</a>
         <a class="ll-btn" href="https://instagram.com/damatafazenda" target="_blank">📷 Instagram</a>
@@ -336,11 +340,12 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25l</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.25m</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
     <div class="acard">
+      <button id="btn-back-portal" onclick="fecharPortal()" style="display:none;background:none;border:none;color:var(--dm);font-size:13px;font-weight:600;cursor:pointer;padding:0 0 12px 0;text-align:left;width:100%;">← Voltar</button>
       <div class="logo-w">
         <svg width="56" height="56"><use href="#logo-sym-lt"/></svg>
         <div class="logo-n">DAMATA</div>
@@ -1581,6 +1586,13 @@ function exitSim(){
   setTab("agenda"); renderCal(null);
 }
 
+function abrirPortal(){
+  document.getElementById('sc-login').classList.add('portal-mode');
+  setTimeout(()=>{const e=document.getElementById('lemail');if(e)e.focus();},150);
+}
+function fecharPortal(){
+  document.getElementById('sc-login').classList.remove('portal-mode');
+}
 function showSc(sc) {
   document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
   document.getElementById("sc-"+sc).classList.add("active");
