@@ -9,12 +9,11 @@
     body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f5f0;color:#2E3C44;}
 
     /* ── HEADER ─────────────────────────────────── */
+    #sticky-top{position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.3);}
     #header{
       width:100%;background:#2E3C44;
       display:flex;align-items:center;justify-content:center;
       gap:16px;padding:18px 32px;
-      position:sticky;top:0;z-index:100;
-      box-shadow:0 2px 12px rgba(0,0,0,.3);
     }
     #header svg{flex-shrink:0;}
     #header-wordmark{
@@ -141,17 +140,17 @@
   </symbol>
 </svg>
 
-<!-- ① HEADER -->
-<header id="header">
-  <svg width="52" height="50"><use href="#logo-sym-lt"/></svg>
-  <div id="header-wordmark">
-    <span class="name">DAMATA</span>
+<!-- ① HEADER + ② BOTÃO ORÇAMENTO (sticky juntos) -->
+<div id="sticky-top">
+  <header id="header">
+    <svg width="52" height="50"><use href="#logo-sym-lt"/></svg>
+    <div id="header-wordmark">
+      <span class="name">DAMATA</span>
+    </div>
+  </header>
+  <div id="orc-bar">
+    <a id="btn-orc" href="#">📋 Fazer Orçamento</a>
   </div>
-</header>
-
-<!-- ② BOTÕES -->
-<div id="orc-bar">
-  <a id="btn-orc" href="#">📋 Fazer Orçamento</a>
 </div>
 <nav id="cta-bar">
   <a class="cta-btn" href="https://wa.me/5519996383386" target="_blank">💬 WhatsApp</a>
