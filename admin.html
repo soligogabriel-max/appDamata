@@ -681,6 +681,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
             </select>
             <input type="month" class="inp inp-inline" id="rec-fil-mes" onchange="renderReceber()" style="width:150px;margin-bottom:0;" title="Deixe vazio para ver todos os meses"/>
             <button class="btn-cancel" style="font-size:12px;padding:5px 12px;" onclick="document.getElementById('rec-fil-mes').value='';document.getElementById('rec-busca').value='';document.getElementById('rec-fil-status').value='';renderReceber()">Limpar</button>
+            <button class="btn-cancel" style="font-size:12px;padding:5px 12px;" onclick="exportarReceberPDF()" title="Exportar registros filtrados como PDF">📄 PDF</button>
           </div>
         </div>
         <div id="rec-totais" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;"></div>
@@ -3247,6 +3248,8 @@ function statusBadgeVenc(s,venc){
   return '<span class="stbadge pend">Pendente</span>';
 }
 
+let _recFiltrado=[], _recAgendaMap={}, _recConcilMap={};
+
 async function renderReceber(){
   const wr=document.getElementById("rec-list"); wr.innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   const totWr=document.getElementById("rec-totais"); totWr.innerHTML="";
@@ -3290,6 +3293,7 @@ async function renderReceber(){
     const concilMap = {};
     extratoDedup.forEach(e=>{ const k=String(e.titulo_a_receber); concilMap[k]=(concilMap[k]||0)+(e.entrada||0); });
 
+    _recFiltrado=filtrado; _recAgendaMap=agendaMap; _recConcilMap=concilMap;
     if(!filtrado.length){ wr.innerHTML='<div class="empty"><div class="eicon">💰</div>Nenhum título encontrado.</div>'; return; }
     wr.innerHTML=`
     <div id="rec-bulk-bar" style="display:none;align-items:center;gap:10px;padding:8px 12px;background:var(--al);border:1.5px solid var(--am);border-radius:10px;margin-bottom:8px;">
@@ -3321,6 +3325,80 @@ async function renderReceber(){
       }).join("")}</tbody>
     </table></div>`;
   } catch(e){ wr.innerHTML='<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar: '+e.message+'</div>'; }
+}
+
+function exportarReceberPDF(){
+  if(!_recFiltrado.length){ alert("Nenhum registro para exportar."); return; }
+  const hoje=new Date(); hoje.setHours(0,0,0,0);
+  const mes  = document.getElementById("rec-fil-mes").value;
+  const st   = document.getElementById("rec-fil-status").value;
+  const busca= document.getElementById("rec-busca").value.trim();
+  const filtroDesc=[
+    mes   ? "Mês: "+mes : "",
+    st    ? "Status: "+st : "",
+    busca ? "Busca: "+busca : "",
+  ].filter(Boolean).join(" · ") || "Todos os registros";
+  const total    =_recFiltrado.reduce((a,r)=>a+(r.valor||0),0);
+  const recebido =_recFiltrado.filter(r=>(r.status||"").toUpperCase()==="PAGO").reduce((a,r)=>a+(r.valor||0),0);
+  const pendente =total-recebido;
+  const rows=_recFiltrado.map(r=>{
+    const nomeEv=_recAgendaMap[r.cod_evento]||r.cod_evento||"—";
+    const concil=_recConcilMap[String(r.id)]||0;
+    const isPago=(r.status||"").toUpperCase()==="PAGO";
+    const isAtras=!isPago&&r.vencimento&&new Date(r.vencimento)<hoje;
+    const status=isPago?"Pago":isAtras?"Atrasado":"Pendente";
+    const statusCor=isPago?"#166534":isAtras?"#b91c1c":"#92400e";
+    return `<tr>
+      <td>${fmtDate(r.vencimento)||"—"}</td>
+      <td style="font-size:11px;color:#6b7280">${r.cod_evento||"—"}</td>
+      <td>${_esc(nomeEv)}</td>
+      <td>${_esc(r.natureza||"—")}</td>
+      <td style="text-align:center">${r.parcela||r.num_parcela||"—"}</td>
+      <td style="text-align:right;font-weight:700">${fmt(r.valor)}</td>
+      <td style="text-align:right;color:${concil>0?"#166534":"#9ca3af"}">${concil>0?fmt(concil):"—"}</td>
+      <td style="text-align:center;color:${statusCor};font-weight:700">${status}</td>
+    </tr>`;
+  }).join("");
+  const w=window.open("","_blank","width=900,height=700");
+  w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+  <title>Contas a Receber — Fazenda Damata</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;color:#1f2937;padding:24px 32px;}
+    h1{font-size:18px;font-weight:800;color:#2E3C44;margin-bottom:2px;}
+    .sub{font-size:11px;color:#6b7280;margin-bottom:16px;}
+    .totais{display:flex;gap:24px;margin-bottom:16px;padding:12px 16px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;}
+    .tot{display:flex;flex-direction:column;gap:2px;}
+    .tot-l{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#6b7280;}
+    .tot-v{font-size:15px;font-weight:800;}
+    .blue{color:#1d4ed8;} .green{color:#166534;} .red{color:#b91c1c;}
+    table{width:100%;border-collapse:collapse;}
+    th{background:#2E3C44;color:#fff;padding:7px 8px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.3px;}
+    td{padding:6px 8px;border-bottom:1px solid #f3f4f6;vertical-align:middle;}
+    tr:nth-child(even) td{background:#f9fafb;}
+    .footer{margin-top:16px;font-size:10px;color:#9ca3af;text-align:right;}
+    @media print{body{padding:0;}@page{margin:16mm 12mm;size:A4 landscape;}}
+  </style></head><body>
+  <h1>Contas a Receber — Fazenda Damata</h1>
+  <div class="sub">Filtro: ${_esc(filtroDesc)} · Gerado em ${new Date().toLocaleString("pt-BR")}</div>
+  <div class="totais">
+    <div class="tot"><span class="tot-l">Total</span><span class="tot-v blue">${fmt(total)}</span></div>
+    <div class="tot"><span class="tot-l">Recebido</span><span class="tot-v green">${fmt(recebido)}</span></div>
+    <div class="tot"><span class="tot-l">Pendente</span><span class="tot-v red">${fmt(pendente)}</span></div>
+    <div class="tot"><span class="tot-l">Títulos</span><span class="tot-v">${_recFiltrado.length}</span></div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Vencimento</th><th>Cód.</th><th>Evento</th><th>Natureza</th>
+      <th style="text-align:center">Parcela</th><th style="text-align:right">Valor</th>
+      <th style="text-align:right">Conciliado</th><th style="text-align:center">Status</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">Fazenda Damata · ${_recFiltrado.length} registros</div>
+  <script>window.onload=()=>window.print();<\/script>
+  </body></html>`);
+  w.document.close();
 }
 
 // ══════════════════════════════════════════
