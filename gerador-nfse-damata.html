@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Emitir NFS-e — Fazenda Damata</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f5f0;color:#2E3C44;font-size:14px;}
+    .page{max-width:720px;margin:0 auto;padding:24px 16px 48px;}
+    h1{font-size:20px;font-weight:800;color:#2E3C44;margin-bottom:4px;}
+    .sub{font-size:12px;color:#7A8C94;margin-bottom:24px;}
+    .card{background:#fff;border-radius:14px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);}
+    .card-title{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#E8A52A;margin-bottom:14px;}
+    .fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    .fgrid.f3{grid-template-columns:1fr 1fr 1fr;}
+    .fgrid.f1{grid-template-columns:1fr;}
+    .fg-full{grid-column:1/-1;}
+    label{display:block;font-size:11px;font-weight:600;color:#7A8C94;margin-bottom:4px;letter-spacing:.3px;}
+    input,select,textarea{width:100%;padding:9px 11px;border:1.5px solid #E0E5E8;border-radius:8px;font-size:13px;color:#2E3C44;font-family:inherit;background:#fafafa;transition:border-color .15s;}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:#E8A52A;background:#fff;}
+    input[readonly]{background:#f0f0f0;color:#7A8C94;cursor:default;}
+    textarea{resize:vertical;min-height:60px;}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+    .btn{padding:12px 28px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;border:none;font-family:inherit;transition:all .15s;}
+    .btn-primary{background:#E8A52A;color:#2E3C44;}
+    .btn-primary:hover{background:#f0b83a;}
+    .btn-primary:disabled{background:#ccc;color:#888;cursor:default;}
+    .btn-secondary{background:#fff;color:#2E3C44;border:1.5px solid #E0E5E8;}
+    .btn-secondary:hover{border-color:#2E3C44;}
+    .status-box{padding:14px 18px;border-radius:10px;font-size:13px;font-weight:600;display:none;}
+    .status-box.ok{background:#e6f4ea;color:#1a6630;display:block;}
+    .status-box.err{background:#fdecea;color:#b71c1c;display:block;}
+    .status-box.loading{background:#fff3cd;color:#856404;display:block;}
+    .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;}
+    .badge-warn{background:#FFF3CD;color:#856404;}
+    .badge-ok{background:#e6f4ea;color:#1a6630;}
+    .divider{border:none;border-top:1px solid #EEE;margin:8px 0 16px;}
+    .nota-result{background:#f0f8f4;border:1.5px solid #4CAF50;border-radius:10px;padding:16px 20px;margin-top:16px;display:none;}
+    .nota-result h3{color:#1a6630;font-size:15px;margin-bottom:8px;}
+    .nota-result .nr{font-size:28px;font-weight:800;color:#1a6630;letter-spacing:2px;}
+    .nota-result a{color:#1a6630;font-size:13px;}
+    @media(max-width:600px){.fgrid,.fgrid.f3{grid-template-columns:1fr;}.fg-full{grid-column:1;}}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <h1>📄 Emitir NFS-e</h1>
+  <p class="sub">Nota Fiscal de Serviços Eletrônica — Fazenda Damata Eventos · Mogi Mirim/SP</p>
+
+  <!-- ALERTA CONFIGURAÇÃO -->
+  <div id="config-warn" class="status-box err" style="display:none;margin-bottom:16px">
+    ⚠️ Configure o token Focus NFe e a Inscrição Municipal nas constantes do arquivo antes de emitir.
+  </div>
+
+  <!-- PRESTADOR (fixo) -->
+  <div class="card">
+    <div class="card-title">Prestador de Serviços</div>
+    <div class="fgrid">
+      <div><label>Razão Social</label><input readonly value="ESPACO DAMATA EVENTOS LTDA"></div>
+      <div><label>CNPJ</label><input readonly value="35.602.719/0001-87"></div>
+      <div><label>Inscrição Municipal</label><input readonly id="disp-im" value="—"></div>
+      <div><label>Município</label><input readonly value="Mogi Mirim/SP"></div>
+    </div>
+  </div>
+
+  <!-- TOMADOR -->
+  <div class="card">
+    <div class="card-title">Tomador (Contratante)</div>
+    <div class="fgrid f1">
+      <div><label>Razão Social / Nome *</label><input id="t-nome" placeholder="Nome do contratante"></div>
+    </div>
+    <div class="fgrid" style="margin-top:12px">
+      <div>
+        <label>Tipo de documento</label>
+        <select id="t-doc-tipo" onchange="toggleDocTipo()">
+          <option value="cpf">CPF (pessoa física)</option>
+          <option value="cnpj">CNPJ (pessoa jurídica)</option>
+        </select>
+      </div>
+      <div><label id="t-doc-label">CPF *</label><input id="t-doc" placeholder="000.000.000-00" oninput="maskDoc(this)"></div>
+      <div><label>E-mail</label><input id="t-email" type="email" placeholder="email@exemplo.com"></div>
+      <div><label>Telefone</label><input id="t-tel" placeholder="(19) 99999-9999"></div>
+    </div>
+    <hr class="divider">
+    <div class="card-title" style="margin-top:8px">Endereço do Tomador</div>
+    <div class="fgrid">
+      <div class="fg-full"><label>Logradouro</label><input id="t-end" placeholder="Rua, Avenida..."></div>
+      <div><label>Número</label><input id="t-num" placeholder="123"></div>
+      <div><label>Complemento</label><input id="t-comp" placeholder="Apto, Sala..."></div>
+      <div><label>Bairro</label><input id="t-bairro" placeholder="Bairro"></div>
+      <div><label>CEP</label><input id="t-cep" placeholder="00000-000"></div>
+      <div><label>Município</label><input id="t-mun" placeholder="Mogi Mirim"></div>
+      <div><label>UF</label>
+        <select id="t-uf">
+          <option>SP</option><option>AC</option><option>AL</option><option>AM</option><option>AP</option>
+          <option>BA</option><option>CE</option><option>DF</option><option>ES</option><option>GO</option>
+          <option>MA</option><option>MG</option><option>MS</option><option>MT</option><option>PA</option>
+          <option>PB</option><option>PE</option><option>PI</option><option>PR</option><option>RJ</option>
+          <option>RN</option><option>RO</option><option>RR</option><option>RS</option><option>SC</option>
+          <option>SE</option><option>TO</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- SERVIÇO -->
+  <div class="card">
+    <div class="card-title">Serviço</div>
+    <div class="fgrid">
+      <div>
+        <label>Tipo de serviço *</label>
+        <select id="s-tipo" onchange="updateServico()">
+          <option value="03.03" data-aliq="3">Locação de espaço para eventos (03.03)</option>
+          <option value="12.13" data-aliq="3">Produção/organização de eventos (12.13)</option>
+          <option value="09.01" data-aliq="2">Hospedagem / Alojamento (09.01)</option>
+          <option value="03.01" data-aliq="3">Locação de bens móveis (03.01)</option>
+          <option value="12.01" data-aliq="3">Espetáculo / Produção musical (12.01)</option>
+        </select>
+      </div>
+      <div><label>Alíquota ISS (%)</label><input id="s-aliq" type="number" step="0.01" min="2" max="5" value="3.00" oninput="calcValores()"></div>
+      <div><label>Valor bruto (R$) *</label><input id="s-valor" type="number" step="0.01" min="0" placeholder="0,00" oninput="calcValores()"></div>
+      <div><label>Valor ISS (R$)</label><input id="s-iss" readonly placeholder="calculado"></div>
+      <div><label>Valor líquido NFS-e (R$)</label><input id="s-liquido" readonly placeholder="calculado"></div>
+      <div>
+        <label>ISS retido na fonte?</label>
+        <select id="s-iss-retido">
+          <option value="false">Não</option>
+          <option value="true">Sim</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <label>Discriminação dos serviços *</label>
+      <textarea id="s-disc" placeholder="Descrição detalhada do serviço prestado..."></textarea>
+    </div>
+    <div style="margin-top:12px">
+      <label>Referência / Evento (opcional)</label>
+      <input id="s-ref" placeholder="Ex: Casamento João e Maria — 15/06/2026">
+    </div>
+  </div>
+
+  <!-- AÇÕES -->
+  <div class="card">
+    <div id="status-box" class="status-box" style="margin-bottom:12px"></div>
+    <div class="row">
+      <button class="btn btn-primary" onclick="emitirNFSe()" id="btn-emitir">📤 Emitir NFS-e</button>
+      <button class="btn btn-secondary" onclick="window.close()">Cancelar</button>
+      <span id="env-mode" class="badge badge-warn">SANDBOX</span>
+    </div>
+    <div class="nota-result" id="nota-result">
+      <h3>✅ NFS-e emitida com sucesso!</h3>
+      <div style="margin:8px 0">Número da nota: <span class="nr" id="res-numero">—</span></div>
+      <div style="margin-bottom:8px;font-size:13px;color:#555">Protocolo: <span id="res-protocolo">—</span></div>
+      <a id="res-pdf" href="#" target="_blank" style="font-weight:700">🔗 Abrir PDF da NFS-e</a>
+    </div>
+  </div>
+
+</div>
+<script>
+// ══════════════════════════════════════════════════════
+// CONFIGURAÇÃO — preencher antes de usar em produção
+// ══════════════════════════════════════════════════════
+const CONFIG = {
+  FOCUS_TOKEN:        "INSERIR_TOKEN_FOCUSNFE",   // token do Focus NFe (sandbox ou produção)
+  INSCRICAO_MUNICIPAL:"INSERIR_CCM",              // CCM na Secretaria de Finanças de Mogi Mirim
+  SANDBOX:            true,                       // false = produção
+  // Dados do prestador (fixos)
+  CNPJ_PRESTADOR:    "35602719000187",
+  COD_MUNICIPIO:     "3531308",                   // IBGE de Mogi Mirim
+  SB_URL:            "https://wwnndsprpofmgbklqdgg.supabase.co",
+  SB_KEY:            "sb_publishable__RQxBa8P-lryd0LtWgTJPw_-aSWERWK",
+};
+
+// Pré-preenche via URL params (?cod=XX&nome=...&valor=...&email=...&doc=...)
+const P = new URLSearchParams(window.location.search);
+if(P.get("nome"))  document.getElementById("t-nome").value  = P.get("nome");
+if(P.get("email")) document.getElementById("t-email").value = P.get("email");
+if(P.get("tel"))   document.getElementById("t-tel").value   = P.get("tel");
+if(P.get("doc"))   document.getElementById("t-doc").value   = P.get("doc");
+if(P.get("valor")) { document.getElementById("s-valor").value = P.get("valor"); calcValores(); }
+if(P.get("ref"))   document.getElementById("s-ref").value   = P.get("ref");
+if(P.get("tipo"))  document.getElementById("s-tipo").value  = P.get("tipo");
+if(P.get("disc"))  document.getElementById("s-disc").value  = P.get("disc");
+if(P.get("end"))   document.getElementById("t-end").value   = P.get("end");
+if(P.get("bairro"))document.getElementById("t-bairro").value= P.get("bairro");
+if(P.get("cep"))   document.getElementById("t-cep").value   = P.get("cep");
+if(P.get("mun"))   document.getElementById("t-mun").value   = P.get("mun");
+if(P.get("uf"))    document.getElementById("t-uf").value    = P.get("uf");
+
+// Exibe inscrição municipal
+if(CONFIG.INSCRICAO_MUNICIPAL && CONFIG.INSCRICAO_MUNICIPAL !== "INSERIR_CCM"){
+  document.getElementById("disp-im").value = CONFIG.INSCRICAO_MUNICIPAL;
+}
+
+// Aviso de configuração pendente
+if(CONFIG.FOCUS_TOKEN === "INSERIR_TOKEN_FOCUSNFE" || CONFIG.INSCRICAO_MUNICIPAL === "INSERIR_CCM"){
+  document.getElementById("config-warn").style.display = "block";
+}
+
+// Ambiente
+if(!CONFIG.SANDBOX){
+  const b = document.getElementById("env-mode");
+  b.textContent = "PRODUÇÃO"; b.className = "badge badge-ok";
+}
+
+function toggleDocTipo(){
+  const t = document.getElementById("t-doc-tipo").value;
+  document.getElementById("t-doc-label").textContent = t === "cpf" ? "CPF *" : "CNPJ *";
+  document.getElementById("t-doc").placeholder = t === "cpf" ? "000.000.000-00" : "00.000.000/0001-00";
+  document.getElementById("t-doc").value = "";
+}
+
+function maskDoc(el){
+  let v = el.value.replace(/\D/g,"");
+  const t = document.getElementById("t-doc-tipo").value;
+  if(t === "cpf"){
+    v = v.slice(0,11);
+    v = v.replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d{1,2})$/,"$1-$2");
+  } else {
+    v = v.slice(0,14);
+    v = v.replace(/(\d{2})(\d)/,"$1.$2").replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d)/,"$1/$2").replace(/(\d{4})(\d{1,2})$/,"$1-$2");
+  }
+  el.value = v;
+}
+
+function updateServico(){
+  const sel = document.getElementById("s-tipo");
+  const aliq = sel.options[sel.selectedIndex].dataset.aliq || "3";
+  document.getElementById("s-aliq").value = parseFloat(aliq).toFixed(2);
+  calcValores();
+}
+
+function calcValores(){
+  const bruto = parseFloat(document.getElementById("s-valor").value) || 0;
+  const aliq  = parseFloat(document.getElementById("s-aliq").value) || 0;
+  const iss   = bruto * (aliq / 100);
+  const liq   = bruto; // ISS não deduzido do valor da nota por padrão
+  document.getElementById("s-iss").value    = iss.toFixed(2);
+  document.getElementById("s-liquido").value = liq.toFixed(2);
+}
+
+function setStatus(msg, type){
+  const b = document.getElementById("status-box");
+  b.textContent = msg;
+  b.className = "status-box " + type;
+}
+
+function docSoNum(v){ return v.replace(/\D/g,""); }
+
+async function emitirNFSe(){
+  if(CONFIG.FOCUS_TOKEN === "INSERIR_TOKEN_FOCUSNFE"){
+    setStatus("❌ Configure o token Focus NFe antes de emitir.", "err"); return;
+  }
+  if(CONFIG.INSCRICAO_MUNICIPAL === "INSERIR_CCM"){
+    setStatus("❌ Configure a Inscrição Municipal antes de emitir.", "err"); return;
+  }
+  const nome  = document.getElementById("t-nome").value.trim();
+  const doc   = docSoNum(document.getElementById("t-doc").value);
+  const valor = parseFloat(document.getElementById("s-valor").value);
+  const disc  = document.getElementById("s-disc").value.trim();
+  if(!nome)  { setStatus("❌ Informe o nome do tomador.", "err"); return; }
+  if(!doc)   { setStatus("❌ Informe o CPF/CNPJ do tomador.", "err"); return; }
+  if(!valor || valor <= 0){ setStatus("❌ Informe o valor do serviço.", "err"); return; }
+  if(!disc)  { setStatus("❌ Informe a discriminação dos serviços.", "err"); return; }
+
+  const btn = document.getElementById("btn-emitir");
+  btn.disabled = true;
+  setStatus("⏳ Enviando NFS-e para a prefeitura de Mogi Mirim…", "loading");
+
+  const aliq     = parseFloat(document.getElementById("s-aliq").value) || 3;
+  const iss      = parseFloat(document.getElementById("s-iss").value) || 0;
+  const liquido  = parseFloat(document.getElementById("s-liquido").value) || valor;
+  const tipo     = document.getElementById("t-doc-tipo").value;
+  const ref      = document.getElementById("s-ref").value.trim();
+  const itemLista= document.getElementById("s-tipo").value;
+  const issRetido= document.getElementById("s-iss-retido").value;
+  const email    = document.getElementById("t-email").value.trim();
+  const tel      = document.getElementById("t-tel").value.trim();
+
+  // Endereço tomador
+  const end    = document.getElementById("t-end").value.trim();
+  const num    = document.getElementById("t-num").value.trim();
+  const comp   = document.getElementById("t-comp").value.trim();
+  const bairro = document.getElementById("t-bairro").value.trim();
+  const cep    = docSoNum(document.getElementById("t-cep").value);
+  const mun    = document.getElementById("t-mun").value.trim();
+  const uf     = document.getElementById("t-uf").value;
+
+  const now = new Date();
+  const dataEmissao = now.toISOString().slice(0,10);
+
+  const discriminacao = disc + (ref ? `\n\nReferência: ${ref}` : "") +
+    "\n\nPrestador: ESPACO DAMATA EVENTOS LTDA | CNPJ: 35.602.719/0001-87" +
+    "\nEstrada Servidão, SN KM 2,5 - Cachoeira, Mogi Mirim/SP - CEP 13800-970";
+
+  const tomador = {
+    razao_social: nome,
+    email: email || undefined,
+    telefone: tel ? tel.replace(/\D/g,"") : undefined,
+    endereco: {
+      logradouro: end || "Não informado",
+      numero: num || "SN",
+      complemento: comp || undefined,
+      bairro: bairro || "Não informado",
+      codigo_municipio: "3531308", // fallback Mogi Mirim
+      uf: uf || "SP",
+      cep: cep || "00000000",
+    }
+  };
+  if(tipo === "cpf")  tomador.cpf  = doc;
+  else                tomador.cnpj = doc;
+
+  const payload = {
+    data_emissao: dataEmissao,
+    prestador: {
+      cnpj: CONFIG.CNPJ_PRESTADOR,
+      inscricao_municipal: CONFIG.INSCRICAO_MUNICIPAL,
+      codigo_municipio: CONFIG.COD_MUNICIPIO,
+    },
+    tomador,
+    servico: {
+      aliquota:              aliq,
+      base_calculo:          valor,
+      valor_iss:             parseFloat(iss.toFixed(2)),
+      valor_liquido_nfse:    parseFloat(liquido.toFixed(2)),
+      iss_retido:            issRetido,
+      item_lista_servico:    itemLista,
+      codigo_municipio:      CONFIG.COD_MUNICIPIO,
+      discriminacao:         discriminacao,
+    },
+  };
+
+  try {
+    // Chama via Edge Function para proteger o token
+    const res = await fetch(CONFIG.SB_URL + "/functions/v1/emitir-nfse", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + CONFIG.SB_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ payload, sandbox: CONFIG.SANDBOX }),
+    });
+    const data = await res.json();
+
+    if(data.ok){
+      setStatus("✅ NFS-e emitida com sucesso!", "ok");
+      document.getElementById("res-numero").textContent    = data.numero || "—";
+      document.getElementById("res-protocolo").textContent = data.protocolo || "—";
+      if(data.url_pdf){
+        const lnk = document.getElementById("res-pdf");
+        lnk.href = data.url_pdf;
+        lnk.style.display = "block";
+      }
+      document.getElementById("nota-result").style.display = "block";
+      btn.disabled = false;
+    } else {
+      setStatus("❌ Erro: " + (data.detail || data.error || "Erro desconhecido"), "err");
+      btn.disabled = false;
+    }
+  } catch(e){
+    setStatus("❌ Erro de conexão: " + e.message, "err");
+    btn.disabled = false;
+  }
+}
+
+// Init
+updateServico();
+</script>
+</body>
+</html>
