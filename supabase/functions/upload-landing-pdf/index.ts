@@ -36,8 +36,9 @@ Deno.serve(async (req) => {
   const file = formData.get("file");
   if (!(file instanceof File)) return json({ error: "Campo 'file' ausente ou inválido." }, 400);
 
+  const folder    = (formData.get("folder") as string | null)?.replace(/[^a-zA-Z0-9_-]/g, "") || "";
   const safeName  = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const objectPath = `${Date.now()}_${safeName}`;
+  const objectPath = folder ? `${folder}/${Date.now()}_${safeName}` : `${Date.now()}_${safeName}`;
   const bytes = await file.arrayBuffer();
 
   const { error } = await supabase.storage

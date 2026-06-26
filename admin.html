@@ -917,12 +917,14 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div id="p-fotoslanding" class="panel">
       <div class="uwrap" style="max-width:600px">
         <div class="sec-t">🖼 Fotos Landing Page</div>
-        <p style="color:var(--dl);font-size:13px;margin-bottom:16px">URLs das fotos exibidas na landing page do orçamento. Adicione, remova ou reordene conforme desejar.</p>
-        <div id="fl-lista"></div>
-        <button onclick="flAddItem()" style="margin-top:12px;padding:8px 16px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700">+ Adicionar foto</button>
-        <div style="margin-top:20px;display:flex;gap:10px">
-          <button onclick="flSalvar()" style="padding:10px 24px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px">Salvar</button>
-          <span id="fl-status" style="align-self:center;font-size:13px;color:var(--dl)"></span>
+        <p style="color:var(--dl);font-size:13px;margin-bottom:16px">Faça upload das fotos exibidas no carrossel da landing page. A ordem aqui define a ordem de exibição.</p>
+        <div id="fl-lista" style="margin-bottom:12px"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <label style="display:inline-flex;align-items:center;gap:8px;padding:9px 18px;background:var(--a);color:#fff;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">
+            <input type="file" id="fl-file-input" accept="image/*" style="display:none" onchange="flUploadFoto()">
+            + Upload Foto
+          </label>
+          <span id="fl-status" style="font-size:13px;color:var(--dl)"></span>
         </div>
         <div style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px">
           <div class="sec-t">🎥 Vídeos Landing Page (YouTube)</div>
@@ -1969,16 +1971,79 @@ function setTab(t) {
   if(t==="naturezas") renderNaturezas();
 }
 
-/* ── Fotos Landing ─────────────────────────────────────────── */
-let _flUrls=[];
+/* ── Fotos Landing (upload-based) ──────────────────────────── */
+let _flUrls=[]; // [{url,name}]
 async function renderFotosLanding(){
-  const res=await sbFetch("app_config?chave=eq.fotos_landing&select=valor");
-  const row=res&&res[0];
-  _flUrls=(row&&Array.isArray(row.valor))?[...row.valor]:["","","",""];
+  try{
+    const res=await sbFetch("app_config?chave=eq.fotos_landing&select=valor");
+    const v=res&&res[0]&&res[0].valor;
+    // suporta formato antigo (array de strings) e novo (array de {url,name})
+    _flUrls=Array.isArray(v)?v.map(x=>typeof x==="string"?{url:x,name:x.split("/").pop()}:x):[];
+  }catch(_){_flUrls=[];}
   _flRender();
   _flvRender();
   await _flpLoad();
   _flpRender();
+}
+async function _flSaveUrls(){
+  const existing=await sbFetch("app_config?chave=eq.fotos_landing&select=chave");
+  if(existing&&existing.length){
+    await sbFetch("app_config?chave=eq.fotos_landing",{method:"PATCH",body:{valor:_flUrls}});
+  } else {
+    await sbFetch("app_config",{method:"POST",body:{chave:"fotos_landing",valor:_flUrls}});
+  }
+}
+function _flRender(){
+  const c=document.getElementById("fl-lista");
+  if(!c) return;
+  if(!_flUrls.length){c.innerHTML='<p style="color:var(--dl);font-size:13px">Nenhuma foto cadastrada.</p>';return;}
+  c.innerHTML=_flUrls.map((p,i)=>`
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:8px 10px;background:#faf9f6;border:1px solid var(--br);border-radius:8px">
+      <img src="${(p.url||'').replace(/"/g,'&quot;')}" style="width:48px;height:36px;object-fit:cover;border-radius:5px;flex-shrink:0;background:#eee">
+      <span style="flex:1;font-size:12px;color:var(--dm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name||p.url}</span>
+      <button onclick="flMove(${i},-1)" ${i===0?"disabled":""} style="padding:3px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff">↑</button>
+      <button onclick="flMove(${i},1)" ${i===_flUrls.length-1?"disabled":""} style="padding:3px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff">↓</button>
+      <button onclick="flRemove(${i})" style="padding:3px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff;color:#e74c3c">✕</button>
+    </div>`).join("");
+}
+async function flRemove(i){
+  _flUrls.splice(i,1); _flRender();
+  await _flSaveUrls();
+  document.getElementById("fl-status").textContent="✓ Lista atualizada";
+  setTimeout(()=>document.getElementById("fl-status").textContent="",2500);
+}
+async function flMove(i,dir){
+  const j=i+dir;
+  if(j<0||j>=_flUrls.length) return;
+  [_flUrls[i],_flUrls[j]]=[_flUrls[j],_flUrls[i]];
+  _flRender(); await _flSaveUrls();
+}
+async function flUploadFoto(){
+  const inp=document.getElementById("fl-file-input");
+  const file=inp&&inp.files&&inp.files[0];
+  if(!file) return;
+  const st=document.getElementById("fl-status");
+  st.textContent="⏳ Enviando…";
+  try{
+    const fd=new FormData();
+    fd.append("file",file);
+    fd.append("folder","fotos");
+    const res=await fetch(SB_URL+"/functions/v1/upload-landing-pdf",{
+      method:"POST",
+      headers:{"Authorization":"Bearer "+SB_KEY},
+      body:fd
+    });
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.detail||data.error||"Erro desconhecido");
+    _flUrls.push({url:data.url,name:file.name});
+    await _flSaveUrls();
+    _flRender();
+    st.textContent="✓ "+file.name+" enviada!";
+    setTimeout(()=>st.textContent="",4000);
+  }catch(e){
+    st.textContent="❌ Erro: "+e.message;
+  }
+  inp.value="";
 }
 /* ── Vídeos Landing ── */
 let _flvUrls=["","",""];
@@ -2010,37 +2075,6 @@ async function flvSalvar(){
   }
   document.getElementById("flv-status").textContent="✓ Salvo!";
   setTimeout(()=>document.getElementById("flv-status").textContent="",3000);
-}
-function _flRender(){
-  const c=document.getElementById("fl-lista");
-  c.innerHTML=_flUrls.map((u,i)=>`
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-      <span style="color:var(--dl);font-size:12px;min-width:24px">${i+1}.</span>
-      <input id="fl-url-${i}" value="${u.replace(/"/g,'&quot;')}" placeholder="https://..." style="flex:1;padding:8px 10px;border:1px solid var(--br);border-radius:8px;font-size:13px">
-      <button onclick="flMove(${i},-1)" ${i===0?"disabled":""} style="padding:4px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff">↑</button>
-      <button onclick="flMove(${i},1)" ${i===_flUrls.length-1?"disabled":""} style="padding:4px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff">↓</button>
-      <button onclick="flRemove(${i})" style="padding:4px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff;color:#e74c3c">✕</button>
-    </div>`).join("");
-}
-function flAddItem(){ _flUrls.push(""); _flRender(); }
-function flRemove(i){ _flUrls.splice(i,1); _flRender(); }
-function flMove(i,dir){
-  const j=i+dir;
-  if(j<0||j>=_flUrls.length) return;
-  [_flUrls[i],_flUrls[j]]=[_flUrls[j],_flUrls[i]];
-  _flRender();
-}
-async function flSalvar(){
-  _flUrls=_flUrls.map((_,i)=>document.getElementById("fl-url-"+i).value.trim()).filter(u=>u);
-  const existing=await sbFetch("app_config?chave=eq.fotos_landing&select=chave");
-  if(existing&&existing.length){
-    await sbFetch("app_config?chave=eq.fotos_landing",{method:"PATCH",body:{valor:_flUrls}});
-  } else {
-    await sbFetch("app_config",{method:"POST",body:{chave:"fotos_landing",valor:_flUrls}});
-  }
-  document.getElementById("fl-status").textContent="✓ Salvo!";
-  setTimeout(()=>document.getElementById("fl-status").textContent="",3000);
-  _flRender();
 }
 
 /* ── PDFs Landing ───────────────────────────────────────────── */

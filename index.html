@@ -239,7 +239,8 @@ async function loadLandingCarousel() {
       headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY }
     });
     const data = await res.json();
-    const arr = (data && data[0] && Array.isArray(data[0].valor)) ? data[0].valor.filter(u => u && u.trim()) : [];
+    const raw = (data && data[0] && Array.isArray(data[0].valor)) ? data[0].valor : [];
+    const arr = raw.map(x => typeof x === "string" ? x : x.url).filter(u => u && u.trim());
     if (arr.length) urls = arr.map(u => /^https?:\/\//i.test(u) ? u : ('./' + u.replace(/^\.?\//,'')));
   } catch(_) {}
 
