@@ -28,22 +28,37 @@
     }
 
     /* ── BOTÕES ──────────────────────────────────── */
+    #orc-bar{
+      width:100%;background:#1e2d35;
+      padding:16px 24px 0;
+    }
+    #btn-orc{
+      display:flex;align-items:center;justify-content:center;gap:10px;
+      width:100%;padding:16px;border-radius:14px;
+      background:#E8A52A;color:#2E3C44;
+      font-size:16px;font-weight:800;letter-spacing:.3px;
+      text-decoration:none;cursor:pointer;
+      transition:background .18s,transform .15s;
+      border:none;font-family:inherit;
+    }
+    #btn-orc:hover{background:#f0b83a;transform:translateY(-1px);}
     #cta-bar{
       width:100%;background:#1e2d35;
-      display:flex;align-items:center;justify-content:center;
-      flex-wrap:wrap;gap:10px;padding:14px 24px;
+      display:grid;grid-template-columns:1fr 1fr;
+      gap:10px;padding:12px 24px 16px;
+      max-width:100%;
     }
     .cta-btn{
-      display:inline-flex;align-items:center;gap:7px;
-      padding:9px 20px;border-radius:30px;
-      background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);
-      color:#fff;font-size:13px;font-weight:600;letter-spacing:.3px;
+      display:inline-flex;align-items:center;justify-content:center;gap:7px;
+      padding:13px 16px;border-radius:12px;
+      background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.15);
+      color:#fff;font-size:14px;font-weight:600;
       text-decoration:none;cursor:pointer;font-family:inherit;
       transition:background .18s,border-color .18s;
       white-space:nowrap;
     }
-    .cta-btn:hover{background:rgba(232,165,42,.25);border-color:#E8A52A;color:#E8A52A;}
-    .cta-btn.portal{background:rgba(232,165,42,.15);border-color:rgba(232,165,42,.5);color:#E8A52A;}
+    .cta-btn:hover{background:rgba(232,165,42,.2);border-color:#E8A52A;color:#E8A52A;}
+    .cta-btn.portal{background:rgba(232,165,42,.1);border-color:rgba(232,165,42,.4);color:#E8A52A;}
     .cta-btn.portal:hover{background:#E8A52A;color:#2E3C44;}
 
     /* ── ÁREA DE INFORMAÇÕES (PDFs em sequência) ─── */
@@ -135,20 +150,17 @@
 </header>
 
 <!-- ② BOTÕES -->
+<div id="orc-bar">
+  <a id="btn-orc" href="#">📋 Fazer Orçamento</a>
+</div>
 <nav id="cta-bar">
-  <a class="cta-btn" href="#">📋 Fazer Orçamento</a>
   <a class="cta-btn" href="https://wa.me/5519996383386" target="_blank">💬 WhatsApp</a>
   <a class="cta-btn" href="https://instagram.com/damatafazenda" target="_blank">📷 Instagram</a>
   <a class="cta-btn" href="https://maps.app.goo.gl/B2KEUapfKFutrrKKA" target="_blank">📍 Como chegar</a>
   <a class="cta-btn portal" href="/admin.html#login">🔐 Portal</a>
 </nav>
 
-<!-- ③ ÁREA DE INFORMAÇÕES (PDFs renderizados como canvas) -->
-<section id="info-area">
-  <div id="pdf-loading">Carregando informações…</div>
-</section>
-
-<!-- ④ CARROSSEL + VÍDEOS -->
+<!-- ③ CARROSSEL + VÍDEOS -->
 <section id="media-section">
   <p class="sec-label">Fotos & Vídeos</p>
   <div id="ll-media-grid">
@@ -162,6 +174,11 @@
     <div class="ll-vid" id="ll-vid-1"></div>
     <div class="ll-vid" id="ll-vid-2"></div>
   </div>
+</section>
+
+<!-- ④ ÁREA DE INFORMAÇÕES (PDFs renderizados como canvas) -->
+<section id="info-area">
+  <div id="pdf-loading">Carregando informações…</div>
 </section>
 
 <footer id="footer">FAZENDA DAMATA · Mogi Mirim · SP</footer>
