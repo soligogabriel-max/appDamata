@@ -49,9 +49,9 @@
   <h1>📄 Emitir NFS-e</h1>
   <p class="sub">Nota Fiscal de Serviços Eletrônica — Fazenda Damata Eventos · Mogi Mirim/SP</p>
 
-  <!-- ALERTA CONFIGURAÇÃO -->
+  <!-- ALERTA: certificado não configurado (mostrado pela Edge Function se necessário) -->
   <div id="config-warn" class="status-box err" style="display:none;margin-bottom:16px">
-    ⚠️ Configure o token Focus NFe e a Inscrição Municipal nas constantes do arquivo antes de emitir.
+    ⚠️ Certificado digital não configurado no servidor. Adicione o e-CNPJ A1 nos Secrets da Edge Function.
   </div>
 
   <!-- PRESTADOR (fixo) -->
@@ -91,7 +91,17 @@
       <div><label>Complemento</label><input id="t-comp" placeholder="Apto, Sala..."></div>
       <div><label>Bairro</label><input id="t-bairro" placeholder="Bairro"></div>
       <div><label>CEP</label><input id="t-cep" placeholder="00000-000"></div>
-      <div><label>Município</label><input id="t-mun" placeholder="Mogi Mirim"></div>
+      <div>
+        <label>Município</label>
+        <div style="display:flex;gap:6px;">
+          <input id="t-mun" placeholder="Mogi Mirim" oninput="clearIbge()" style="flex:1">
+          <button type="button" onclick="buscarIbge()" title="Buscar código IBGE" style="padding:8px 12px;border:1.5px solid #E0E5E8;border-radius:8px;background:#fafafa;cursor:pointer;font-size:13px;white-space:nowrap;">🔍</button>
+        </div>
+      </div>
+      <div>
+        <label>Cód. IBGE Município *</label>
+        <input id="t-ibge" placeholder="ex: 3531308" maxlength="7" oninput="this.value=this.value.replace(/\D/g,'')">
+      </div>
       <div><label>UF</label>
         <select id="t-uf">
           <option>SP</option><option>AC</option><option>AL</option><option>AM</option><option>AP</option>
@@ -160,15 +170,13 @@
 </div>
 <script>
 // ══════════════════════════════════════════════════════
-// CONFIGURAÇÃO — preencher antes de usar em produção
+// CONFIGURAÇÃO
 // ══════════════════════════════════════════════════════
 const CONFIG = {
-  FOCUS_TOKEN:        "INSERIR_TOKEN_FOCUSNFE",   // token do Focus NFe (sandbox ou produção)
-  INSCRICAO_MUNICIPAL:"36302",                     // CCM na Secretaria de Finanças de Mogi Mirim
-  SANDBOX:            true,                       // false = produção
-  // Dados do prestador (fixos)
+  INSCRICAO_MUNICIPAL:"36302",        // CCM Mogi Mirim
+  SANDBOX:            true,           // false = produção
   CNPJ_PRESTADOR:    "35602719000187",
-  COD_MUNICIPIO:     "3531308",                   // IBGE de Mogi Mirim
+  COD_MUNICIPIO:     "3531308",       // IBGE de Mogi Mirim
   SB_URL:            "https://wwnndsprpofmgbklqdgg.supabase.co",
   SB_KEY:            "sb_publishable__RQxBa8P-lryd0LtWgTJPw_-aSWERWK",
 };
@@ -189,21 +197,36 @@ if(P.get("cep"))   document.getElementById("t-cep").value   = P.get("cep");
 if(P.get("mun"))   document.getElementById("t-mun").value   = P.get("mun");
 if(P.get("uf"))    document.getElementById("t-uf").value    = P.get("uf");
 
-// Exibe inscrição municipal
-if(CONFIG.INSCRICAO_MUNICIPAL && CONFIG.INSCRICAO_MUNICIPAL !== "INSERIR_CCM"){
-  document.getElementById("disp-im").value = CONFIG.INSCRICAO_MUNICIPAL;
-}
+// Preenche IBGE automaticamente se município já está preenchido
+(function(){
+  const mun = document.getElementById("t-mun").value.trim().toLowerCase();
+  if(!mun || mun === "mogi mirim") document.getElementById("t-ibge").value = "3531308";
+})();
 
-// Aviso de configuração pendente
-if(CONFIG.FOCUS_TOKEN === "INSERIR_TOKEN_FOCUSNFE" || CONFIG.INSCRICAO_MUNICIPAL === "INSERIR_CCM"){
-  document.getElementById("config-warn").style.display = "block";
-}
-
-// Ambiente
+// Exibe inscrição municipal e ambiente
+document.getElementById("disp-im").value = CONFIG.INSCRICAO_MUNICIPAL;
 if(!CONFIG.SANDBOX){
   const b = document.getElementById("env-mode");
   b.textContent = "PRODUÇÃO"; b.className = "badge badge-ok";
 }
+
+async function buscarIbge(){
+  const mun = document.getElementById("t-mun").value.trim();
+  const uf  = document.getElementById("t-uf").value;
+  if(!mun){ alert("Digite o nome do município primeiro."); return; }
+  const ibgeEl = document.getElementById("t-ibge");
+  ibgeEl.value = "buscando...";
+  try {
+    const res  = await fetch(`https://servicodados.ibge.gov.br/api/v1/localidades/estados/${uf}/municipios`);
+    const list = await res.json();
+    const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+    const found = list.find(m => norm(m.nome) === norm(mun));
+    if(found){ ibgeEl.value = String(found.id); }
+    else { ibgeEl.value = ""; alert(`Município "${mun}" não encontrado em ${uf}. Verifique o nome ou digite o código manualmente.`); }
+  } catch(e) { ibgeEl.value = ""; alert("Erro ao buscar IBGE: " + e.message); }
+}
+
+function clearIbge(){ document.getElementById("t-ibge").value = ""; }
 
 function toggleDocTipo(){
   const t = document.getElementById("t-doc-tipo").value;
@@ -250,20 +273,17 @@ function setStatus(msg, type){
 function docSoNum(v){ return v.replace(/\D/g,""); }
 
 async function emitirNFSe(){
-  if(CONFIG.FOCUS_TOKEN === "INSERIR_TOKEN_FOCUSNFE"){
-    setStatus("❌ Configure o token Focus NFe antes de emitir.", "err"); return;
-  }
-  if(CONFIG.INSCRICAO_MUNICIPAL === "INSERIR_CCM"){
-    setStatus("❌ Configure a Inscrição Municipal antes de emitir.", "err"); return;
-  }
   const nome  = document.getElementById("t-nome").value.trim();
   const doc   = docSoNum(document.getElementById("t-doc").value);
   const valor = parseFloat(document.getElementById("s-valor").value);
   const disc  = document.getElementById("s-disc").value.trim();
+  const ibge  = document.getElementById("t-ibge").value.trim();
+
   if(!nome)  { setStatus("❌ Informe o nome do tomador.", "err"); return; }
   if(!doc)   { setStatus("❌ Informe o CPF/CNPJ do tomador.", "err"); return; }
   if(!valor || valor <= 0){ setStatus("❌ Informe o valor do serviço.", "err"); return; }
   if(!disc)  { setStatus("❌ Informe a discriminação dos serviços.", "err"); return; }
+  if(!ibge)  { setStatus("❌ Informe o código IBGE do município do tomador (clique em 🔍).", "err"); return; }
 
   const btn = document.getElementById("btn-emitir");
   btn.disabled = true;
@@ -278,85 +298,76 @@ async function emitirNFSe(){
   const issRetido= document.getElementById("s-iss-retido").value;
   const email    = document.getElementById("t-email").value.trim();
   const tel      = document.getElementById("t-tel").value.trim();
+  const end      = document.getElementById("t-end").value.trim();
+  const num      = document.getElementById("t-num").value.trim();
+  const comp     = document.getElementById("t-comp").value.trim();
+  const bairro   = document.getElementById("t-bairro").value.trim();
+  const cep      = docSoNum(document.getElementById("t-cep").value);
+  const mun      = document.getElementById("t-mun").value.trim();
+  const uf       = document.getElementById("t-uf").value;
 
-  // Endereço tomador
-  const end    = document.getElementById("t-end").value.trim();
-  const num    = document.getElementById("t-num").value.trim();
-  const comp   = document.getElementById("t-comp").value.trim();
-  const bairro = document.getElementById("t-bairro").value.trim();
-  const cep    = docSoNum(document.getElementById("t-cep").value);
-  const mun    = document.getElementById("t-mun").value.trim();
-  const uf     = document.getElementById("t-uf").value;
+  const dataEmissao = new Date().toISOString().slice(0,10);
 
-  const now = new Date();
-  const dataEmissao = now.toISOString().slice(0,10);
-
-  const discriminacao = disc + (ref ? `\n\nReferência: ${ref}` : "") +
+  const discriminacao = disc +
+    (ref ? `\n\nReferência: ${ref}` : "") +
     "\n\nPrestador: ESPACO DAMATA EVENTOS LTDA | CNPJ: 35.602.719/0001-87" +
     "\nEstrada Servidão, SN KM 2,5 - Cachoeira, Mogi Mirim/SP - CEP 13800-970";
 
-  const tomador = {
-    razao_social: nome,
-    email: email || undefined,
-    telefone: tel ? tel.replace(/\D/g,"") : undefined,
-    endereco: {
-      logradouro: end || "Não informado",
-      numero: num || "SN",
-      complemento: comp || undefined,
-      bairro: bairro || "Não informado",
-      codigo_municipio: "3531308", // fallback Mogi Mirim
-      uf: uf || "SP",
-      cep: cep || "00000000",
-    }
+  const tomador = { razao_social: nome };
+  if(tipo === "cpf") tomador.cpf  = doc;
+  else               tomador.cnpj = doc;
+  if(email) tomador.email    = email;
+  if(tel)   tomador.telefone = tel.replace(/\D/g,"");
+  if(end) tomador.endereco = {
+    logradouro:       end,
+    numero:           num || "S/N",
+    complemento:      comp || undefined,
+    bairro:           bairro || "Não informado",
+    codigo_municipio: ibge,
+    uf,
+    cep:              cep || "00000000",
   };
-  if(tipo === "cpf")  tomador.cpf  = doc;
-  else                tomador.cnpj = doc;
 
   const payload = {
     data_emissao: dataEmissao,
     prestador: {
-      cnpj: CONFIG.CNPJ_PRESTADOR,
+      cnpj:                CONFIG.CNPJ_PRESTADOR,
       inscricao_municipal: CONFIG.INSCRICAO_MUNICIPAL,
-      codigo_municipio: CONFIG.COD_MUNICIPIO,
+      codigo_municipio:    CONFIG.COD_MUNICIPIO,
     },
     tomador,
     servico: {
-      aliquota:              aliq,
-      base_calculo:          valor,
-      valor_iss:             parseFloat(iss.toFixed(2)),
-      valor_liquido_nfse:    parseFloat(liquido.toFixed(2)),
-      iss_retido:            issRetido,
-      item_lista_servico:    itemLista,
-      codigo_municipio:      CONFIG.COD_MUNICIPIO,
-      discriminacao:         discriminacao,
+      aliquota:           aliq,
+      base_calculo:       valor,
+      valor_iss:          parseFloat(iss.toFixed(2)),
+      valor_liquido_nfse: parseFloat(liquido.toFixed(2)),
+      iss_retido:         issRetido,
+      item_lista_servico: itemLista,
+      codigo_municipio:   CONFIG.COD_MUNICIPIO,
+      discriminacao,
     },
   };
 
   try {
-    // Chama via Edge Function para proteger o token
     const res = await fetch(CONFIG.SB_URL + "/functions/v1/emitir-nfse", {
       method: "POST",
-      headers: {
-        "Authorization": "Bearer " + CONFIG.SB_KEY,
-        "Content-Type": "application/json",
-      },
+      headers: { "Authorization": "Bearer " + CONFIG.SB_KEY, "Content-Type": "application/json" },
       body: JSON.stringify({ payload, sandbox: CONFIG.SANDBOX }),
     });
     const data = await res.json();
-
     if(data.ok){
       setStatus("✅ NFS-e emitida com sucesso!", "ok");
-      document.getElementById("res-numero").textContent    = data.numero || "—";
+      document.getElementById("res-numero").textContent    = data.numero    || "—";
       document.getElementById("res-protocolo").textContent = data.protocolo || "—";
       if(data.url_pdf){
         const lnk = document.getElementById("res-pdf");
-        lnk.href = data.url_pdf;
-        lnk.style.display = "block";
+        lnk.href = data.url_pdf; lnk.style.display = "block";
       }
       document.getElementById("nota-result").style.display = "block";
       btn.disabled = false;
     } else {
-      setStatus("❌ Erro: " + (data.detail || data.error || "Erro desconhecido"), "err");
+      setStatus("❌ " + (data.error || "Erro desconhecido") + (data.codigo ? ` [${data.codigo}]` : ""), "err");
+      console.error("Detalhe SigISS:", data);
       btn.disabled = false;
     }
   } catch(e){
