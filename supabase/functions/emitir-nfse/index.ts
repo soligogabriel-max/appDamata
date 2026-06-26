@@ -1,7 +1,8 @@
 // Supabase Edge Function: emitir-nfse
 // Integração direta com SigISS de Mogi Mirim — ABRASF 2.04
-// Secrets obrigatórios: NFSE_CERT_PFX_B64, NFSE_CERT_PASSWORD
+// Certificado lido do bucket privado "nfse-certs" (gerenciado pelo admin).
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import forge from "npm:node-forge@1";
 import { SignedXml } from "npm:xml-crypto@3";
 
@@ -216,15 +217,34 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
-  const pfxB64  = Deno.env.get("NFSE_CERT_PFX_B64");
-  const pfxPass = Deno.env.get("NFSE_CERT_PASSWORD") ?? "";
+  // Carrega certificado do bucket privado "nfse-certs"
+  const sb = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
 
-  if (!pfxB64) {
+  const { data: pfxBlob, error: dlErr } = await sb.storage
+    .from("nfse-certs")
+    .download("cert.pfx");
+
+  if (dlErr || !pfxBlob) {
     return json({
-      error: "Certificado não configurado.",
-      hint: "Adicione NFSE_CERT_PFX_B64 (base64 do .pfx) e NFSE_CERT_PASSWORD nos Secrets da Edge Function no Supabase.",
+      error: "Certificado digital não encontrado.",
+      hint: "Faça upload do e-CNPJ A1 (.pfx) na seção 'Fotos e Vídeos' do painel administrativo.",
     }, 500);
   }
+
+  const pfxBytes = new Uint8Array(await pfxBlob.arrayBuffer());
+  const pfxB64   = forge.util.encode64(
+    Array.from(pfxBytes).map(b => String.fromCharCode(b)).join("")
+  );
+
+  // Lê senha do app_config
+  const { data: passRow } = await sb.from("app_config")
+    .select("valor")
+    .eq("chave", "nfse_cert_password")
+    .maybeSingle();
+  const pfxPass = (passRow?.valor as string) ?? "";
 
   let body: Record<string, unknown>;
   try { body = await req.json(); }
