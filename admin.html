@@ -536,6 +536,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <button class="tab" onclick="setTab('fluxo');closeGrps()" id="t-fluxo">📊 Fluxo de Caixa</button>
         <button class="tab" onclick="setTab('extrato');closeGrps()" id="t-extrato">🏦 Extrato C6</button>
         <button class="tab" onclick="setTab('fluxoreal');closeGrps()" id="t-fluxoreal">📈 Fluxo Real</button>
+        <button class="tab" onclick="setTab('socios');closeGrps()" id="t-socios">👥 Conta Sócios</button>
       </div>
     </div>
 
@@ -788,6 +789,19 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <button class="btn-cancel" style="padding:5px 14px;font-size:12px;" onclick="_extClearSel()">Limpar</button>
         </div>
         <div id="ext-list"></div>
+      </div>
+    </div>
+
+    <!-- CONTA SÓCIOS -->
+    <div id="p-socios" class="panel">
+      <div class="uwrap" style="max-width:1100px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+          <div class="sec-t" style="margin-bottom:0;">Conta Sócios</div>
+          <select class="inp inp-inline" id="socios-fil-ano" onchange="renderContaSocios()" style="width:110px;margin-bottom:0;"></select>
+        </div>
+        <div id="socios-pendentes"></div>
+        <div id="socios-resumo"></div>
+        <div id="socios-lista"></div>
       </div>
     </div>
 
@@ -1590,7 +1604,7 @@ function effIsAdmin() { return !_simRole && isAdmin(getCU()); }
 function _applyNavForRole(role){
   var isA = !_simRole && isAdmin(getCU());
   var allGroups=["grp-financeiro","grp-cadastros","grp-admin","grp-eventos"];
-  var allSubTabs=["t-contratos","t-vt","t-orcamentos","t-pagar","t-fluxo","t-extrato","t-fluxoreal"];
+  var allSubTabs=["t-contratos","t-vt","t-orcamentos","t-pagar","t-fluxo","t-extrato","t-fluxoreal","t-socios"];
   if(isA || role==="admin"){
     allGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     allSubTabs.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
@@ -1609,7 +1623,7 @@ function _applyNavForRole(role){
     // assessoria vê agenda, eventos (contratos+pedidos+vt), financeiro (só receber)
     ["grp-cadastros","grp-admin"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     ["grp-financeiro","grp-eventos"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
-    ["t-orcamentos","t-pagar","t-fluxo","t-extrato","t-fluxoreal"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    ["t-orcamentos","t-pagar","t-fluxo","t-extrato","t-fluxoreal","t-socios"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     ["t-contratos","t-pedidos","t-vt"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     document.getElementById("t-pedidos-eq").style.display="none";
   }
@@ -1958,7 +1972,7 @@ async function openApp(u) {
 // ── Grupos do menu ──
 const TAB_GRP={
   contratos:"grp-eventos", pedidos:"grp-eventos", vt:"grp-eventos", orcamentos:"grp-eventos",
-  receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro",
+  receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro", socios:"grp-financeiro",
   fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros", naturezas:"grp-cadastros", assessorias:"grp-cadastros",
   relatorio:"grp-admin", pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin"
 };
@@ -1987,7 +2001,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas"};
+  const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(cfilter);
   if(t==="receber") renderReceber();
@@ -2008,6 +2022,7 @@ function setTab(t) {
   if(t==="orcamentos") renderOrcamentos();
   if(t==="contratos") renderContratos();
   if(t==="naturezas") renderNaturezas();
+  if(t==="socios") renderContaSocios();
 }
 
 /* ── Certificado Digital NFS-e ─────────────────────────────── */
@@ -3604,6 +3619,164 @@ async function renderFluxo(){
       }).join("")}</tbody>
     </table></div>`;
   } catch(e){ wr.innerHTML='<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar: '+e.message+'</div>'; }
+}
+
+// ══════════════════════════════════════════
+// CONTA SÓCIOS
+// ══════════════════════════════════════════
+async function renderContaSocios(){
+  const pendDiv  = document.getElementById("socios-pendentes");
+  const resumoDiv= document.getElementById("socios-resumo");
+  const listaDiv = document.getElementById("socios-lista");
+  if(!pendDiv) return;
+  pendDiv.innerHTML = '<div style="color:var(--dl);padding:20px 0;">Carregando...</div>';
+  resumoDiv.innerHTML = listaDiv.innerHTML = '';
+
+  // Popula filtro de ano na 1ª abertura
+  const selAno = document.getElementById("socios-fil-ano");
+  if(selAno && !selAno.options.length){
+    const anoAtual = new Date().getFullYear();
+    for(let y=anoAtual; y>=2024; y--){
+      const o=document.createElement("option"); o.value=y; o.textContent=y; selAno.appendChild(o);
+    }
+  }
+  const ano = selAno ? selAno.value : new Date().getFullYear();
+
+  try {
+    const [classified, devols] = await Promise.all([
+      sbFetch(`extrato_bancario?select=id_extrato_c6,data_lancamento,titulo,descricao,entrada,saida,socio&socio=in.(gabriel,vitoria)&data_lancamento=gte.${ano}-01-01&data_lancamento=lte.${ano}-12-31&order=data_lancamento.desc`),
+      sbFetch(`extrato_bancario?select=id_extrato_c6,data_lancamento,titulo,descricao,entrada,saida,socio&titulo=ilike.*DEVOL*PIX*&socio=is.null&order=data_lancamento.desc`)
+    ]);
+
+    // ── Pendentes de classificação
+    if(devols.length){
+      let rows='';
+      devols.forEach(r=>{
+        const val=r.saida>0?r.saida:r.entrada;
+        const sinal=r.saida>0?'−':'+';
+        const cor=r.saida>0?'#b91c1c':'#166534';
+        rows+=`<tr style="border-top:1px solid #fef3c7;">
+          <td style="padding:6px 8px;white-space:nowrap;">${fmtDate(r.data_lancamento)}</td>
+          <td style="padding:6px 8px;color:var(--dm);">${r.titulo||r.descricao||'—'}</td>
+          <td style="padding:6px 8px;text-align:right;font-weight:600;color:${cor};">${sinal} ${fmt(val)}</td>
+          <td style="padding:6px 8px;text-align:center;white-space:nowrap;">
+            <button class="btn-a" style="padding:3px 10px;font-size:12px;margin:0 2px;" onclick="classificarSocio('${r.id_extrato_c6}','gabriel')">Gabriel</button>
+            <button class="btn-a" style="padding:3px 10px;font-size:12px;margin:0 2px;background:#7c3aed;" onclick="classificarSocio('${r.id_extrato_c6}','vitoria')">Vitória</button>
+            <button class="btn-cancel" style="padding:3px 10px;font-size:12px;margin:0 2px;" onclick="classificarSocio('${r.id_extrato_c6}','nenhum')">Nenhum</button>
+          </td>
+        </tr>`;
+      });
+      pendDiv.innerHTML=`<div style="background:#fffbeb;border:1.5px solid #f59e0b;border-radius:12px;padding:16px;margin-bottom:20px;">
+        <div style="font-weight:700;color:#92400e;margin-bottom:12px;">⚠️ ${devols.length} devolução(ões) de Pix pendente(s) de classificação</div>
+        <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr style="color:#92400e;font-size:12px;">
+            <th style="text-align:left;padding:4px 8px;">Data</th>
+            <th style="text-align:left;padding:4px 8px;">Título</th>
+            <th style="text-align:right;padding:4px 8px;">Valor</th>
+            <th style="text-align:center;padding:4px 8px;">Associar a</th>
+          </tr></thead><tbody>${rows}</tbody>
+        </table></div></div>`;
+    } else {
+      pendDiv.innerHTML='';
+    }
+
+    // ── Cards de resumo por sócio
+    const tot={gabriel:{e:0,s:0},vitoria:{e:0,s:0}};
+    classified.forEach(r=>{
+      if(tot[r.socio]){ tot[r.socio].e+=r.entrada||0; tot[r.socio].s+=r.saida||0; }
+    });
+    function cardSocio(key,label){
+      const t=tot[key], saldo=t.e-t.s;
+      const cor=saldo>=0?'#166534':'#b91c1c';
+      const bg=saldo>=0?'#f0fdf4':'#fef2f2';
+      const nota=saldo<0?'empresa deve ao sócio':saldo>0?'sócio tem crédito na empresa':'em dia';
+      return `<div style="flex:1;min-width:220px;background:#f9fafb;border:1.5px solid #e5e7eb;border-radius:12px;padding:16px;">
+        <div style="font-weight:700;font-size:15px;margin-bottom:12px;">👤 ${label}</div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--dl);">Aportes (entradas)</span>
+            <span style="color:#166534;font-weight:600;">+ ${fmt(t.e)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span style="color:var(--dl);">Retiradas (saídas)</span>
+            <span style="color:#b91c1c;font-weight:600;">− ${fmt(t.s)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;border-top:1px solid #e5e7eb;padding-top:8px;margin-top:4px;">
+            <span style="font-weight:600;">Saldo ${ano}</span>
+            <span style="font-weight:700;color:${cor};background:${bg};padding:2px 10px;border-radius:6px;">${saldo>=0?'+':'−'} ${fmt(Math.abs(saldo))}</span>
+          </div>
+          <div style="font-size:11px;color:${cor};margin-top:2px;">${nota}</div>
+        </div>
+      </div>`;
+    }
+    resumoDiv.innerHTML=`<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+      ${cardSocio('gabriel','Gabriel José Soligo')}
+      ${cardSocio('vitoria','Vitória Bedutti Rodrigues')}
+    </div>`;
+
+    // ── Tabela detalhada
+    if(!classified.length){
+      listaDiv.innerHTML=`<div style="color:var(--dl);text-align:center;padding:30px 0;">Nenhuma transação classificada em ${ano}</div>`;
+      return;
+    }
+    const filSocio=window._sociosFil||'todos';
+    const filtered=filSocio==='todos'?classified:classified.filter(r=>r.socio===filSocio);
+    const tabBtns=['todos','gabriel','vitoria'].map(s=>{
+      const labels={todos:'Todos',gabriel:'Gabriel',vitoria:'Vitória'};
+      const active=filSocio===s?'background:var(--a);color:#fff;':'background:var(--bg2);color:var(--dk);border:1px solid #e5e7eb;';
+      return `<button onclick="window._sociosFil='${s}';renderContaSocios()" style="padding:4px 14px;border-radius:20px;border:none;cursor:pointer;font-size:12px;font-weight:600;${active}">${labels[s]}</button>`;
+    }).join('');
+    let rows='';
+    filtered.forEach(r=>{
+      const isE=r.entrada>0;
+      const val=isE?r.entrada:r.saida;
+      const cor=isE?'#166534':'#b91c1c';
+      const sinal=isE?'+':'−';
+      const sLabel=r.socio==='gabriel'?'Gabriel':'Vitória';
+      const sColor=r.socio==='gabriel'?'#1d4ed8':'#7c3aed';
+      rows+=`<tr style="border-top:1px solid #f3f4f6;">
+        <td style="padding:7px 8px;white-space:nowrap;font-size:13px;">${fmtDate(r.data_lancamento)}</td>
+        <td style="padding:7px 8px;font-size:13px;color:var(--dm);">${r.titulo||r.descricao||'—'}</td>
+        <td style="padding:7px 8px;text-align:right;font-weight:600;font-size:13px;color:${cor};">${sinal} ${fmt(val)}</td>
+        <td style="padding:7px 8px;text-align:center;">
+          <span style="background:${sColor}1a;color:${sColor};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">${sLabel}</span>
+        </td>
+        <td style="padding:7px 8px;text-align:center;">
+          <button class="btn-cancel" style="padding:2px 8px;font-size:11px;" title="Remover classificação" onclick="desclassificarSocio('${r.id_extrato_c6}')">✕</button>
+        </td>
+      </tr>`;
+    });
+    listaDiv.innerHTML=`<div style="display:flex;gap:6px;margin-bottom:12px;align-items:center;">
+        <span style="font-size:12px;color:var(--dl);margin-right:4px;">Sócio:</span>${tabBtns}
+      </div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="color:var(--dl);font-size:12px;">
+          <th style="text-align:left;padding:4px 8px;">Data</th>
+          <th style="text-align:left;padding:4px 8px;">Descrição</th>
+          <th style="text-align:right;padding:4px 8px;">Valor</th>
+          <th style="text-align:center;padding:4px 8px;">Sócio</th>
+          <th style="padding:4px 8px;"></th>
+        </tr></thead><tbody>${rows}</tbody>
+      </table></div>`;
+
+  } catch(e) {
+    pendDiv.innerHTML=`<div style="color:var(--er)">Erro: ${e.message}</div>`;
+  }
+}
+
+async function classificarSocio(id, socio){
+  try {
+    await sbFetch('extrato_bancario?id_extrato_c6=eq.'+id, {method:'PATCH', body:{socio: socio==='nenhum'?'nenhum':socio}, prefer:'return=minimal'});
+    await renderContaSocios();
+  } catch(e) { alert('Erro ao classificar: '+e.message); }
+}
+
+async function desclassificarSocio(id){
+  if(!confirm('Remover classificação desta transação?')) return;
+  try {
+    await sbFetch('extrato_bancario?id_extrato_c6=eq.'+id, {method:'PATCH', body:{socio:null}, prefer:'return=minimal'});
+    await renderContaSocios();
+  } catch(e) { alert('Erro: '+e.message); }
 }
 
 // ══════════════════════════════════════════
