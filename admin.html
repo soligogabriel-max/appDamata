@@ -797,7 +797,11 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <div class="uwrap" style="max-width:1100px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
           <div class="sec-t" style="margin-bottom:0;">Conta Sócios</div>
-          <select class="inp inp-inline" id="socios-fil-ano" onchange="renderContaSocios()" style="width:110px;margin-bottom:0;"></select>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="month" class="inp inp-inline" id="socios-fil-de" onchange="renderContaSocios()" style="width:150px;margin-bottom:0;" title="Mês início"/>
+            <span style="color:var(--dl);font-size:13px;">até</span>
+            <input type="month" class="inp inp-inline" id="socios-fil-ate" onchange="renderContaSocios()" style="width:150px;margin-bottom:0;" title="Mês fim"/>
+          </div>
         </div>
         <div id="socios-pendentes"></div>
         <div id="socios-resumo"></div>
@@ -3632,19 +3636,23 @@ async function renderContaSocios(){
   pendDiv.innerHTML = '<div style="color:var(--dl);padding:20px 0;">Carregando...</div>';
   resumoDiv.innerHTML = listaDiv.innerHTML = '';
 
-  // Popula filtro de ano na 1ª abertura
-  const selAno = document.getElementById("socios-fil-ano");
-  if(selAno && !selAno.options.length){
-    const anoAtual = new Date().getFullYear();
-    for(let y=anoAtual; y>=2024; y--){
-      const o=document.createElement("option"); o.value=y; o.textContent=y; selAno.appendChild(o);
-    }
+  // Inicializa filtros de mês na 1ª abertura
+  const inpDe  = document.getElementById("socios-fil-de");
+  const inpAte = document.getElementById("socios-fil-ate");
+  if(inpDe && !inpDe.value){
+    const now = new Date();
+    inpDe.value  = `${now.getFullYear()}-01`;
+    inpAte.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   }
-  const ano = selAno ? selAno.value : new Date().getFullYear();
+  const de  = inpDe?.value  || '';
+  const ate = inpAte?.value || '';
+  const dateGte = de  ? `${de}-01`  : '2020-01-01';
+  const dateLte = ate ? (()=>{ const [y,m]=ate.split('-').map(Number); return `${ate}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`; })() : '2099-12-31';
+  const periodoLabel = (de||'?').slice(0,7).split('-').reverse().join('/') + ' — ' + (ate||'?').slice(0,7).split('-').reverse().join('/');
 
   try {
     const [classified, devols] = await Promise.all([
-      sbFetch(`extrato_bancario?select=id_extrato_c6,data_lancamento,titulo,descricao,entrada,saida,socio&socio=in.(gabriel,vitoria)&data_lancamento=gte.${ano}-01-01&data_lancamento=lte.${ano}-12-31&order=data_lancamento.desc`),
+      sbFetch(`extrato_bancario?select=id_extrato_c6,data_lancamento,titulo,descricao,entrada,saida,socio&socio=in.(gabriel,vitoria)&data_lancamento=gte.${dateGte}&data_lancamento=lte.${dateLte}&order=data_lancamento.desc`),
       sbFetch(`extrato_bancario?select=id_extrato_c6,data_lancamento,titulo,descricao,entrada,saida,socio&titulo=ilike.*DEVOL*PIX*&socio=is.null&order=data_lancamento.desc`)
     ]);
 
@@ -3702,7 +3710,7 @@ async function renderContaSocios(){
             <span style="color:#b91c1c;font-weight:600;">− ${fmt(t.s)}</span>
           </div>
           <div style="display:flex;justify-content:space-between;border-top:1px solid #e5e7eb;padding-top:8px;margin-top:4px;">
-            <span style="font-weight:600;">Saldo ${ano}</span>
+            <span style="font-weight:600;">Saldo do período</span>
             <span style="font-weight:700;color:${cor};background:${bg};padding:2px 10px;border-radius:6px;">${saldo>=0?'+':'−'} ${fmt(Math.abs(saldo))}</span>
           </div>
           <div style="font-size:11px;color:${cor};margin-top:2px;">${nota}</div>
@@ -3716,7 +3724,7 @@ async function renderContaSocios(){
 
     // ── Tabela detalhada
     if(!classified.length){
-      listaDiv.innerHTML=`<div style="color:var(--dl);text-align:center;padding:30px 0;">Nenhuma transação classificada em ${ano}</div>`;
+      listaDiv.innerHTML=`<div style="color:var(--dl);text-align:center;padding:30px 0;">Nenhuma transação classificada no período ${periodoLabel}</div>`;
       return;
     }
     const filSocio=window._sociosFil||'todos';
