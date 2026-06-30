@@ -2258,7 +2258,7 @@ async function renderPend(){
     if(!users.length){wr.innerHTML='<div class="empty"><div class="eicon">✅</div>Nenhuma solicitação pendente.</div>';return;}
     users.forEach(u=>{
       const c=document.createElement("div");c.className="ucard";
-      c.innerHTML=`<div class="uav">👤</div><div class="uinfo"><div class="uname2">${u.name}</div><div class="uemail">${u.email}</div>${u.phone?`<div class="uemail">📱 ${u.phone}</div>`:""}<div class="uemail">${u.created_at?new Date(u.created_at).toLocaleDateString("pt-BR"):""}</div></div><div class="uacts"><button class="btn-a" onclick="openApr('${u.id}','${u.name.replace(/'/g,"\'")}')">Aprovar</button><button class="btn-sm" onclick="rejU('${u.id}')">Rejeitar</button></div>`;
+      c.innerHTML=`<div class="uav">👤</div><div class="uinfo"><div class="uname2">${_esc(u.name)}</div><div class="uemail">${_esc(u.email)}</div>${u.phone?`<div class="uemail">📱 ${_esc(u.phone)}</div>`:""}<div class="uemail">${u.created_at?new Date(u.created_at).toLocaleDateString("pt-BR"):""}</div></div><div class="uacts"><button class="btn-a" onclick="openApr(this.dataset.id,this.dataset.n)" data-id="${u.id}" data-n="${_esc(u.name)}">Aprovar</button><button class="btn-sm" onclick="rejU('${u.id}')">Rejeitar</button></div>`;
       wr.appendChild(c);
     });
   } catch(e){wr.innerHTML='<div class="empty">Erro ao carregar.</div>';}
@@ -2283,7 +2283,7 @@ async function renderUsers(){
       const ud = _esc(JSON.stringify(u));
       const c=document.createElement("div");c.className="ucard";
       const gcBtn = u.role==="cliente" ? `<button style="margin-top:6px;font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--a);background:var(--al);cursor:pointer;font-weight:700;" onclick='openGerarContrato(JSON.parse(this.dataset.u))' data-u="${ud}">📄 Gerar Contrato</button>` : "";
-      c.innerHTML=`<div class="uav">👤</div><div class="uinfo"><div class="uname2">${u.name}</div><div class="uemail">${u.email}</div>${evN?`<div class="uemail" style="margin-top:3px;">📅 ${evN}</div>`:""}${assNome?`<div class="uemail" style="margin-top:3px;">🎗 ${assNome}</div>`:""}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"><button style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--br);background:var(--al);cursor:pointer;" onclick='openEditUser(JSON.parse(this.dataset.u))' data-u="${ud}">✏️ Editar acesso</button>${gcBtn}</div></div><span class="urb" style="background:${rbg[u.role]||"#EEE"};color:${rtx[u.role]||"#555"};">${RL[u.role]||u.role}</span>`;
+      c.innerHTML=`<div class="uav">👤</div><div class="uinfo"><div class="uname2">${_esc(u.name)}</div><div class="uemail">${_esc(u.email)}</div>${evN?`<div class="uemail" style="margin-top:3px;">📅 ${_esc(evN)}</div>`:""}${assNome?`<div class="uemail" style="margin-top:3px;">🎗 ${_esc(assNome)}</div>`:""}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"><button style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--br);background:var(--al);cursor:pointer;" onclick='openEditUser(JSON.parse(this.dataset.u))' data-u="${ud}">✏️ Editar acesso</button>${gcBtn}</div></div><span class="urb" style="background:${rbg[u.role]||"#EEE"};color:${rtx[u.role]||"#555"};">${RL[u.role]||u.role}</span>`;
       wr.appendChild(c);
     });
   } catch(e){wr.innerHTML='<div class="empty">Erro ao carregar.</div>';}
@@ -3358,7 +3358,7 @@ async function renderOrcamentos(){
       return `<tr style="border-bottom:1px solid var(--br);">
         <td style="padding:10px 12px;">${r.created_at?r.created_at.slice(0,10).split("-").reverse().join("/"):"—"}</td>
         <td style="padding:10px 12px;">${r.data_evento?r.data_evento.split("-").reverse().join("/"):"—"}</td>
-        <td style="padding:10px 12px;font-weight:600;cursor:pointer;" onclick="verOrcamento(${r.id})">${nomes}</td>
+        <td style="padding:10px 12px;font-weight:600;cursor:pointer;" onclick="verOrcamento(${r.id})">${_esc(nomes)}</td>
         <td style="padding:10px 12px;">${r.tipo_evento||"—"}</td>
         <td style="padding:10px 12px;text-align:center;">${r.num_convidados||"—"}</td>
         <td style="padding:10px 12px;font-weight:700;">R$ ${r.valor_total?Number(r.valor_total).toLocaleString("pt-BR",{minimumFractionDigits:2}):"—"}</td>
