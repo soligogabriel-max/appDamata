@@ -340,7 +340,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.28b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.30a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -504,7 +504,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.06.28b</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.06.30a</div>
       </div>
     </div>
     <div class="uarea">
@@ -554,10 +554,17 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       </div>
     </div>
 
+    <div class="tgrp" id="grp-relatorios">
+      <button class="tgrp-btn" onclick="toggleGrp('grp-relatorios')">📊 Relatórios</button>
+      <div class="tgrp-drop">
+        <button class="tab" onclick="setTab('relatorio');closeGrps()" id="t-relatorio">📋 Faturamento</button>
+        <button class="tab" onclick="setTab('relorc');closeGrps()" id="t-relorc">💬 Orçamentos</button>
+      </div>
+    </div>
+
     <div class="tgrp" id="grp-admin">
       <button class="tgrp-btn" onclick="toggleGrp('grp-admin')">⚙️ Admin</button>
       <div class="tgrp-drop">
-        <button class="tab" onclick="setTab('relatorio');closeGrps()" id="t-relatorio">📋 Relatório</button>
         <button class="tab" onclick="setTab('pend');closeGrps()" id="t-pend">🔔 Solicitações <span id="pbadge" style="color:var(--a);"></span></button>
         <button class="tab" onclick="setTab('users');closeGrps()" id="t-users">👥 Usuários</button>
         <button class="tab" onclick="setTab('fotoslanding');closeGrps()" id="t-fotoslanding">🗂 Storage</button>
@@ -764,6 +771,40 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <canvas id="rel-chart" height="80"></canvas>
         </div>
         <div id="rel-table"></div>
+      </div>
+    </div>
+
+    <!-- RELATÓRIO DE ORÇAMENTOS -->
+    <div id="p-relorc" class="panel">
+      <div class="uwrap" style="max-width:1100px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+          <div class="sec-t" style="margin-bottom:0;">Relatório de Orçamentos Gerados</div>
+          <button onclick="relOrcLimparFiltro()" style="background:none;border:1px solid var(--br);border-radius:6px;padding:4px 10px;font-size:11px;color:var(--dl);cursor:pointer;">✕ Limpar filtros</button>
+        </div>
+        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--br);border-radius:14px;padding:14px 16px;margin-bottom:18px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;font-weight:600;color:var(--dl);">Tipo de evento</span>
+            <select id="relorc-tipo" class="inp inp-inline" onchange="renderRelOrcamentos()" style="width:170px;margin-bottom:0;">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:12px;font-weight:600;color:var(--dl);">Gerado de</span>
+            <input type="month" id="relorc-de" class="inp inp-inline" onchange="renderRelOrcamentos()" style="width:140px;margin-bottom:0;">
+            <span style="font-size:12px;font-weight:600;color:var(--dl);">até</span>
+            <input type="month" id="relorc-ate" class="inp inp-inline" onchange="renderRelOrcamentos()" style="width:140px;margin-bottom:0;">
+          </div>
+          <div style="display:flex;gap:14px;align-items:center;border-left:1px solid var(--br);padding-left:14px;">
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--dk);cursor:pointer;">
+              <input type="checkbox" id="relorc-bromelias" onchange="renderRelOrcamentos()" style="accent-color:var(--a);width:15px;height:15px;"> Contém Bromélias
+            </label>
+            <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--dk);cursor:pointer;">
+              <input type="checkbox" id="relorc-tumbergia" onchange="renderRelOrcamentos()" style="accent-color:var(--a);width:15px;height:15px;"> Contém Tumbérgia
+            </label>
+          </div>
+        </div>
+        <div id="relorc-totais" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;"></div>
+        <div id="relorc-table"></div>
       </div>
     </div>
 
@@ -1610,7 +1651,7 @@ function effIsAdmin() { return !_simRole && isAdmin(getCU()); }
 
 function _applyNavForRole(role){
   var isA = !_simRole && isAdmin(getCU());
-  var allGroups=["grp-financeiro","grp-cadastros","grp-admin","grp-eventos"];
+  var allGroups=["grp-financeiro","grp-cadastros","grp-admin","grp-eventos","grp-relatorios"];
   var allSubTabs=["t-contratos","t-vt","t-orcamentos","t-pagar","t-fluxo","t-extrato","t-fluxoreal","t-socios"];
   if(isA || role==="admin"){
     allGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
@@ -1628,7 +1669,7 @@ function _applyNavForRole(role){
     document.getElementById("t-pedidos-eq").style.display="none";
   } else if(role==="assessoria"){
     // assessoria vê agenda, eventos (contratos+pedidos+vt), financeiro (só receber)
-    ["grp-cadastros","grp-admin"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    ["grp-cadastros","grp-admin","grp-relatorios"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     ["grp-financeiro","grp-eventos"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     ["t-orcamentos","t-pagar","t-fluxo","t-extrato","t-fluxoreal","t-socios"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     ["t-contratos","t-pedidos","t-vt"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
@@ -1981,7 +2022,8 @@ const TAB_GRP={
   contratos:"grp-eventos", pedidos:"grp-eventos", vt:"grp-eventos", orcamentos:"grp-eventos",
   receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro", socios:"grp-financeiro",
   fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros", naturezas:"grp-cadastros", assessorias:"grp-cadastros",
-  relatorio:"grp-admin", pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin"
+  pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin",
+  relatorio:"grp-relatorios", relorc:"grp-relatorios"
 };
 function toggleGrp(id){
   const el=document.getElementById(id);
@@ -2008,7 +2050,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios"};
+  const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(cfilter);
   if(t==="receber") renderReceber();
@@ -2020,6 +2062,7 @@ function setTab(t) {
   if(t==="inventario") renderInventario();
   if(t==="fluxoreal") renderFluxoReal();
   if(t==="relatorio") renderRelatorio();
+  if(t==="relorc") renderRelOrcamentos();
   if(t==="pedidos") renderPedidos();
   if(t==="vt") renderVT();
   if(t==="tabelaspreco") renderTabelasPreco();
@@ -6458,6 +6501,81 @@ async function renderRelatorio() {
         <td style="font-weight:700;color:var(--ok);">${fmt(grupos[k].total)}</td>
         <td style="color:var(--dm);">${fmt(grupos[k].total/grupos[k].qtd)}</td>
       </tr>`).join("")}</tbody>
+    </table></div>`;
+
+  } catch(e) {
+    totWr.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro: '+e.message+'</div>';
+  }
+}
+
+function relOrcLimparFiltro(){
+  document.getElementById("relorc-tipo").value="";
+  document.getElementById("relorc-de").value="";
+  document.getElementById("relorc-ate").value="";
+  document.getElementById("relorc-bromelias").checked=false;
+  document.getElementById("relorc-tumbergia").checked=false;
+  renderRelOrcamentos();
+}
+async function renderRelOrcamentos() {
+  const tipoSel = document.getElementById("relorc-tipo");
+  if(tipoSel && tipoSel.options.length<=1){
+    ORC_TIPOS.forEach(t=>{ const o=document.createElement("option"); o.value=t; o.textContent=t; tipoSel.appendChild(o); });
+  }
+  const totWr = document.getElementById("relorc-totais");
+  const tblWr = document.getElementById("relorc-table");
+  totWr.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  tblWr.innerHTML = "";
+  try {
+    const rows = await dbGet("orcamentos","select=id,created_at,data_evento,tipo_evento,nome_noiva,nome_noivo,nome_contratante,num_convidados,valor_total,salao,status&order=created_at.desc&limit=2000");
+
+    const tipo = tipoSel?.value || "";
+    const de   = document.getElementById("relorc-de")?.value  || "";
+    const ate  = document.getElementById("relorc-ate")?.value || "";
+    const fBromelias = document.getElementById("relorc-bromelias")?.checked;
+    const fTumbergia = document.getElementById("relorc-tumbergia")?.checked;
+
+    const filtrado = rows.filter(r => {
+      if(tipo && r.tipo_evento !== tipo) return false;
+      const ref = (r.created_at || "").slice(0,7);
+      if(de  && ref < de)  return false;
+      if(ate && ref > ate) return false;
+      if((fBromelias || fTumbergia)) {
+        const eh = (fBromelias && r.salao === "Bromélias") || (fTumbergia && r.salao === "Tumbergia");
+        if(!eh) return false;
+      }
+      return true;
+    });
+
+    if(!filtrado.length) {
+      totWr.innerHTML = '<div class="empty"><div class="eicon">💬</div>Nenhum orçamento encontrado para os filtros selecionados.</div>';
+      return;
+    }
+
+    const totalGeral  = filtrado.reduce((a,r) => a + (Number(r.valor_total)||0), 0);
+    const convertidos = filtrado.filter(r => r.status === "convertido").length;
+
+    totWr.innerHTML = `
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+        <div class="tot-card"><div class="tot-lbl">Orçamentos</div><div class="tot-val blue">${filtrado.length}</div></div>
+        <div class="tot-card"><div class="tot-lbl">Valor Total</div><div class="tot-val green">${fmt(totalGeral)}</div></div>
+        <div class="tot-card"><div class="tot-lbl">Ticket Médio</div><div class="tot-val">${fmt(totalGeral/filtrado.length)}</div></div>
+        <div class="tot-card"><div class="tot-lbl">Convertidos</div><div class="tot-val">${convertidos}</div></div>
+      </div>`;
+
+    tblWr.innerHTML = `<div class="table-wrap"><table class="fin-table">
+      <thead><tr><th>Gerado em</th><th>Evento</th><th>Tipo</th><th>Salão</th><th>Convidados</th><th>Valor</th><th>Status</th></tr></thead>
+      <tbody>${filtrado.map(r => {
+        const nomes = [r.nome_noiva,r.nome_noivo].filter(Boolean).join(" e ") || r.nome_contratante || "—";
+        return `<tr>
+          <td>${r.created_at ? r.created_at.slice(0,10).split("-").reverse().join("/") : "—"}</td>
+          <td style="font-weight:600;">${_esc(nomes)}</td>
+          <td>${_esc(r.tipo_evento||"—")}</td>
+          <td>${_esc(r.salao||"—")}</td>
+          <td style="text-align:center;">${r.num_convidados||"—"}</td>
+          <td style="font-weight:700;color:var(--ok);">${r.valor_total ? fmt(r.valor_total) : "—"}</td>
+          <td>${ORC_STATUS_LABEL[r.status]||r.status||"—"}</td>
+        </tr>`;
+      }).join("")}</tbody>
     </table></div>`;
 
   } catch(e) {
