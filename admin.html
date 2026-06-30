@@ -340,7 +340,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.30b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.30c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -504,7 +504,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.06.30b</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.06.30c</div>
       </div>
     </div>
     <div class="uarea">
@@ -2480,15 +2480,24 @@ function renderGrid(fi){
       const stt=getDiaStatus(dk);
       if(stt==="buffer"){
         const ch=document.createElement("div");
+        ch.title="Montagem/Desmontagem";
         ch.style.cssText="font-size:9px;font-weight:700;background:#fef3c7;color:#b45309;border-radius:5px 2px 2px 5px;padding:2px 5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;cursor:default;";
-        ch.textContent="🔧 Montagem/Desmontagem";
+        ch.textContent="🔧 Buffer";
         cell.appendChild(ch);
       } else if(stt==="disponivel"){
         const ch=document.createElement("div");
+        ch.title="Disponível";
         ch.style.cssText="font-size:9px;font-weight:700;background:#dcfce7;color:#16a34a;border-radius:5px 2px 2px 5px;padding:2px 5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;cursor:default;";
-        const oc=_orcCountMap[dk]||0;
-        ch.textContent="✓ Disponível"+(oc>0?` · 💬 ${oc}`:"");
+        ch.textContent="🟢 Livre";
         cell.appendChild(ch);
+        const oc=_orcCountMap[dk]||0;
+        if(oc>0){
+          const co=document.createElement("div");
+          co.title=oc+" orçamento(s) gerado(s) para esta data";
+          co.style.cssText="font-size:9px;font-weight:700;background:#e0f2fe;color:#0369a1;border-radius:5px 2px 2px 5px;padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;cursor:default;";
+          co.textContent="💬 "+oc;
+          cell.appendChild(co);
+        }
       }
     }
     gr.appendChild(cell);
