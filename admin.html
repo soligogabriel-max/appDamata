@@ -340,7 +340,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.30a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.06.30b</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -504,7 +504,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.06.30a</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.06.30b</div>
       </div>
     </div>
     <div class="uarea">
@@ -2326,6 +2326,7 @@ async function updBadge() {
 const todayD = new Date();
 let cy=todayD.getFullYear(), cm=todayD.getMonth(), cvm="cal", cfilter=null;
 let cachedEvts = [], _assMap = {}, _assAll = [];
+let _allEvts = [], _orcCountMap = {};
 
 function pd(s){if(!s)return new Date();const[y,mo,d]=s.split("-").map(Number);return new Date(y,mo-1,d);}
 function tk(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
@@ -2340,6 +2341,40 @@ function evDay(dk, fi) {
     const eEnd=(e.data_fim && e.data_fim>=e.data_evento)?pd(e.data_fim):eStart;
     return day>=eStart && day<=eEnd;
   });
+}
+
+// Disponibilidade do espaço inteiro: qualquer contrato não-cancelado ocupa o dia
+// + 1 dia de buffer antes/depois (montagem/desmontagem) — vale p/ evento e hospedagem.
+function getDiaStatus(dk) {
+  const day = pd(dk);
+  let buffer = false;
+  for (const e of _allEvts) {
+    if (!e.data_evento || e.status === "cancelado") continue;
+    const eStart = pd(e.data_evento);
+    const eEnd = (e.data_fim && e.data_fim >= e.data_evento) ? pd(e.data_fim) : eStart;
+    if (day >= eStart && day <= eEnd) return "ocupado";
+    const bufStart = new Date(eStart); bufStart.setDate(bufStart.getDate()-1);
+    const bufEnd = new Date(eEnd); bufEnd.setDate(bufEnd.getDate()+1);
+    if (day >= bufStart && day <= bufEnd) buffer = true;
+  }
+  return buffer ? "buffer" : "disponivel";
+}
+
+// Verifica se [d1-1, d2+1] colide com outro contrato não-cancelado (já considerando o buffer dele também).
+async function checkDateConflict(d1, d2, excludeCod) {
+  const start = pd(d1), end = pd(d2 || d1);
+  const buffStart = new Date(start); buffStart.setDate(buffStart.getDate()-1);
+  const buffEnd = new Date(end); buffEnd.setDate(buffEnd.getDate()+1);
+  const rows = await dbGet("agenda","select=cod,nome_evento,tipo_evento,data_evento,data_fim,status&status=neq.cancelado&limit=1000");
+  return rows.find(r=>{
+    if(!r.data_evento) return false;
+    if(excludeCod && r.cod===excludeCod) return false;
+    const rStart=pd(r.data_evento);
+    const rEnd=(r.data_fim && r.data_fim>=r.data_evento)?pd(r.data_fim):rStart;
+    const rBuffStart=new Date(rStart); rBuffStart.setDate(rBuffStart.getDate()-1);
+    const rBuffEnd=new Date(rEnd); rBuffEnd.setDate(rBuffEnd.getDate()+1);
+    return buffStart<=rBuffEnd && buffEnd>=rBuffStart;
+  }) || null;
 }
 
 function cmo(d){cm+=d;if(cm>11){cm=0;cy++;}if(cm<0){cm=11;cy--;}renderCal(cfilter);}
@@ -2366,11 +2401,18 @@ async function renderCal(fi) {
 
   // Load events for this month from Supabase (all events, filter in JS)
   try {
-    const [_evtsRaw, _assRows] = await Promise.all([
+    const [_evtsRaw, _assRows, _orcRows] = await Promise.all([
       dbGet("agenda","order=data_evento.asc.nullslast&select=*&limit=1000"),
-      dbGet("assessorias","select=cod,nome&limit=500")
+      dbGet("assessorias","select=cod,nome&limit=500"),
+      dbGet("orcamentos","select=data_evento,status&limit=3000")
     ]);
     _assRows.forEach(a=>{ _assMap[a.cod]=a.nome; }); _assAll=_assRows;
+    _allEvts = _evtsRaw; // base completa (sem filtro de mês) p/ cálculo de ocupação/buffer
+    _orcCountMap = {};
+    (_orcRows||[]).forEach(r=>{
+      if(!r.data_evento || r.status==="convertido") return;
+      _orcCountMap[r.data_evento] = (_orcCountMap[r.data_evento]||0) + 1;
+    });
     cachedEvts = _evtsRaw;
     // Filter to events overlapping this month (exclude null dates and invalid dates like 3000-01-01)
     const mStart = new Date(cy, cm, 1);
@@ -2434,11 +2476,20 @@ function renderGrid(fi){
         cell.appendChild(ch);
       }
     }
-    if((dow===5||dow===6||dow===0)&&deAll.length===0){
-      const ch=document.createElement("div");
-      ch.style.cssText="font-size:9px;font-weight:700;background:#dcfce7;color:#16a34a;border-radius:5px 2px 2px 5px;padding:2px 5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;cursor:default;";
-      ch.textContent="✓ Disponível";
-      cell.appendChild(ch);
+    if(deAll.length===0){
+      const stt=getDiaStatus(dk);
+      if(stt==="buffer"){
+        const ch=document.createElement("div");
+        ch.style.cssText="font-size:9px;font-weight:700;background:#fef3c7;color:#b45309;border-radius:5px 2px 2px 5px;padding:2px 5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;cursor:default;";
+        ch.textContent="🔧 Montagem/Desmontagem";
+        cell.appendChild(ch);
+      } else if(stt==="disponivel"){
+        const ch=document.createElement("div");
+        ch.style.cssText="font-size:9px;font-weight:700;background:#dcfce7;color:#16a34a;border-radius:5px 2px 2px 5px;padding:2px 5px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;cursor:default;";
+        const oc=_orcCountMap[dk]||0;
+        ch.textContent="✓ Disponível"+(oc>0?` · 💬 ${oc}`:"");
+        cell.appendChild(ch);
+      }
     }
     gr.appendChild(cell);
   }
@@ -2688,6 +2739,17 @@ async function saveEvent(){
   const d1=document.getElementById("mef-d1").value;
   const d2=document.getElementById("mef-d2").value;
   if(!d1||!d2){toast("Informe data de início e fim.");return;}
+  const existCodChk=document.getElementById("mef-id").value;
+  const statusChk=document.getElementById("mef-status").value;
+  if(statusChk!=="cancelado"){
+    const conflito=await checkDateConflict(d1,d2,existCodChk||null);
+    if(conflito){
+      const ref=conflito.nome_evento||conflito.cod;
+      const dataRef=conflito.data_evento.split("-").reverse().join("/");
+      toast(`⚠️ Data indisponível: conflito com "${ref}" (${dataRef}). Considere a montagem/desmontagem de 1 dia antes e depois.`);
+      return;
+    }
+  }
   const locSel=document.getElementById("mef-loc-sel").value;
   const location=locSel==="outro"?document.getElementById("mef-loc-txt").value:locSel;
   const typeSel=document.getElementById("mef-type-sel").value;
@@ -5217,7 +5279,8 @@ function _orcHTML1(){
     <label class="lbl">Tipo de evento *</label>
     <select id="orc-tipo" class="inp" onchange="_orcRenderNames()">${tipos}</select>
     <label class="lbl">Data do evento *</label>
-    <input type="date" id="orc-data" class="inp" value="${_orc.data_evento}" min="${new Date().toISOString().slice(0,10)}"/>
+    <input type="date" id="orc-data" class="inp" value="${_orc.data_evento}" min="${new Date().toISOString().slice(0,10)}" onchange="_orcCheckDataConflito()"/>
+    <div id="orc-warn-data" style="display:none;color:#b45309;font-size:12px;margin:-10px 0 14px;"></div>
     <label class="lbl">Número de convidados *</label>
     <input type="number" id="orc-conv" class="inp" value="${_orc.num_convidados}" placeholder="ex: 80" min="1" max="450"/>
     <div id="orc-name-fields">${_orcNameFieldsHTML(curTipo)}</div>
@@ -5232,6 +5295,21 @@ function _orcHTML1(){
   <div class="orc-nav">
     <button class="orc-btn-next" onclick="_orcNext1()">Próximo →</button>
   </div>`;
+}
+
+async function _orcCheckDataConflito(){
+  const data=document.getElementById("orc-data").value;
+  const warn=document.getElementById("orc-warn-data");
+  if(!data){warn.style.display="none";return;}
+  try{
+    const conflito=await checkDateConflict(data,data,null);
+    if(conflito){
+      warn.style.display="block";
+      warn.textContent="⚠️ Já existe um evento próximo a esta data. Você pode enviar a solicitação, mas a disponibilidade será confirmada pela nossa equipe.";
+    } else {
+      warn.style.display="none";
+    }
+  }catch(e){ warn.style.display="none"; }
 }
 
 async function _orcNext1(){
