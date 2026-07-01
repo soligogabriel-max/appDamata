@@ -1,6 +1,6 @@
 // Edge Function: set-user-role
-// Atualiza app_metadata.role de um usuário no Supabase Auth.
-// Chamada pelo admin ao aprovar um usuário em confirmApr().
+// Atualiza app_metadata.role e/ou senha de um usuário no Supabase Auth.
+// Chamada pelo admin ao aprovar ou editar usuários.
 // Requer JWT de admin no header Authorization.
 
 const CORS = {
@@ -23,19 +23,18 @@ Deno.serve(async (req) => {
   const SB_URL = Deno.env.get("SUPABASE_URL")!;
   const SB_SR  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  // Verificar que quem chama é admin — conferir papel no JWT
+  // Verificar que quem chama é admin
   const authHeader = req.headers.get("Authorization") || "";
-  const callerToken = authHeader.replace("Bearer ", "").trim();
+  const callerToken = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!callerToken || callerToken === Deno.env.get("SUPABASE_ANON_KEY")) {
     return json({ error: "Não autorizado." }, 401);
   }
 
-  // Decodificar JWT para verificar papel (sem verificação de assinatura — Supabase já fez isso)
   try {
     const [, payload] = callerToken.split(".");
     const claims = JSON.parse(atob(payload));
-    const role = claims?.app_metadata?.role || claims?.user_metadata?.role;
-    if (role !== "admin") return json({ error: "Apenas admins podem alterar papéis." }, 403);
+    const callerRole = claims?.app_metadata?.role || claims?.user_metadata?.role;
+    if (callerRole !== "admin") return json({ error: "Apenas admins podem alterar papéis ou senhas." }, 403);
   } catch {
     return json({ error: "Token inválido." }, 401);
   }
@@ -43,10 +42,12 @@ Deno.serve(async (req) => {
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "JSON inválido." }, 400); }
 
-  const { user_email, role } = body || {};
-  if (!user_email || !role) return json({ error: "Campos obrigatórios: user_email, role." }, 400);
+  const { user_email, role, password } = body || {};
+  if (!user_email || (!role && !password)) {
+    return json({ error: "Campos obrigatórios: user_email e ao menos role ou password." }, 400);
+  }
 
-  // Buscar usuário pelo email via Admin API
+  // Buscar usuário pelo email
   const listRes = await fetch(`${SB_URL}/auth/v1/admin/users?email=${encodeURIComponent(user_email)}`, {
     headers: { apikey: SB_SR, Authorization: "Bearer " + SB_SR },
   });
@@ -56,7 +57,11 @@ Deno.serve(async (req) => {
 
   const userId = users[0].id;
 
-  // Atualizar app_metadata.role
+  // Montar payload de atualização
+  const updatePayload: Record<string, unknown> = {};
+  if (role) updatePayload.app_metadata = { role };
+  if (password) updatePayload.password = password;
+
   const patchRes = await fetch(`${SB_URL}/auth/v1/admin/users/${userId}`, {
     method: "PUT",
     headers: {
@@ -64,13 +69,13 @@ Deno.serve(async (req) => {
       Authorization: "Bearer " + SB_SR,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ app_metadata: { role } }),
+    body: JSON.stringify(updatePayload),
   });
 
   if (!patchRes.ok) {
     const err = await patchRes.text();
-    return json({ error: "Falha ao atualizar papel.", detail: err }, 502);
+    return json({ error: "Falha ao atualizar usuário.", detail: err }, 502);
   }
 
-  return json({ ok: true, user_email, role });
+  return json({ ok: true, user_email, ...(role ? { role } : {}), ...(password ? { password_updated: true } : {}) });
 });
