@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.51/dist/zip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 :root{--a:#E8A52A;--al:#FDF3D8;--am:#F5D68A;--dk:#2E3C44;--dm:#4A5D66;--dl:#7A8F96;--bg:#FAFAF7;--card:#FFF;--br:#EDE8DF;--ok:#2A6644;--wa:#C08820;--er:#A03030;--pr:#1e3a5f;}
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -340,7 +341,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.01a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.01b</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -504,7 +505,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.01a</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.01b</div>
       </div>
     </div>
     <div class="uarea">
@@ -1581,12 +1582,15 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 // ══════════════════════════════════════════
 const SB_URL = "https://wwnndsprpofmgbklqdgg.supabase.co";
 const SB_KEY = "sb_publishable__RQxBa8P-lryd0LtWgTJPw_-aSWERWK";
+const _sb = supabase.createClient(SB_URL, SB_KEY);
+let _authToken = SB_KEY;
+_sb.auth.onAuthStateChange((_, session) => { _authToken = session?.access_token || SB_KEY; });
 
 async function sbFetch(path, opts={}) {
   const res = await fetch(SB_URL + "/rest/v1/" + path, {
     headers: {
       "apikey": SB_KEY,
-      "Authorization": "Bearer " + SB_KEY,
+      "Authorization": "Bearer " + _authToken,
       "Content-Type": "application/json",
       "Prefer": opts.prefer || "return=representation",
       ...( opts.headers || {} )
@@ -1878,13 +1882,18 @@ async function doLogin() {
   const btn = document.getElementById("btn-login");
   btn.disabled = true; btn.textContent = "Entrando...";
   try {
-    // Check DB users
+    const { data, error } = await _sb.auth.signInWithPassword({ email: em, password: pw });
+    if (error) {
+      er.style.display="block";
+      er.textContent = error.message.includes("Invalid") ? "Email ou senha incorretos." : "Erro de conexão. Tente novamente.";
+      return;
+    }
+    if (data.session) _authToken = data.session.access_token;
     const users = await dbGet("app_users", "email=eq." + encodeURIComponent(em) + "&select=*");
-    if (!users.length) { er.style.display="block"; er.textContent="Email não encontrado."; return; }
+    if (!users.length) { await _sb.auth.signOut(); er.style.display="block"; er.textContent="Usuário não encontrado. Contate a Damata."; return; }
     const u = users[0];
-    if (u.password !== pw) { er.style.display="block"; er.textContent="Senha incorreta."; return; }
-    if (u.status === "pending") { er.style.display="block"; er.textContent="Cadastro aguardando aprovação."; return; }
-    if (u.status === "rejected") { er.style.display="block"; er.textContent="Acesso negado. Contate a Damata."; return; }
+    if (u.status === "pending") { await _sb.auth.signOut(); er.style.display="block"; er.textContent="Cadastro aguardando aprovação."; return; }
+    if (u.status === "rejected") { await _sb.auth.signOut(); er.style.display="block"; er.textContent="Acesso negado. Contate a Damata."; return; }
     setCU(u); openApp(u); offerBiometric(u);
   } catch(e) {
     er.style.display="block"; er.textContent="Erro de conexão. Tente novamente.";
@@ -1925,8 +1934,12 @@ async function doCadastroCliente() {
       cpf_testemunha:      document.getElementById("cad-test-cpf").value.trim()||null,
       email_testemunha:    document.getElementById("cad-test-email").value.trim()||null,
     };
+    const { error: authErr } = await _sb.auth.signUp({ email, password: senha, options: { data: { name: nome } } });
+    if (authErr && !authErr.message.toLowerCase().includes("already registered")) {
+      er.style.display="block"; er.textContent="Erro ao criar conta: "+authErr.message; return;
+    }
     await dbInsert("app_users", {
-      name: nome, email, phone: cel, password: senha,
+      name: nome, email, phone: cel, password: '',
       role: "cliente", status: "approved",
       event_ids: [], personal,
     });
@@ -1951,7 +1964,11 @@ async function doReg() {
   try {
     const existing = await dbGet("app_users","email=eq."+encodeURIComponent(em)+"&select=id");
     if (existing.length) { er.style.display="block"; er.textContent="Email já cadastrado."; return; }
-    await dbInsert("app_users", {name, email:em, phone, password:pw, role:"pending", status:"pending", event_ids:[], personal:{}});
+    const { error: authErr } = await _sb.auth.signUp({ email: em, password: pw, options: { data: { name } } });
+    if (authErr && !authErr.message.toLowerCase().includes("already registered")) {
+      er.style.display="block"; er.textContent="Erro ao criar conta: "+authErr.message; return;
+    }
+    await dbInsert("app_users", {name, email:em, phone, password:'', role:"pending", status:"pending", event_ids:[], personal:{}});
     showSc("pending");
   } catch(e) {
     er.style.display="block"; er.textContent="Erro ao enviar. Tente novamente.";
@@ -1960,7 +1977,7 @@ async function doReg() {
   }
 }
 
-function doLogout() { setCU(null); showSc("login"); }
+function doLogout() { _sb.auth.signOut(); setCU(null); showSc("login"); }
 
 // ══════════════════════════════════════════
 // APP
@@ -3115,7 +3132,7 @@ async function renderPend(){
     if(!users.length){wr.innerHTML='<div class="empty"><div class="eicon">✅</div>Nenhuma solicitação pendente.</div>';return;}
     users.forEach(u=>{
       const c=document.createElement("div");c.className="ucard";
-      c.innerHTML=`<div class="uav">👤</div><div class="uinfo"><div class="uname2">${u.name}</div><div class="uemail">${u.email}</div>${u.phone?`<div class="uemail">📱 ${u.phone}</div>`:""}<div class="uemail">${u.created_at?new Date(u.created_at).toLocaleDateString("pt-BR"):""}</div></div><div class="uacts"><button class="btn-a" onclick="openApr('${u.id}','${u.name.replace(/'/g,"\'")}')">Aprovar</button><button class="btn-sm" onclick="rejU('${u.id}')">Rejeitar</button></div>`;
+      c.innerHTML=`<div class="uav">👤</div><div class="uinfo"><div class="uname2">${_esc(u.name)}</div><div class="uemail">${_esc(u.email)}</div>${u.phone?`<div class="uemail">📱 ${_esc(u.phone)}</div>`:""}<div class="uemail">${u.created_at?new Date(u.created_at).toLocaleDateString("pt-BR"):""}</div></div><div class="uacts"><button class="btn-a" onclick="openApr(this.dataset.id,this.dataset.n)" data-id="${u.id}" data-n="${_esc(u.name)}">Aprovar</button><button class="btn-sm" onclick="rejU('${u.id}')">Rejeitar</button></div>`;
       wr.appendChild(c);
     });
   } catch(e){wr.innerHTML='<div class="empty">Erro ao carregar.</div>';}
@@ -3140,7 +3157,7 @@ async function renderUsers(){
       const ud = _esc(JSON.stringify(u));
       const c=document.createElement("div");c.className="ucard";
       const gcBtn = u.role==="cliente" ? `<button style="margin-top:6px;font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--a);background:var(--al);cursor:pointer;font-weight:700;" onclick='openGerarContrato(JSON.parse(this.dataset.u))' data-u="${ud}">📄 Gerar Contrato</button>` : "";
-      c.innerHTML=`<div class="uav">👤</div><div class="uinfo"><div class="uname2">${u.name}</div><div class="uemail">${u.email}</div>${evN?`<div class="uemail" style="margin-top:3px;">📅 ${evN}</div>`:""}${assNome?`<div class="uemail" style="margin-top:3px;">🎗 ${assNome}</div>`:""}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"><button style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--br);background:var(--al);cursor:pointer;" onclick='openEditUser(JSON.parse(this.dataset.u))' data-u="${ud}">✏️ Editar acesso</button>${gcBtn}</div></div><span class="urb" style="background:${rbg[u.role]||"#EEE"};color:${rtx[u.role]||"#555"};">${RL[u.role]||u.role}</span>`;
+      c.innerHTML=`<div class="uav">👤</div><div class="uinfo"><div class="uname2">${_esc(u.name)}</div><div class="uemail">${_esc(u.email)}</div>${evN?`<div class="uemail" style="margin-top:3px;">📅 ${_esc(evN)}</div>`:""}${assNome?`<div class="uemail" style="margin-top:3px;">🎗 ${_esc(assNome)}</div>`:""}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"><button style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--br);background:var(--al);cursor:pointer;" onclick='openEditUser(JSON.parse(this.dataset.u))' data-u="${ud}">✏️ Editar acesso</button>${gcBtn}</div></div><span class="urb" style="background:${rbg[u.role]||"#EEE"};color:${rtx[u.role]||"#555"};">${RL[u.role]||u.role}</span>`;
       wr.appendChild(c);
     });
   } catch(e){wr.innerHTML='<div class="empty">Erro ao carregar.</div>';}
@@ -4849,11 +4866,21 @@ var HOSPEDAGEM_B64="PCFET0NUWVBFIGh0bWw+CjxodG1sIGxhbmc9InB0LUJSIj4KPGhlYWQ+Cjxt
 window.addEventListener("load", async()=>{
   const loading = document.getElementById("loading");
   try {
-    const u = getCU();
-    if(u && u.status==="approved") {
-      openApp(u);
+    const { data: { session } } = await _sb.auth.getSession();
+    if (session) {
+      _authToken = session.access_token;
+      let u = getCU();
+      if (!u || u.email !== session.user.email) {
+        const rows = await dbGet("app_users", "email=eq." + encodeURIComponent(session.user.email) + "&select=*");
+        u = rows[0] || null;
+      }
+      if (u && u.status === "approved") {
+        setCU(u); openApp(u);
+      } else {
+        await _sb.auth.signOut(); setCU(null); showSc("login");
+      }
     } else {
-      showSc("login");
+      setCU(null); showSc("login");
     }
   } catch(e){
     showSc("login");

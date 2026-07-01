@@ -8,7 +8,7 @@
 //   GOOGLE_CALENDAR_ID         = atendimentoespacodamata@gmail.com
 //
 // Body: { action: "upsert"|"delete", cod, nome_evento, data_evento, data_fim?,
-//         tipo_evento?, local_evento?, status?, google_cal_id? }
+//         tipo_evento?, local_evento?, status?, spaces_json?, google_cal_id? }
 //
 // Resposta: { ok: true, google_cal_id: "..." }
 
@@ -47,6 +47,48 @@ function addOneDay(dateStr: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+const SPACES_LABELS: Record<string, string> = {
+  spTumb:    "Salão Tumbérgia",
+  spPeroba:  "Peroba Rosa",
+  spBrom:    "Salão Bromélias",
+  acLoft:    "Loft Flamboyant",
+  acCasa:    "Casa Flamboyant",
+  acSuiteAss:"Suíte Assessoria",
+  acSf1:     "Suíte SF1",
+  acSf2:     "Suíte SF2",
+  acSf3:     "Suíte SF3",
+  acSf4:     "Suíte SF4",
+  acSf5:     "Suíte SF5",
+  acSb1:     "Suíte SB1",
+  acSb2:     "Suíte SB2",
+  acSb3:     "Suíte SB3",
+  fuBal:     "Balneário",
+};
+
+function buildDescription(tipo_evento?: string, status?: string, spaces_json?: string, assessoria_nome?: string): string {
+  const parts: string[] = [];
+
+  if (tipo_evento) parts.push(tipo_evento);
+  if (status) parts.push(`Status: ${status}`);
+  if (assessoria_nome) parts.push(`Assessoria: ${assessoria_nome}`);
+
+  if (spaces_json) {
+    try {
+      const sp = JSON.parse(spaces_json);
+      const items: string[] = [];
+      for (const [key, label] of Object.entries(SPACES_LABELS)) {
+        if (sp[key]) items.push(label);
+      }
+      if (sp.mesas) items.push(`${sp.mesas} mesas`);
+      if (sp.cad)   items.push(`${sp.cad} cadeiras`);
+      if (sp.ban)   items.push(`${sp.ban} banquetas`);
+      if (items.length) parts.push("Incluso: " + items.join(", "));
+    } catch { /* spaces_json inválido, ignora */ }
+  }
+
+  return parts.join("\n") || "";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
@@ -69,7 +111,9 @@ Deno.serve(async (req) => {
     tipo_evento?: string;
     local_evento?: string;
     status?: string;
+    spaces_json?: string;
     google_cal_id?: string;
+    assessoria_nome?: string;
   } = {};
 
   try {
@@ -78,7 +122,7 @@ Deno.serve(async (req) => {
     return json({ error: "JSON inválido." }, 400);
   }
 
-  const { action = "upsert", cod, nome_evento, data_evento, data_fim, tipo_evento, local_evento, status, google_cal_id } = body;
+  const { action = "upsert", cod, nome_evento, data_evento, data_fim, tipo_evento, local_evento, status, spaces_json, google_cal_id, assessoria_nome } = body;
 
   if (!data_evento) return json({ error: "data_evento obrigatório." }, 400);
 
@@ -100,13 +144,16 @@ Deno.serve(async (req) => {
   }
 
   // ── UPSERT (create ou update) ──
-  const descParts = [tipo_evento, status ? `Status: ${status}` : null].filter(Boolean);
+  const title = nome_evento && cod
+    ? `${nome_evento} [${cod}]`
+    : (nome_evento || cod || "Evento Fazenda Damata");
+
   const event = {
-    summary: nome_evento || cod || "Evento Fazenda Damata",
-    description: descParts.join(" · ") || undefined,
-    location: local_evento || "Fazenda Damata, Campinas - SP",
+    summary: title,
+    description: buildDescription(tipo_evento, status, spaces_json, assessoria_nome) || undefined,
+    location: local_evento || "Fazenda Damata, Mogi Mirim - SP",
     start: { date: data_evento },
-    end: { date: addOneDay(data_fim || data_evento) },
+    end: { date: addOneDay((data_fim && data_fim >= data_evento) ? data_fim : data_evento) },
   };
 
   let gcalId = google_cal_id;
