@@ -67,11 +67,16 @@ Deno.serve(async (req) => {
       }
     }`;
 
-  // Signatários fixos da fazenda (assinam todo contrato, por WhatsApp)
+  // Signatários fixos da fazenda — configurar via Supabase Edge Functions Secrets:
+  // FAZENDA_SIGNER1_NAME, FAZENDA_SIGNER1_PHONE, FAZENDA_SIGNER2_NAME, FAZENDA_SIGNER2_PHONE
+  const s1n = Deno.env.get("FAZENDA_SIGNER1_NAME") || "";
+  const s1p = Deno.env.get("FAZENDA_SIGNER1_PHONE") || "";
+  const s2n = Deno.env.get("FAZENDA_SIGNER2_NAME") || "";
+  const s2p = Deno.env.get("FAZENDA_SIGNER2_PHONE") || "";
   const FAZENDA_SIGNERS = [
-    { name: "Vitoria Bedutti Rodrigues", phone: "+5519994086658", action: "SIGN", delivery_method: "DELIVERY_METHOD_WHATSAPP" },
-    { name: "Gabriel Jose Soligo", phone: "+5519991677827", action: "SIGN", delivery_method: "DELIVERY_METHOD_WHATSAPP" },
-  ];
+    s1p ? { name: s1n, phone: s1p, action: "SIGN", delivery_method: "DELIVERY_METHOD_WHATSAPP" } : null,
+    s2p ? { name: s2n, phone: s2p, action: "SIGN", delivery_method: "DELIVERY_METHOD_WHATSAPP" } : null,
+  ].filter(Boolean);
 
   const variables = {
     document: { name: docName || ("Contrato " + (cod || "")) },

@@ -2,28 +2,14 @@
 
 ## Início de cada sessão
 
-Trabalhar sempre direto no `main`. Sincronizar e ativar o hook de versão:
+Antes de fazer qualquer mudança, sincronizar os arquivos principais com o main:
 
 ```bash
 git fetch origin
-git checkout main
-git pull origin main
-git config core.hooksPath .githooks
+git checkout origin/main -- index.html gerador-contrato-damata.html
 ```
 
-O `git config core.hooksPath .githooks` ativa o hook pre-commit que bumpa a versão automaticamente — **rodar sempre no início**, pois `.git/hooks/` não é versionado.
-
-## Deploy
-
-**Toda mudança vai direto ao `main` e entra em produção imediatamente.**
-Não usar branches intermediários nem PRs — o usuário testa em produção.
-
-Fluxo após cada alteração:
-```bash
-git add index.html gerador-contrato-damata.html  # (ou outros arquivos alterados)
-git commit -m "fix/feat: descrição"
-git push origin main
-```
+Isso garante que partimos sempre da versão mais recente, evitando perder fixes anteriores.
 
 ## Arquitetura
 
@@ -54,21 +40,18 @@ b64 = base64.b64encode(html.encode('utf-8')).decode('ascii')
 
 ## Versão na landing page
 
-A versão é bumpa **automaticamente** pelo hook `.githooks/pre-commit` a cada commit — não precisa atualizar manualmente.
+A cada commit com mudanças funcionais, atualizar o número de versão na linha 338 do `index.html`:
 
-Formato: `v{ANO}.{MÊS}.{DIA}{letra}` — a letra distingue múltiplos deploys no mesmo dia.
-
-Se por algum motivo o hook não estiver ativo, rodar:
-```bash
-git config core.hooksPath .githooks
+```html
+<div id="ll-version" ...>v2026.06.19h</div>
 ```
 
-## Edições em massa
+Formato: `v{ANO}.{MÊS}.{DIA}{letra}` — a letra (`a`, `b`, `c`...) distingue múltiplos deploys no mesmo dia.
+Exemplo: segunda mudança em 22/06/2026 → `v2026.06.22b`
 
-Usar Python para edições no `index.html` (arquivo muito grande para o editor direto):
+## Workflow de branches
 
-```python
-with open('index.html', 'r', encoding='utf-8') as f: c = f.read()
-c = c.replace(OLD, NEW, 1)
-with open('index.html', 'w', encoding='utf-8') as f: f.write(c)
-```
+- Trabalhar sempre no branch designado pela sessão
+- Usar Python para edições em massa (arquivo é grande demais para Edit direto)
+- Commits atômicos com todas as mudanças relacionadas juntas
+- Nunca usar `git stash pop` entre branches diferentes com `index.html`
