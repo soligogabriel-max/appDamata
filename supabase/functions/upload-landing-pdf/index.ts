@@ -1,6 +1,7 @@
 // Supabase Edge Function: upload-landing-pdf
 // Recebe multipart/form-data com campo "file" (PDF).
 // Usa service role key (auto-injetada) para salvar no bucket landing-pdfs.
+// Requer JWT autenticado com papel admin ou equipe.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -17,9 +18,26 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function getRole(jwt: string): string | null {
+  try {
+    const payload = JSON.parse(atob(jwt.split(".")[1]));
+    return payload?.app_metadata?.role || payload?.user_metadata?.role || null;
+  } catch {
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
+
+  // Verificar autenticação e papel
+  const authHeader = req.headers.get("Authorization") || "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  if (!token || token === anonKey) return json({ error: "Não autorizado." }, 401);
+  const role = getRole(token);
+  if (!["admin", "equipe"].includes(role ?? "")) return json({ error: "Acesso restrito à equipe." }, 403);
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,

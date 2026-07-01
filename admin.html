@@ -341,7 +341,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.01c</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.01d</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -505,7 +505,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.01c</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.01d</div>
       </div>
     </div>
     <div class="uarea">
@@ -2132,7 +2132,7 @@ async function uploadCertNfse(){
     fd.append("password", pass);
     const res  = await fetch(SB_URL + "/functions/v1/upload-nfse-cert", {
       method: "POST",
-      headers: { "Authorization": "Bearer " + SB_KEY },
+      headers: { "Authorization": "Bearer " + _authToken },
       body: fd,
     });
     const data = await res.json();
@@ -2211,7 +2211,7 @@ async function flUploadFoto(){
     fd.append("folder","fotos");
     const res=await fetch(SB_URL+"/functions/v1/upload-landing-pdf",{
       method:"POST",
-      headers:{"Authorization":"Bearer "+SB_KEY},
+      headers:{"Authorization":"Bearer "+_authToken},
       body:fd
     });
     const data=await res.json();
@@ -2313,7 +2313,7 @@ async function flpUpload(){
     fd.append("file",file);
     const res=await fetch(SB_URL+"/functions/v1/upload-landing-pdf",{
       method:"POST",
-      headers:{"Authorization":"Bearer "+SB_KEY},
+      headers:{"Authorization":"Bearer "+_authToken},
       body:fd
     });
     const data=await res.json();
@@ -2952,7 +2952,7 @@ async function runGCalSync() {
 async function _syncGoogleCal(evData) {
   const res = await fetch(SB_URL + "/functions/v1/sync-google-calendar", {
     method: "POST",
-    headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY, "Content-Type": "application/json" },
+    headers: { "apikey": SB_KEY, "Authorization": "Bearer " + _authToken, "Content-Type": "application/json" },
     body: JSON.stringify({
       action: "upsert",
       cod: evData.cod,
@@ -6238,7 +6238,7 @@ async function _verificarAutentique(cod, btn) {
   try {
     const res = await fetch(SB_URL + "/functions/v1/check-autentique-status", {
       method: "POST",
-      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY, "Content-Type": "application/json" },
+      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + _authToken, "Content-Type": "application/json" },
       body: JSON.stringify({ cod }),
     });
     const data = await res.json();
@@ -8175,7 +8175,7 @@ async function sendWppLembretes() {
   try {
     const res = await fetch(SB_URL + "/functions/v1/enviar-lembretes-wpp", {
       method: "POST",
-      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY, "Content-Type": "application/json" },
+      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + _authToken, "Content-Type": "application/json" },
       body: JSON.stringify({ vencimento_de: de, vencimento_ate: ate }),
     });
     const resp = await res.json();

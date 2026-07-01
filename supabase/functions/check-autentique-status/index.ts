@@ -21,9 +21,21 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function getJwtRole(authHeader: string): string | null {
+  const t = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!t) return null;
+  try {
+    const p = JSON.parse(atob(t.split(".")[1]));
+    return p?.app_metadata?.role || p?.user_metadata?.role || null;
+  } catch { return null; }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
+
+  const role = getJwtRole(req.headers.get("Authorization") || "");
+  if (!["admin", "equipe"].includes(role ?? "")) return json({ error: "Não autorizado." }, 401);
 
   const token = Deno.env.get("Autentique_token");
   if (!token) return json({ error: "Token do Autentique não configurado." }, 500);
