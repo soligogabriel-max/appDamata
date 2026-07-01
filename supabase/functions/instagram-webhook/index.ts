@@ -1,12 +1,12 @@
 // Supabase Edge Function: instagram-webhook
 // Recebe eventos de comentários do Instagram via Meta Webhooks.
-// Para cada comentário novo, gera uma resposta com Claude e publica via Graph API.
+// Para cada comentário novo, gera uma resposta com GPT e publica via Graph API.
 //
 // Secrets necessários (Supabase Dashboard → Edge Functions → Secrets):
-//   META_VERIFY_TOKEN   = string aleatória que você define ao configurar o webhook no Meta
-//   META_APP_SECRET     = App Secret do seu Meta App (para verificar assinatura HMAC)
-//   META_ACCESS_TOKEN   = Page Access Token com permissão instagram_manage_comments
-//   ANTHROPIC_API_KEY   = chave da API da Anthropic (console.anthropic.com)
+//   META_VERIFY_TOKEN   = string definida ao configurar o webhook no Meta
+//   META_APP_SECRET     = App Secret do Meta App (para verificar assinatura HMAC)
+//   META_ACCESS_TOKEN   = Page/User Access Token com instagram_manage_comments
+//   OPENAI_API_KEY      = chave da API da OpenAI (platform.openai.com)
 //
 // URL desta função (configurar no Meta App → Webhooks):
 //   https://wwnndsprpofmgbklqdgg.supabase.co/functions/v1/instagram-webhook
@@ -28,7 +28,6 @@ function json(body: unknown, status = 200) {
   });
 }
 
-// Verifica assinatura HMAC-SHA256 do Meta para garantir autenticidade
 async function verifySignature(body: string, signature: string, secret: string): Promise<boolean> {
   try {
     const key = await crypto.subtle.importKey(
@@ -47,24 +46,21 @@ async function verifySignature(body: string, signature: string, secret: string):
   }
 }
 
-// Chama a API do Claude para gerar a resposta ao comentário
 async function generateReply(comment: string, authorName: string, apiKey: string): Promise<string> {
-  const systemPrompt = `Você é a assistente virtual da Fazenda Damata, um espaço de eventos para casamentos, festas e hospedagem em meio à natureza em Minas Gerais.
-
-Responda comentários do Instagram de forma calorosa, genuína e profissional. Use um tom acolhedor e próximo, como uma equipe apaixonada pelo que faz. Seja breve (1-3 frases). Não use emojis em excesso. Se a pessoa demonstra interesse em reservar ou pedir informações, convide a entrar em contato pelo WhatsApp ou DM. Não invente preços ou datas. Escreva em português brasileiro.`;
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
+      "Authorization": "Bearer " + apiKey,
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
+      model: "gpt-4o-mini",
       max_tokens: 200,
-      system: systemPrompt,
       messages: [
+        {
+          role: "system",
+          content: `Você é a assistente virtual da Fazenda Damata, um espaço de eventos para casamentos, festas e hospedagem em meio à natureza em Minas Gerais. Responda comentários do Instagram de forma calorosa, genuína e profissional. Use um tom acolhedor e próximo, como uma equipe apaixonada pelo que faz. Seja breve (1-3 frases). Não use emojis em excesso. Se a pessoa demonstra interesse em reservar ou pedir informações, convide a entrar em contato pelo WhatsApp ou DM. Não invente preços ou datas. Escreva em português brasileiro.`,
+        },
         {
           role: "user",
           content: `${authorName} comentou: "${comment}"\n\nEscreva uma resposta para este comentário.`,
@@ -75,14 +71,13 @@ Responda comentários do Instagram de forma calorosa, genuína e profissional. U
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error("Claude API error: " + err);
+    throw new Error("OpenAI API error: " + err);
   }
 
   const data = await res.json();
-  return (data.content?.[0]?.text || "").trim();
+  return (data.choices?.[0]?.message?.content || "").trim();
 }
 
-// Publica resposta como reply ao comentário via Graph API
 async function postReply(commentId: string, message: string, accessToken: string): Promise<void> {
   const res = await fetch(
     `https://graph.facebook.com/v21.0/${commentId}/replies`,
@@ -104,13 +99,13 @@ Deno.serve(async (req) => {
   const META_VERIFY_TOKEN = Deno.env.get("META_VERIFY_TOKEN") || "";
   const META_APP_SECRET   = Deno.env.get("META_APP_SECRET") || "";
   const META_ACCESS_TOKEN = Deno.env.get("META_ACCESS_TOKEN") || "";
-  const ANTHROPIC_KEY     = Deno.env.get("ANTHROPIC_API_KEY") || "";
+  const OPENAI_KEY        = Deno.env.get("OPENAI_API_KEY") || "";
 
   // ── GET: verificação do webhook pelo Meta ─────────────────────────────────
   if (req.method === "GET") {
-    const url    = new URL(req.url);
-    const mode   = url.searchParams.get("hub.mode");
-    const token  = url.searchParams.get("hub.verify_token");
+    const url       = new URL(req.url);
+    const mode      = url.searchParams.get("hub.mode");
+    const token     = url.searchParams.get("hub.verify_token");
     const challenge = url.searchParams.get("hub.challenge");
 
     if (mode === "subscribe" && token === META_VERIFY_TOKEN && challenge) {
@@ -125,9 +120,8 @@ Deno.serve(async (req) => {
 
   const rawBody = await req.text();
 
-  // Verificar assinatura HMAC
   if (META_APP_SECRET) {
-    const sig = req.headers.get("x-hub-signature-256") || "";
+    const sig   = req.headers.get("x-hub-signature-256") || "";
     const valid = await verifySignature(rawBody, sig, META_APP_SECRET);
     if (!valid) {
       console.error("Assinatura inválida.");
@@ -138,36 +132,31 @@ Deno.serve(async (req) => {
   let payload: any;
   try { payload = JSON.parse(rawBody); } catch { return json({ error: "JSON inválido." }, 400); }
 
-  // Processar eventos em paralelo (sem bloquear resposta ao Meta)
-  if (!ANTHROPIC_KEY || !META_ACCESS_TOKEN) {
-    console.error("Secrets META_ACCESS_TOKEN ou ANTHROPIC_API_KEY não configurados.");
-    return json({ ok: true }); // retorna 200 para o Meta não reenviar
+  if (!OPENAI_KEY || !META_ACCESS_TOKEN) {
+    console.error("Secrets OPENAI_API_KEY ou META_ACCESS_TOKEN não configurados.");
+    return json({ ok: true });
   }
 
-  // O Meta espera 200 em até 20s — processar de forma assíncrona
   const entries: any[] = payload.entry || [];
   const tasks = entries.flatMap((entry: any) =>
     (entry.changes || []).map(async (change: any) => {
-      // Suporta campo "comments" de páginas Instagram Business
       if (change.field !== "comments") return;
 
-      const value = change.value || {};
-      const commentId   = value.id;
+      const value      = change.value || {};
+      const commentId  = value.id;
       const commentText = value.text || "";
-      const authorName  = value.from?.name || "visitante";
+      const authorName = value.from?.name || "visitante";
 
-      // Ignorar respostas da própria página (evitar loop)
       if (value.from?.id === value.item?.id) return;
-      // Ignorar comentários vazios
       if (!commentId || !commentText.trim()) return;
 
       console.log(`Comentário de ${authorName}: "${commentText}"`);
 
       try {
-        const reply = await generateReply(commentText, authorName, ANTHROPIC_KEY);
+        const reply = await generateReply(commentText, authorName, OPENAI_KEY);
         if (reply) {
           await postReply(commentId, reply, META_ACCESS_TOKEN);
-          console.log(`Resposta publicada para ${commentId}: "${reply}"`);
+          console.log(`Resposta publicada: "${reply}"`);
         }
       } catch (e) {
         console.error("Erro ao processar comentário:", e);
@@ -175,7 +164,6 @@ Deno.serve(async (req) => {
     })
   );
 
-  // Aguarda processamento mas com timeout para não ultrapassar 25s
   await Promise.race([
     Promise.allSettled(tasks),
     new Promise(r => setTimeout(r, 20000)),
