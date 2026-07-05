@@ -341,7 +341,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.05f</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.05g</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -505,7 +505,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.05f</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.05g</div>
       </div>
     </div>
     <div class="uarea">
@@ -1584,7 +1584,12 @@ const SB_URL = "https://wwnndsprpofmgbklqdgg.supabase.co";
 const SB_KEY = "sb_publishable__RQxBa8P-lryd0LtWgTJPw_-aSWERWK";
 const _sb = supabase.createClient(SB_URL, SB_KEY);
 let _authToken = SB_KEY;
-_sb.auth.onAuthStateChange((_, session) => { _authToken = session?.access_token || SB_KEY; });
+_sb.auth.onAuthStateChange((event, session) => {
+  _authToken = session?.access_token || SB_KEY;
+  if (!session && event === 'SIGNED_OUT' && getCU() && typeof showSc === 'function') {
+    setCU(null); showSc("login");
+  }
+});
 
 async function sbFetch(path, opts={}) {
   const res = await fetch(SB_URL + "/rest/v1/" + path, {
@@ -6239,7 +6244,7 @@ async function _verificarAutentique(cod, btn) {
   try {
     const { data: { session } } = await _sb.auth.getSession();
     const token = session?.access_token;
-    if (!token) { toast("❌ Sessão expirada. Faça login novamente."); btn.disabled=false; btn.textContent=orig; return; }
+    if (!token) { toast("❌ Sessão expirada. Fazendo login novamente..."); btn.disabled=false; btn.textContent=orig; setTimeout(() => { setCU(null); showSc("login"); }, 1200); return; }
     const res = await fetch(SB_URL + "/functions/v1/check-autentique-status", {
       method: "POST",
       headers: { "apikey": SB_KEY, "Authorization": "Bearer " + token, "Content-Type": "application/json" },
