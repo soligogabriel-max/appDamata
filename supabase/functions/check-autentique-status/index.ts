@@ -21,12 +21,12 @@ function json(body: unknown, status = 200) {
   });
 }
 
-function getJwtEmail(authHeader: string): string | null {
+function getJwtSub(authHeader: string): string | null {
   const t = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!t) return null;
   try {
     const p = JSON.parse(atob(t.split(".")[1]));
-    return p?.email || null;
+    return p?.sub || null;
   } catch { return null; }
 }
 
@@ -39,15 +39,15 @@ Deno.serve(async (req) => {
     const SB_URL = Deno.env.get("SUPABASE_URL");
     const SB_SR  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    // Resolve role from app_users table (role is stored in DB, not in JWT claims)
+    // app_users.id = auth.uid() (UUID do auth, armazenado como TEXT)
     const authHeader = req.headers.get("Authorization") || "";
-    const email = getJwtEmail(authHeader);
-    if (!email) return json({ error: "Não autorizado." }, 401);
+    const sub = getJwtSub(authHeader);
+    if (!sub) return json({ error: "Não autorizado." }, 401);
 
     let userRole: string | null = null;
     try {
       const uRes = await fetch(
-        `${SB_URL}/rest/v1/app_users?email=eq.${encodeURIComponent(email)}&select=role&limit=1`,
+        `${SB_URL}/rest/v1/app_users?id=eq.${encodeURIComponent(sub)}&select=role&limit=1`,
         { headers: { apikey: SB_SR!, Authorization: "Bearer " + SB_SR } }
       );
       const uRows: any[] = await uRes.json();
