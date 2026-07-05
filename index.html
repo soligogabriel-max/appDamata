@@ -209,23 +209,15 @@ function loadScript(src) {
   });
 }
 
-async function renderPdf(pdfEntry, container) {
-  const url = typeof pdfEntry === "string" ? pdfEntry : pdfEntry.url;
-  if (!url) return;
-
-  const wrapper = document.createElement("div");
-  wrapper.className = "pdf-doc";
-  container.appendChild(wrapper);
-
+async function renderPdfNow(url, wrapper) {
   try {
     const loadingTask = pdfjsLib.getDocument({ url, withCredentials: false });
     const pdf = await loadingTask.promise;
+    const containerWidth = Math.min(wrapper.parentElement ? wrapper.parentElement.clientWidth || 900 : 900, 900);
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const vp = page.getViewport({ scale: 1 });
-      // Scale to fill container width (900px max, actual rendered width)
-      const containerWidth = Math.min(container.clientWidth || 900, 900);
       const scale = containerWidth / vp.width;
       const viewport = page.getViewport({ scale });
 
@@ -237,6 +229,8 @@ async function renderPdf(pdfEntry, container) {
 
       await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
     }
+    // Remove placeholder height after render
+    wrapper.style.minHeight = "";
   } catch (e) {
     const err = document.createElement("p");
     err.style.cssText = "color:#e74c3c;font-size:13px;padding:16px;text-align:center";
@@ -244,6 +238,28 @@ async function renderPdf(pdfEntry, container) {
     wrapper.appendChild(err);
     console.error("PDF render error:", e);
   }
+}
+
+function renderPdf(pdfEntry, container) {
+  const url = typeof pdfEntry === "string" ? pdfEntry : pdfEntry.url;
+  if (!url) return;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "pdf-doc";
+  // Reserve space so IntersectionObserver triggers when scrolled to
+  wrapper.style.minHeight = "400px";
+  container.appendChild(wrapper);
+
+  // Lazy render: only load PDF when wrapper enters viewport
+  let rendered = false;
+  const obs = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && !rendered) {
+      rendered = true;
+      obs.disconnect();
+      renderPdfNow(url, wrapper);
+    }
+  }, { rootMargin: "200px" });
+  obs.observe(wrapper);
 }
 
 let _llTimer = null, _llIdx = 0;
@@ -350,7 +366,7 @@ async function init() {
   loading.remove();
 
   for (const entry of pdfList) {
-    await renderPdf(entry, infoArea);
+    renderPdf(entry, infoArea);
   }
 }
 
