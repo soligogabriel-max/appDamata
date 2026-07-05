@@ -21,13 +21,52 @@ function json(body: unknown, status = 200) {
   });
 }
 
-function getJwtSub(authHeader: string): string | null {
+function decodeJwt(authHeader: string): Record<string, any> | null {
   const t = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!t) return null;
+  const parts = t.split(".");
+  if (parts.length !== 3) return null;
   try {
-    const p = JSON.parse(atob(t.split(".")[1]));
-    return p?.sub || null;
+    return JSON.parse(atob(parts[1].replace(/-/g, "+").replace(/_/g, "/")));
   } catch { return null; }
+}
+
+async function resolveRole(claims: Record<string, any>, sbUrl: string, sbSr: string): Promise<string | null> {
+  // 1) Role direto no JWT (set via migration ou Supabase dashboard)
+  const jwtRole = claims?.app_metadata?.role || claims?.user_metadata?.role;
+  if (jwtRole) return String(jwtRole);
+
+  // 2) Busca em app_users por email (email sempre presente no JWT do Supabase)
+  const email = claims?.email;
+  if (email) {
+    try {
+      const r = await fetch(
+        `${sbUrl}/rest/v1/app_users?email=eq.${encodeURIComponent(email)}&select=role&limit=1`,
+        { headers: { apikey: sbSr, Authorization: "Bearer " + sbSr } }
+      );
+      if (r.ok) {
+        const rows: any[] = await r.json();
+        if (Array.isArray(rows) && rows[0]?.role) return rows[0].role;
+      }
+    } catch { /* continua */ }
+  }
+
+  // 3) Busca em app_users por sub (funciona se app_users.id = auth UUID)
+  const sub = claims?.sub;
+  if (sub) {
+    try {
+      const r = await fetch(
+        `${sbUrl}/rest/v1/app_users?id=eq.${encodeURIComponent(sub)}&select=role&limit=1`,
+        { headers: { apikey: sbSr, Authorization: "Bearer " + sbSr } }
+      );
+      if (r.ok) {
+        const rows: any[] = await r.json();
+        if (Array.isArray(rows) && rows[0]?.role) return rows[0].role;
+      }
+    } catch { /* continua */ }
+  }
+
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -36,24 +75,14 @@ Deno.serve(async (req) => {
   try {
     if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
-    const SB_URL = Deno.env.get("SUPABASE_URL");
-    const SB_SR  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const SB_URL = Deno.env.get("SUPABASE_URL")!;
+    const SB_SR  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // app_users.id = auth.uid() (UUID do auth, armazenado como TEXT)
     const authHeader = req.headers.get("Authorization") || "";
-    const sub = getJwtSub(authHeader);
-    if (!sub) return json({ error: "Não autorizado." }, 401);
+    const claims = decodeJwt(authHeader);
+    if (!claims) return json({ error: "Não autorizado." }, 401);
 
-    let userRole: string | null = null;
-    try {
-      const uRes = await fetch(
-        `${SB_URL}/rest/v1/app_users?id=eq.${encodeURIComponent(sub)}&select=role&limit=1`,
-        { headers: { apikey: SB_SR!, Authorization: "Bearer " + SB_SR } }
-      );
-      const uRows: any[] = await uRes.json();
-      userRole = uRows[0]?.role || null;
-    } catch { /* deny below */ }
-
+    const userRole = await resolveRole(claims, SB_URL, SB_SR);
     if (!["admin", "equipe"].includes(userRole ?? "")) return json({ error: "Não autorizado." }, 401);
 
     const token = Deno.env.get("Autentique_token");
@@ -70,7 +99,7 @@ Deno.serve(async (req) => {
     try {
       const evRes = await fetch(
         `${SB_URL}/rest/v1/agenda?cod=eq.${encodeURIComponent(cod)}&select=cod,assinatura_doc_id,assinatura_status,contrato_ok`,
-        { headers: { apikey: SB_SR!, Authorization: "Bearer " + SB_SR } }
+        { headers: { apikey: SB_SR, Authorization: "Bearer " + SB_SR } }
       );
       evRows = await evRes.json();
     } catch (e) {
@@ -136,7 +165,7 @@ Deno.serve(async (req) => {
         await fetch(`${SB_URL}/rest/v1/agenda?cod=eq.${encodeURIComponent(cod)}`, {
           method: "PATCH",
           headers: {
-            apikey: SB_SR!,
+            apikey: SB_SR,
             Authorization: "Bearer " + SB_SR,
             "Content-Type": "application/json",
             Prefer: "return=minimal",
