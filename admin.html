@@ -341,7 +341,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.05g</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.07a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -505,7 +505,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.05g</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.07a</div>
       </div>
     </div>
     <div class="uarea">
@@ -6024,8 +6024,10 @@ async function salvarContrato(preset) {
       ...(isHospSave && {nomeLocatario: preset.nomeNoiva||""}),
     });
 
+    let isEdit = false;
+
     if(preset.gcEvt) {
-      // Evento já criado pelo fluxo app_users — apenas atualiza valor
+      // Evento já criado pelo fluxo app_users — atualiza agenda
       cod = preset.gcEvt;
       const agExist = await dbGet("agenda",`select=nome_evento&cod=eq.${cod}&limit=1`);
       nomeEvento = agExist.length ? agExist[0].nome_evento : `${nomes} - ${dStr}`;
@@ -6036,6 +6038,7 @@ async function salvarContrato(preset) {
         obs: preset.obs||null,
         payments_json: paymentsJson, spaces_json: spacesJson,
       }, prefer:"return=minimal"});
+      isEdit = true;
     } else if(preset.code) {
       // Código já gerado pelo gerador (fluxo normal) — verifica se já existe (incluindo soft-deleted)
       cod = preset.code;
@@ -6052,9 +6055,9 @@ async function salvarContrato(preset) {
         payments_json: paymentsJson, spaces_json: spacesJson,
       };
       if(agExist.length && !agExist[0].deleted_at) {
-        // Registro ativo já existe — apenas notifica, não sobrescreve
-        toast("Evento "+cod+" já existe no sistema.");
-        return;
+        // Registro ativo já existe — atualiza (edição de contrato)
+        await sbFetch(`agenda?cod=eq.${encodeURIComponent(cod)}`, {method:"PATCH", body: eventoBody, prefer:"return=minimal"});
+        isEdit = true;
       } else if(agExist.length && agExist[0].deleted_at) {
         // Registro soft-deleted — ressuscita com novos dados
         await sbFetch(`agenda?cod=eq.${encodeURIComponent(cod)}`, {method:"PATCH",
@@ -6092,42 +6095,58 @@ async function salvarContrato(preset) {
       }
     }
 
-    // 4. Criar parcelas em contas_a_receber
-    if(preset.payments && preset.payments.length) {
-      const parcelas = preset.payments.map((p,i)=>({
-        cod_evento: cod,
-        parcela: String(i+1),
-        num_parcela: String(preset.payments.length),
-        valor: p.value ? parseFloat(p.value) : null,
-        vencimento: p.date||null,
-        mes_ano: p.date ? p.date.slice(0,7).replace("-","") : null,
-        status: "NP",
-        obs: p.desc||null,
-      }));
-      await sbFetch("contas_a_receber", {method:"POST", body: parcelas, prefer:"return=minimal"});
+    // 4. Parcelas em contas_a_receber
+    const _parcelasBody = preset.payments && preset.payments.length ? preset.payments.map((p,i)=>({
+      cod_evento: cod,
+      parcela: String(i+1),
+      num_parcela: String(preset.payments.length),
+      valor: p.value ? parseFloat(p.value) : null,
+      vencimento: p.date||null,
+      mes_ano: p.date ? p.date.slice(0,7).replace("-","") : null,
+      status: "NP",
+      obs: p.desc||null,
+    })) : [];
+    if(isEdit && _parcelasBody.length) {
+      // Edição: soft-delete parcelas NP antigas e insere novas
+      await sbFetch(`contas_a_receber?cod_evento=eq.${encodeURIComponent(cod)}&status=eq.NP`, {method:"PATCH", body:{deleted_at: new Date().toISOString()}, prefer:"return=minimal"});
+      await sbFetch("contas_a_receber", {method:"POST", body: _parcelasBody, prefer:"return=minimal"});
+      _parcelasInseridas = true;
+    } else if(!isEdit && _parcelasBody.length) {
+      await sbFetch("contas_a_receber", {method:"POST", body: _parcelasBody, prefer:"return=minimal"});
       _parcelasInseridas = true;
     }
 
-    // 5. Criar pedido de locação
-    const numPedido = String(Date.now()).slice(-10).padStart(10,"0");
-    const pedido = await sbFetch("pedidos", {
-      method:"POST",
-      body: {numero_pedido: numPedido, cod_evento: cod, total_pedido: preset.total ? parseFloat(preset.total) : null},
-      prefer:"return=representation"
-    });
-    _pedidoCriadoId = Array.isArray(pedido) ? pedido[0]?.id : pedido?.id;
-
-    // 6. Criar itens do pedido
-    if(preset.itens && preset.itens.length && _pedidoCriadoId) {
-      const itens = preset.itens.map(it=>({
-        pedido_id: _pedidoCriadoId,
-        cod_item: it.cod,
-        descricao: it.descricao,
-        quantidade: it.quantidade,
-        valor_unitario: it.valor_unitario,
-        valor_subtotal: (it.quantidade||0)*(it.valor_unitario||0),
-      }));
-      await sbFetch("itens_pedido", {method:"POST", body: itens, prefer:"return=minimal"});
+    // 5. Pedido de locação
+    const _itensBody = preset.itens && preset.itens.length ? preset.itens.map(it=>({
+      cod_item: it.cod,
+      descricao: it.descricao,
+      quantidade: it.quantidade,
+      valor_unitario: it.valor_unitario,
+      valor_subtotal: (it.quantidade||0)*(it.valor_unitario||0),
+    })) : [];
+    if(isEdit) {
+      // Edição: atualiza total do pedido existente e substitui itens
+      const pedidosExist = await dbGet("pedidos",`cod_evento=eq.${encodeURIComponent(cod)}&limit=1`);
+      if(pedidosExist.length) {
+        _pedidoCriadoId = pedidosExist[0].id;
+        await sbFetch(`pedidos?id=eq.${_pedidoCriadoId}`, {method:"PATCH", body:{total_pedido: preset.total ? parseFloat(preset.total) : null}, prefer:"return=minimal"});
+        await sbFetch(`itens_pedido?pedido_id=eq.${_pedidoCriadoId}`, {method:"PATCH", body:{deleted_at: new Date().toISOString()}, prefer:"return=minimal"});
+        if(_itensBody.length) {
+          await sbFetch("itens_pedido", {method:"POST", body: _itensBody.map(it=>({...it, pedido_id: _pedidoCriadoId})), prefer:"return=minimal"});
+        }
+      } else {
+        // Pedido ainda não existe para este evento — cria
+        const numPedido = String(Date.now()).slice(-10).padStart(10,"0");
+        const pedido = await sbFetch("pedidos", {method:"POST", body:{numero_pedido: numPedido, cod_evento: cod, total_pedido: preset.total ? parseFloat(preset.total) : null}, prefer:"return=representation"});
+        _pedidoCriadoId = Array.isArray(pedido) ? pedido[0]?.id : pedido?.id;
+        if(_itensBody.length && _pedidoCriadoId) await sbFetch("itens_pedido", {method:"POST", body: _itensBody.map(it=>({...it, pedido_id: _pedidoCriadoId})), prefer:"return=minimal"});
+      }
+    } else {
+      // Novo evento: cria pedido e itens
+      const numPedido = String(Date.now()).slice(-10).padStart(10,"0");
+      const pedido = await sbFetch("pedidos", {method:"POST", body:{numero_pedido: numPedido, cod_evento: cod, total_pedido: preset.total ? parseFloat(preset.total) : null}, prefer:"return=representation"});
+      _pedidoCriadoId = Array.isArray(pedido) ? pedido[0]?.id : pedido?.id;
+      if(_itensBody.length && _pedidoCriadoId) await sbFetch("itens_pedido", {method:"POST", body: _itensBody.map(it=>({...it, pedido_id: _pedidoCriadoId})), prefer:"return=minimal"});
     }
 
     // 7. Criar despesa variável prevista (contas_a_pagar fixo por evento)
