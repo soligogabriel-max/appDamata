@@ -341,7 +341,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.13f</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.13h</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -505,7 +505,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.13f</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.13h</div>
       </div>
     </div>
     <div class="uarea">
@@ -7524,7 +7524,7 @@ async function savePedido() {
 // VISITA TÉCNICA
 // ══════════════════════════════════════════
 const VT_TIPOS = ["Buffet","Bar","Som/Iluminação","Som","Iluminação","Decoração","Assessoria","Locação de móveis"];
-let _vtId = null, _vtFornecList = [], _vtPer = "todos";
+let _vtId = null, _vtFornecList = [], _vtPer = "todos", _vtLinhaOrigIds = new Set();
 const _VT_TIPOS_BASE = ["Assessoria","Buffet","Cerimonialista","Decoração","DJ","Filmagem","Floricultura","Fotografia","Iluminação","Som/Iluminação","Segurança","Outros"];
 
 function _vtSetPer(p) {
@@ -7723,9 +7723,10 @@ async function openVTModal(vt) {
     try {
       _vtFornecList = await dbGet("fornecedores","select=codigo,nome,tipo_servico&order=nome.asc&limit=500");
     } catch(fe){ _vtFornecList=[]; }
+    _vtLinhaOrigIds = new Set();
     if(_vtId) {
       const linhas = await dbGet("vt_linhas","vt_id=eq."+_vtId+"&order=id.asc&limit=100");
-      linhas.forEach(ln=>_vtAddLinha(ln));
+      linhas.forEach(ln=>{ _vtLinhaOrigIds.add(ln.id); _vtAddLinha(ln); });
     }
   } catch(e) {
     toast("Erro ao abrir VT: "+e.message);
@@ -7739,14 +7740,6 @@ async function saveVT() {
     const cod_evento = document.getElementById("vtm-evento").value;
     const data_vt = document.getElementById("vtm-data").value||null;
     if(!cod_evento){ toast("Selecione um evento."); return; }
-    // Coleta linhas
-    const linhaEls = document.querySelectorAll("#vtm-linhas [data-id]");
-    const linhas = Array.from(linhaEls).map(div=>({
-      fornecedor_cod: (()=>{ const v=div.querySelector(".vtm-forn-sel").value; return(v&&v!=="__novo__")?v:null; })(),
-      nome_fornecedor: (()=>{ const s=div.querySelector(".vtm-forn-sel").value; return s==="__novo__"?div.querySelector(".vtm-forn-nome").value.trim()||null:null; })(),
-      tipo_fornecedor: div.querySelector(".vtm-tipo").value||null,
-      obs: div.querySelector(".vtm-obs").value.trim()||null
-    }));
     let vtId = _vtId;
     if(vtId) {
       await dbUpdate("visitas_tecnicas","id=eq."+vtId,{cod_evento,data_vt});
@@ -7754,20 +7747,26 @@ async function saveVT() {
       const res = await sbFetch("visitas_tecnicas",{method:"POST",body:{cod_evento,data_vt},prefer:"return=representation"});
       vtId = Array.isArray(res)?res[0]?.id:res?.id;
     }
-    // Filtra linhas completamente vazias para evitar violação de constraint
-    const linhasValidas = linhas.filter(l=>l.fornecedor_cod||l.nome_fornecedor||l.tipo_fornecedor||l.obs);
-    if(linhasValidas.length && vtId) {
-      // INSERT primeiro; soft-delete dos antigos só depois (evita perda de dados se INSERT falhar)
-      const inserted = await sbFetch("vt_linhas",{method:"POST",body:linhasValidas.map(l=>({...l,vt_id:vtId})),prefer:"return=representation"});
-      const newIds = Array.isArray(inserted)?inserted.map(r=>r.id).filter(Boolean):[];
-      const delQ = newIds.length
-        ? `vt_linhas?vt_id=eq.${vtId}&id=not.in.(${newIds.join(",")})`
-        : `vt_linhas?vt_id=eq.${vtId}`;
-      await sbFetch(delQ,{method:"PATCH",body:{deleted_at:new Date().toISOString()},prefer:"return=minimal"});
-    } else if(vtId) {
-      // Sem linhas válidas: apaga todas as existentes
-      await sbFetch("vt_linhas?vt_id=eq."+vtId,{method:"PATCH",body:{deleted_at:new Date().toISOString()},prefer:"return=minimal"});
-    }
+    // Separa linhas existentes (com id) das novas (sem id)
+    const linhaEls = document.querySelectorAll("#vtm-linhas [data-id]");
+    const presentIds = new Set();
+    const toInsert = [], toUpdate = [];
+    linhaEls.forEach(div => {
+      const id = div.dataset.id;
+      const fornecedor_cod = (()=>{ const v=div.querySelector(".vtm-forn-sel").value; return(v&&v!=="__novo__")?v:null; })();
+      const nome_fornecedor = (()=>{ const s=div.querySelector(".vtm-forn-sel").value; return s==="__novo__"?div.querySelector(".vtm-forn-nome").value.trim()||null:null; })();
+      const tipo_fornecedor = div.querySelector(".vtm-tipo").value||null;
+      const obs = div.querySelector(".vtm-obs").value.trim()||null;
+      if(id) { presentIds.add(id); toUpdate.push({id, fornecedor_cod, nome_fornecedor, tipo_fornecedor, obs}); }
+      else if(fornecedor_cod||nome_fornecedor||tipo_fornecedor||obs) toInsert.push({fornecedor_cod, nome_fornecedor, tipo_fornecedor, obs, vt_id:vtId});
+    });
+    // DELETE linhas que o usuário removeu (estavam no BD mas saíram do DOM)
+    const toDelete = [..._vtLinhaOrigIds].filter(id=>!presentIds.has(id));
+    for(const id of toDelete) await sbFetch("vt_linhas?id=eq."+id,{method:"DELETE",prefer:"return=minimal"});
+    // UPDATE linhas existentes (tipo, obs podem ter mudado)
+    for(const {id,...data} of toUpdate) await sbFetch("vt_linhas?id=eq."+id,{method:"PATCH",body:data,prefer:"return=minimal"});
+    // INSERT novas linhas
+    if(toInsert.length) await sbFetch("vt_linhas",{method:"POST",body:toInsert,prefer:"return=minimal"});
     closeVTModal(); renderVT(); toast("✅ Visita técnica salva!");
   } catch(e){ toast("Erro: "+e.message); }
   finally { btn.disabled=false; btn.textContent="Salvar"; }
