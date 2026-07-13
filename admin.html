@@ -341,7 +341,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.13b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.13d</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -505,7 +505,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.13b</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.13d</div>
       </div>
     </div>
     <div class="uarea">
@@ -7720,7 +7720,7 @@ async function openVTModal(vt) {
     const evts = await dbGet("agenda","select=cod,nome_evento&data_evento=gte."+hojeVT+"&order=data_evento.asc&limit=500");
     evts.forEach(e=>{ const o=document.createElement("option"); o.value=e.cod; o.textContent=(e.nome_evento||e.cod); if(vt&&e.cod===vt.cod_evento)o.selected=true; sel.appendChild(o); });
     try {
-      _vtFornecList = await dbGet("fornecedores","select=codigo,nome,tipo_servico&tipo_servico=not.is.null&tipo_servico=neq.&order=nome.asc&limit=500");
+      _vtFornecList = await dbGet("fornecedores","select=codigo,nome,tipo_servico&order=nome.asc&limit=500");
     } catch(fe){ _vtFornecList=[]; }
     if(_vtId) {
       const linhas = await dbGet("vt_linhas","vt_id=eq."+_vtId+"&order=id.asc&limit=100");
