@@ -1,9 +1,5 @@
 // Supabase Edge Function: manage-fornecedor
 // Cria fornecedores usando service role (bypassa RLS).
-// Valida role do usuário via JWT + fallback em app_users.
-//
-// Body: { action: "create", nome, tipo_servico? }
-// Resposta: { ok: true, fornecedor: { codigo, nome, tipo_servico } }
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -65,38 +61,38 @@ async function resolveRole(claims: Record<string, any>, sbUrl: string, sbSr: str
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
-  if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
-  const SB_URL = Deno.env.get("SUPABASE_URL")!;
-  const SB_SR  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  try {
+    if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
 
-  const authHeader = req.headers.get("Authorization") || "";
-  const claims = decodeJwt(authHeader);
-  if (!claims) return json({ error: "Não autorizado." }, 401);
+    const SB_URL = Deno.env.get("SUPABASE_URL")!;
+    const SB_SR  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  const userRole = await resolveRole(claims, SB_URL, SB_SR);
-  if (!["admin", "equipe"].includes(userRole ?? "")) return json({ error: "Não autorizado." }, 401);
+    const authHeader = req.headers.get("Authorization") || "";
+    const claims = decodeJwt(authHeader);
+    if (!claims) return json({ error: "Não autorizado." }, 401);
 
-  let body: { action?: string; nome?: string; tipo_servico?: string } = {};
-  try { body = await req.json(); } catch { return json({ error: "JSON inválido." }, 400); }
+    const userRole = await resolveRole(claims, SB_URL, SB_SR);
+    if (!["admin", "equipe"].includes(userRole ?? "")) return json({ error: "Não autorizado." }, 401);
 
-  const { action = "create", nome, tipo_servico } = body;
+    let body: { nome?: string; tipo_servico?: string } = {};
+    try { body = await req.json(); } catch { return json({ error: "JSON invalido." }, 400); }
 
-  if (action === "create") {
-    if (!nome?.trim()) return json({ error: "nome obrigatório." }, 400);
+    const { nome, tipo_servico } = body;
+    if (!nome || !nome.trim()) return json({ error: "nome obrigatorio." }, 400);
 
-    // Busca max código numérico
-    const codsRes = await fetch(`${SB_URL}/rest/v1/fornecedores?select=codigo`, {
+    const codsRes = await fetch(SB_URL + "/rest/v1/fornecedores?select=codigo", {
       headers: { apikey: SB_SR, Authorization: "Bearer " + SB_SR },
     });
     const cods: any[] = codsRes.ok ? await codsRes.json() : [];
-    const maxNum = cods.reduce((mx: number, r: any) => {
+    let maxNum = 0;
+    for (const r of cods) {
       const n = parseInt(r.codigo, 10);
-      return !isNaN(n) && n > mx ? n : mx;
-    }, 0);
+      if (!isNaN(n) && n > maxNum) maxNum = n;
+    }
     const novoCod = String(maxNum + 1).padStart(8, "0");
 
-    const insertRes = await fetch(`${SB_URL}/rest/v1/fornecedores`, {
+    const insertRes = await fetch(SB_URL + "/rest/v1/fornecedores", {
       method: "POST",
       headers: {
         apikey: SB_SR,
@@ -114,7 +110,9 @@ Deno.serve(async (req) => {
 
     const rows: any[] = await insertRes.json();
     return json({ ok: true, fornecedor: rows[0] });
-  }
 
-  return json({ error: "Ação desconhecida." }, 400);
+  } catch (e) {
+    console.error("Erro inesperado:", e);
+    return json({ error: "Erro interno: " + String(e) }, 500);
+  }
 });

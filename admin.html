@@ -341,7 +341,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.13l</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.13n</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -505,7 +505,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.13l</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.13n</div>
       </div>
     </div>
     <div class="uarea">
@@ -7694,10 +7694,10 @@ async function _vtConfirmNovoForn(btn) {
     // Gera próximo código sequencial para fornecedores (busca todos e calcula max numérico)
     const { data: { session } } = await _sb.auth.getSession();
     const token = session?.access_token || _authToken;
-    const fnRes = await fetch(SB_URL+"/functions/v1/manage-fornecedor",{
+    const fnRes = await fetch(SB_URL+"/functions/v1/131d8b14-e56a-42b0-92fc-770574048573",{
       method:"POST",
       headers:{"apikey":SB_KEY,"Authorization":"Bearer "+token,"Content-Type":"application/json"},
-      body:JSON.stringify({action:"create",nome,tipo_servico:tipo||undefined})
+      body:JSON.stringify({nome,tipo_servico:tipo||undefined})
     });
     const fnData = await fnRes.json();
     if(!fnRes.ok || !fnData.ok) throw new Error(fnData.error||"Erro ao criar fornecedor");
