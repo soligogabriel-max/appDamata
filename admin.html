@@ -341,7 +341,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.14g</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.14i</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -358,6 +358,9 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <label class="lbl">Senha</label>
       <input type="password" id="lpass" class="inp" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
       <button class="btn-p" id="btn-login" onclick="doLogin()">Entrar</button>
+      <div style="text-align:right;margin-top:6px;margin-bottom:2px;">
+        <button onclick="doForgotPassword()" style="background:none;border:none;color:var(--dm);font-size:12px;cursor:pointer;padding:0;text-decoration:underline;">Esqueci minha senha</button>
+      </div>
       <button id="btn-bio" onclick="loginBiometric()" style="display:none;margin-top:8px;width:100%;align-items:center;justify-content:center;gap:8px;background:#f8fafc;border:1.5px solid #e2e8f0;color:#1e293b;padding:11px 16px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1e3a5f" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 11c0-1.1.9-2 2-2s2 .9 2 2v2m-8-2c0-3.3 2.7-6 6-6s6 2.7 6 6v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6zm6 4v-2"/><circle cx="12" cy="15" r="1" fill="#1e3a5f"/></svg>
         <span id="bio-label">Entrar com biometria</span>
@@ -505,7 +508,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.14g</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.14i</div>
       </div>
     </div>
     <div class="uarea">
@@ -1878,6 +1881,25 @@ async function offerBiometric(user){
 }
 // Inicializa botão ao carregar a página
 (function(){ if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded',bioUpdateBtn); } else { bioUpdateBtn(); } })();
+
+async function doForgotPassword() {
+  const em = (document.getElementById("lemail").value || "").trim().toLowerCase();
+  const email = em || prompt("Digite seu e-mail cadastrado:");
+  if (!email) return;
+  const er = document.getElementById("lerr");
+  er.style.display = "none";
+  try {
+    const { error } = await _sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.href.split("?")[0]
+    });
+    if (error) { er.style.display="block"; er.textContent="Erro: "+error.message; return; }
+    er.style.display="block";
+    er.style.background="#d1fae5"; er.style.color="#065f46"; er.style.borderColor="#6ee7b7";
+    er.textContent="✅ E-mail de redefinição enviado para "+email+". Verifique sua caixa de entrada.";
+  } catch(e) {
+    er.style.display="block"; er.textContent="Erro de conexão. Tente novamente.";
+  }
+}
 
 async function doLogin() {
   const em = document.getElementById("lemail").value.trim().toLowerCase();
