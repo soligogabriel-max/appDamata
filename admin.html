@@ -341,7 +341,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.14e</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.14g</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -505,7 +505,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.14e</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.14g</div>
       </div>
     </div>
     <div class="uarea">
@@ -3162,7 +3162,7 @@ async function renderUsers(){
       const ud = _esc(JSON.stringify(u));
       const c=document.createElement("div");c.className="ucard";
       const gcBtn = u.role==="cliente" ? `<button style="margin-top:6px;font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--a);background:var(--al);cursor:pointer;font-weight:700;" onclick='openGerarContrato(JSON.parse(this.dataset.u))' data-u="${ud}">📄 Gerar Contrato</button>` : "";
-      c.innerHTML=`<div class="uav">👤</div><div class="uinfo"><div class="uname2">${_esc(u.name)}</div><div class="uemail">${_esc(u.email)}</div>${evN?`<div class="uemail" style="margin-top:3px;">📅 ${_esc(evN)}</div>`:""}${assNome?`<div class="uemail" style="margin-top:3px;">🎗 ${_esc(assNome)}</div>`:""}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"><button style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--br);background:var(--al);cursor:pointer;" onclick='openEditUser(JSON.parse(this.dataset.u))' data-u="${ud}">✏️ Editar acesso</button>${gcBtn}</div></div><span class="urb" style="background:${rbg[u.role]||"#EEE"};color:${rtx[u.role]||"#555"};">${RL[u.role]||u.role}</span>`;
+      c.innerHTML=`<div class="uav">👤</div><div class="uinfo"><div class="uname2">${_esc(u.name)}</div><div class="uemail">${_esc(u.email)}</div>${evN?`<div class="uemail" style="margin-top:3px;">📅 ${_esc(evN)}</div>`:""}${assNome?`<div class="uemail" style="margin-top:3px;">🎗 ${_esc(assNome)}</div>`:""}<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;"><button style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid var(--br);background:var(--al);cursor:pointer;" onclick='openEditUser(JSON.parse(this.dataset.u))' data-u="${ud}">✏️ Editar acesso</button>${gcBtn}<button style="font-size:11px;padding:4px 10px;border-radius:8px;border:1px solid #f87171;background:#fef2f2;color:#b91c1c;cursor:pointer;" onclick='deleteUser(JSON.parse(this.dataset.u))' data-u="${ud}">🗑 Remover</button></div></div><span class="urb" style="background:${rbg[u.role]||"#EEE"};color:${rtx[u.role]||"#555"};">${RL[u.role]||u.role}</span>`;
       wr.appendChild(c);
     });
   } catch(e){wr.innerHTML='<div class="empty">Erro ao carregar.</div>';}
@@ -7111,6 +7111,19 @@ let _euId=null, _euRole=null, _euEvIds=[];
 
 function closeEditUser() { document.getElementById("m-edit-user").classList.remove("open"); }
 
+async function deleteUser(u) {
+  if(!confirm("Remover " + u.name + "?\nEsta ação não pode ser desfeita.")) return;
+  try {
+    if(u.role === "admin") {
+      const admins = await dbGet("app_users","role=eq.admin&status=eq.approved&select=id");
+      if(admins.length <= 1) { toast("Não é possível remover: deve existir pelo menos um admin."); return; }
+    }
+    await sbFetch("app_users?id=eq."+u.id, {method:"DELETE", prefer:"return=minimal"});
+    renderUsers();
+    toast("✅ Usuário removido.");
+  } catch(e) { toast("Erro ao remover: "+e.message); }
+}
+
 function _euPickRole(role, el) {
   _euRole=role;
   document.querySelectorAll("#m-edit-user .ropt").forEach(r=>r.classList.remove("sel"));
@@ -7147,7 +7160,7 @@ async function openEditUser(u) {
   const roleIdx={equipe:0,fornecedor:1,assessoria:2,cliente:3,admin:4};
   const ropts=document.querySelectorAll("#m-edit-user .ropt");
   if(ropts[roleIdx[u.role]] !== undefined) ropts[roleIdx[u.role]].classList.add("sel");
-  document.getElementById("eu-senha-atual").value = "";
+  document.getElementById("eu-senha-atual").value = u.password || "";
   document.getElementById("eu-nova-senha").value = "";
   document.getElementById("eu-senha-wrap").style.display = "none";
   const wrap=document.getElementById("eu-eswrap");
