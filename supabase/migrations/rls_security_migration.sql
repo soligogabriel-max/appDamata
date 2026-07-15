@@ -207,3 +207,12 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+
+-- ── app_config (landing page — acesso público) ───────────────
+-- Permite que a landing page (anon) leia apenas as chaves públicas
+DROP POLICY IF EXISTS "anon_read_landing_config" ON app_config;
+CREATE POLICY "anon_read_landing_config"
+  ON app_config FOR SELECT
+  TO anon
+  USING (chave IN ('fotos_landing', 'videos_landing', 'landing_pdfs'));
