@@ -341,7 +341,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.15a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.15b</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -508,7 +508,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.15a</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.15b</div>
       </div>
     </div>
     <div class="uarea">
@@ -572,6 +572,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <button class="tab" onclick="setTab('pend');closeGrps()" id="t-pend">🔔 Solicitações <span id="pbadge" style="color:var(--a);"></span></button>
         <button class="tab" onclick="setTab('users');closeGrps()" id="t-users">👥 Usuários</button>
         <button class="tab" onclick="setTab('fotoslanding');closeGrps()" id="t-fotoslanding">🗂 Storage</button>
+        <button class="tab" onclick="setTab('visitas');closeGrps()" id="t-visitas">📊 Visitas do Site</button>
         <button class="tab" onclick="openSettings();closeGrps()" id="t-settings">⚙ Config</button>
       </div>
     </div>
@@ -981,6 +982,31 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 
     <div id="p-pend" class="panel"><div class="uwrap"><div class="sec-t">Solicitações pendentes</div><div id="pend-list"></div></div></div>
     <div id="p-users" class="panel"><div class="uwrap"><div class="sec-t">Usuários aprovados</div><div id="users-list"></div></div></div>
+    <div id="p-visitas" class="panel">
+      <div class="uwrap" style="max-width:800px">
+        <div class="sec-t">📊 Visitas ao Site</div>
+        <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:28px;font-weight:700;color:var(--a);" id="vis-total-hoje">—</div>
+            <div style="font-size:12px;color:var(--dl);margin-top:4px;">Visitas hoje</div>
+          </div>
+          <div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:28px;font-weight:700;color:var(--a);" id="vis-uniq-hoje">—</div>
+            <div style="font-size:12px;color:var(--dl);margin-top:4px;">Visitantes únicos hoje</div>
+          </div>
+          <div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:28px;font-weight:700;color:var(--a);" id="vis-total-mes">—</div>
+            <div style="font-size:12px;color:var(--dl);margin-top:4px;">Visitas este mês</div>
+          </div>
+          <div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:16px;text-align:center;">
+            <div style="font-size:28px;font-weight:700;color:var(--a);" id="vis-uniq-mes">—</div>
+            <div style="font-size:12px;color:var(--dl);margin-top:4px;">Visitantes únicos este mês</div>
+          </div>
+        </div>
+        <div class="sec-t" style="font-size:14px;margin-bottom:10px;">Últimos 30 dias</div>
+        <div id="vis-tabela" style="overflow-x:auto;"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
+      </div>
+    </div>
     <div id="p-fotoslanding" class="panel">
       <div class="uwrap" style="max-width:600px">
         <div class="sec-t">🖼 Fotos Landing Page</div>
@@ -2066,7 +2092,7 @@ const TAB_GRP={
   contratos:"grp-eventos", pedidos:"grp-eventos", vt:"grp-eventos", orcamentos:"grp-eventos",
   receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro", socios:"grp-financeiro",
   fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros", naturezas:"grp-cadastros", assessorias:"grp-cadastros",
-  pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin",
+  pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin", visitas:"grp-admin",
   relatorio:"grp-relatorios", relorc:"grp-relatorios"
 };
 function toggleGrp(id){
@@ -2094,7 +2120,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios"};
+  const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(cfilter);
   if(t==="receber") renderReceber();
@@ -2117,6 +2143,7 @@ function setTab(t) {
   if(t==="contratos") renderContratos();
   if(t==="naturezas") renderNaturezas();
   if(t==="socios") renderContaSocios();
+  if(t==="visitas") renderVisitas();
 }
 
 /* ── Certificado Digital NFS-e ─────────────────────────────── */
@@ -3188,6 +3215,64 @@ async function renderUsers(){
       wr.appendChild(c);
     });
   } catch(e){wr.innerHTML='<div class="empty">Erro ao carregar.</div>';}
+}
+
+// ── Visitas ao Site ──────────────────────────────────────────
+async function renderVisitas() {
+  const tabela = document.getElementById("vis-tabela");
+  tabela.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  ["vis-total-hoje","vis-uniq-hoje","vis-total-mes","vis-uniq-mes"].forEach(id => document.getElementById(id).textContent = "—");
+  try {
+    const since = new Date(); since.setDate(since.getDate() - 30); since.setHours(0,0,0,0);
+    const rows = await dbGet("site_visits", "visited_at=gte."+since.toISOString()+"&select=visited_at,session_id,referrer,device&order=visited_at.desc&limit=5000");
+
+    const hoje = new Date().toISOString().slice(0,10);
+    const mesAtual = new Date().toISOString().slice(0,7);
+
+    // Agrupar por dia
+    const byDay = {};
+    rows.forEach(r => {
+      const day = r.visited_at.slice(0,10);
+      if(!byDay[day]) byDay[day] = { total:0, uniq: new Set() };
+      byDay[day].total++;
+      byDay[day].uniq.add(r.session_id);
+    });
+
+    // Cards de hoje
+    const dh = byDay[hoje];
+    document.getElementById("vis-total-hoje").textContent = dh ? dh.total : "0";
+    document.getElementById("vis-uniq-hoje").textContent = dh ? dh.uniq.size : "0";
+
+    // Cards do mês
+    let totalMes = 0, uniqMes = new Set();
+    rows.filter(r => r.visited_at.slice(0,7) === mesAtual).forEach(r => {
+      totalMes++;
+      uniqMes.add(r.session_id);
+    });
+    document.getElementById("vis-total-mes").textContent = totalMes;
+    document.getElementById("vis-uniq-mes").textContent = uniqMes.size;
+
+    // Tabela últimos 30 dias (mais recente primeiro)
+    const days = Object.keys(byDay).sort((a,b)=>b.localeCompare(a));
+    if(!days.length) { tabela.innerHTML = '<div class="empty"><div class="eicon">📊</div>Nenhuma visita registrada ainda.</div>'; return; }
+
+    const fmtDate = d => { const [y,m,dd] = d.split("-"); return dd+"/"+m+"/"+y; };
+    tabela.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:var(--bg2);color:var(--dl);">
+        <th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--br);">Data</th>
+        <th style="text-align:center;padding:8px 10px;border-bottom:1px solid var(--br);">Visitantes únicos</th>
+        <th style="text-align:center;padding:8px 10px;border-bottom:1px solid var(--br);">Total de visitas</th>
+      </tr></thead>
+      <tbody>${days.map((d,i) => `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
+        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${fmtDate(d)}${d===hoje?' <span style="background:var(--a);color:#fff;font-size:10px;border-radius:4px;padding:1px 5px;margin-left:4px;">hoje</span>':''}</td>
+        <td style="text-align:center;padding:7px 10px;border-bottom:1px solid var(--br);font-weight:600;color:var(--a);">${byDay[d].uniq.size}</td>
+        <td style="text-align:center;padding:7px 10px;border-bottom:1px solid var(--br);">${byDay[d].total}</td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+  } catch(e) {
+    tabela.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar visitas: '+e.message+'</div>';
+    ["vis-total-hoje","vis-uniq-hoje","vis-total-mes","vis-uniq-mes"].forEach(id => document.getElementById(id).textContent = "—");
+  }
 }
 
 // ── Gerar Contrato a partir de usuário ──
