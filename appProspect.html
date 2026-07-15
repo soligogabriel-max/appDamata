@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>appProspect — Gestão de Imóveis</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f1f5f9;color:#1e293b;display:flex;height:100vh;overflow:hidden}
+#sidebar{width:220px;background:#1e3a5f;color:#fff;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.sb-logo{padding:18px 16px;font-size:16px;font-weight:700;border-bottom:1px solid rgba(255,255,255,.12);display:flex;align-items:center;gap:8px}
+.sb-logo span{font-size:20px}
+#sidebar nav{flex:1;padding:8px 0}
+#sidebar nav a{display:flex;align-items:center;gap:10px;padding:9px 16px;color:rgba(255,255,255,.72);text-decoration:none;font-size:13.5px;cursor:pointer;border-left:3px solid transparent;transition:all .15s}
+#sidebar nav a:hover{background:rgba(255,255,255,.08);color:#fff}
+#sidebar nav a.active{background:rgba(255,255,255,.12);color:#fff;border-left-color:#60a5fa}
+#sidebar nav a .ico{width:20px;text-align:center;font-size:15px}
+#main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+.topbar{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 24px;height:54px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:10}
+.topbar h1{font-size:17px;font-weight:600;color:#1e293b}
+#topbar-btn{display:flex;gap:8px}
+.content{padding:22px 24px;flex:1}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;margin-bottom:22px}
+.card{background:#fff;border-radius:8px;padding:18px 20px;border:1px solid #e2e8f0}
+.card-label{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.card-val{font-size:26px;font-weight:700;color:#1e293b}
+.card-sub{font-size:12px;color:#94a3b8;margin-top:4px}
+.section-box{background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden;margin-bottom:20px}
+.section-header{padding:14px 20px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.section-title{font-size:14px;font-weight:600;color:#374151}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filters select,.filters input[type=text],.filters input[type=month]{padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;color:#374151;background:#fff;height:34px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+thead th{background:#f8fafc;padding:9px 14px;text-align:left;font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #e2e8f0;white-space:nowrap}
+tbody td{padding:11px 14px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#f8fafc}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11.5px;font-weight:500;white-space:nowrap}
+.bg{background:#dcfce7;color:#16a34a}
+.bb{background:#dbeafe;color:#2563eb}
+.by{background:#fef9c3;color:#a16207}
+.br{background:#fee2e2;color:#dc2626}
+.bgr{background:#f1f5f9;color:#64748b}
+.bo{background:#ffedd5;color:#ea580c}
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;white-space:nowrap}
+.btn-p{background:#3b82f6;color:#fff}.btn-p:hover{background:#2563eb}
+.btn-s{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0}.btn-s:hover{background:#e2e8f0}
+.btn-d{background:#fee2e2;color:#dc2626}.btn-d:hover{background:#fca5a5}
+.btn-g{background:#dcfce7;color:#16a34a}.btn-g:hover{background:#bbf7d0}
+.btn-sm{padding:4px 9px;font-size:12px}
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center}
+.mo.open{display:flex}
+.mo-box{background:#fff;border-radius:10px;width:580px;max-width:95vw;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.mo-box.wide{width:750px}
+.mo-head{padding:18px 22px 14px;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}
+.mo-head h2{font-size:15px;font-weight:600}
+.mo-close{background:none;border:none;cursor:pointer;font-size:18px;color:#94a3b8;padding:2px 6px;border-radius:4px}.mo-close:hover{background:#f1f5f9}
+.mo-body{padding:18px 22px;overflow-y:auto;flex:1}
+.mo-foot{padding:14px 22px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fg .full{grid-column:1/-1}
+.fl{display:flex;flex-direction:column;gap:5px}
+label{font-size:12.5px;font-weight:500;color:#374151}
+input,select,textarea{padding:7px 11px;border:1px solid #d1d5db;border-radius:6px;font-size:13.5px;width:100%;color:#1e293b;background:#fff;font-family:inherit}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+textarea{resize:vertical;min-height:72px}
+.empty{text-align:center;padding:48px;color:#94a3b8}
+.empty .ei{font-size:40px;margin-bottom:12px}
+.empty p{font-size:14px}
+.toast{position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:12px 20px;border-radius:8px;font-size:13.5px;z-index:999;opacity:0;transform:translateY(10px);transition:all .25s;pointer-events:none}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ok{background:#16a34a}
+.toast.err{background:#dc2626}
+.sala-check{display:flex;flex-wrap:wrap;gap:8px;padding:6px 0}
+.sala-check label{display:flex;align-items:center;gap:5px;font-weight:400;cursor:pointer;padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;font-size:13px}
+.sala-check label:has(input:checked){border-color:#3b82f6;background:#eff6ff;color:#2563eb}
+.sala-check input{width:auto}
+.step{padding:10px 0;border-bottom:1px solid #f1f5f9;margin-bottom:10px}
+.step h3{font-size:13px;font-weight:600;color:#374151;margin-bottom:10px}
+.match-row{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid #e2e8f0;border-radius:6px;margin-bottom:6px;font-size:13px}
+.match-row .tx{flex:1}
+.match-row .val{font-weight:600;min-width:90px;text-align:right}
+@media print{
+  body>*:not(#print-area){display:none!important}
+  #print-area{display:block!important;padding:0}
+}
+#print-area{display:none}
+.contract-page{font-family:'Times New Roman',Times,serif;font-size:12pt;line-height:1.6;color:#000;max-width:800px;margin:0 auto;padding:30px 40px}
+.contract-page h1{text-align:center;font-size:15pt;margin-bottom:4px}
+.contract-page .sub{text-align:center;font-size:12pt;margin-bottom:24px}
+.contract-page h2{font-size:12pt;font-weight:700;margin:20px 0 8px;text-transform:uppercase}
+.contract-page p{margin-bottom:8px;text-align:justify}
+.contract-page table{width:100%;border-collapse:collapse;margin:10px 0}
+.contract-page table td,.contract-page table th{border:1px solid #000;padding:5px 8px;font-size:11pt}
+.contract-page .sig{margin-top:48px}
+.contract-page .sig-line{border-top:1px solid #000;width:280px;margin:32px auto 4px;text-align:center;font-size:10pt}
+.contract-page .sig-row{display:flex;justify-content:space-between;margin-top:40px}
+</style>
+</head>
+<body>
+
+<nav id="sidebar">
+  <div class="sb-logo"><span>🏢</span>appProspect</div>
+  <nav>
+    <a onclick="nav('dashboard')" id="nav-dashboard" class="active"><span class="ico">📊</span>Dashboard</a>
+    <a onclick="nav('imoveis')" id="nav-imoveis"><span class="ico">🏠</span>Imóveis</a>
+    <a onclick="nav('salas')" id="nav-salas"><span class="ico">🚪</span>Salas/Unidades</a>
+    <a onclick="nav('inquilinos')" id="nav-inquilinos"><span class="ico">👥</span>Inquilinos</a>
+    <a onclick="nav('contratos')" id="nav-contratos"><span class="ico">📋</span>Contratos</a>
+    <a onclick="nav('receber')" id="nav-receber"><span class="ico">💰</span>A Receber</a>
+    <a onclick="nav('pagar')" id="nav-pagar"><span class="ico">💸</span>A Pagar</a>
+    <a onclick="nav('conciliacao')" id="nav-conciliacao"><span class="ico">⚖️</span>Conciliação</a>
+  </nav>
+</nav>
+
+<main id="main">
+  <div class="topbar">
+    <h1 id="page-title">Dashboard</h1>
+    <div id="topbar-btn"></div>
+  </div>
+  <div class="content" id="content"></div>
+</main>
+
+<!-- Modal Imóvel -->
+<div class="mo" id="mo-imovel">
+<div class="mo-box">
+<div class="mo-head"><h2 id="mo-imovel-title">Imóvel</h2><button class="mo-close" onclick="closeMo('mo-imovel')">✕</button></div>
+<div class="mo-body">
+<div class="fg">
+  <div class="fl"><label>Código *</label><input id="i-cod" placeholder="Ex: CASA264"></div>
+  <div class="fl"><label>Nome</label><input id="i-nome" placeholder="Ex: Casa 264"></div>
+  <div class="fl full"><label>Endereço *</label><input id="i-end" placeholder="Rua, número"></div>
+  <div class="fl"><label>Bairro</label><input id="i-bairro"></div>
+  <div class="fl"><label>Cidade</label><input id="i-cidade" value="Mogi Mirim"></div>
+  <div class="fl"><label>Tipo</label>
+    <select id="i-tipo">
+      <option value="comercial">Comercial</option>
+      <option value="residencial">Residencial</option>
+      <option value="sala">Sala/Conjunto</option>
+      <option value="galpao">Galpão</option>
+      <option value="terreno">Terreno</option>
+    </select>
+  </div>
+  <div class="fl"><label>Área (m²)</label><input id="i-area" type="number" step="0.01"></div>
+  <div class="fl"><label>Valor base aluguel (R$)</label><input id="i-valor" type="number" step="0.01"></div>
+  <div class="fl"><label>Status</label>
+    <select id="i-status">
+      <option value="disponivel">Disponível</option>
+      <option value="alugado">Alugado</option>
+      <option value="em_reforma">Em Reforma</option>
+      <option value="inativo">Inativo</option>
+    </select>
+  </div>
+  <div class="fl full"><label>Observações</label><textarea id="i-obs"></textarea></div>
+</div>
+</div>
+<div class="mo-foot">
+  <button class="btn btn-s" onclick="closeMo('mo-imovel')">Cancelar</button>
+  <button class="btn btn-p" onclick="saveImovel()">Salvar</button>
+</div>
+</div></div>
+
+<!-- Modal Sala -->
+<div class="mo" id="mo-sala">
+<div class="mo-box">
+<div class="mo-head"><h2 id="mo-sala-title">Sala/Unidade</h2><button class="mo-close" onclick="closeMo('mo-sala')">✕</button></div>
+<div class="mo-body">
+<div class="fg">
+  <div class="fl"><label>Imóvel *</label><select id="s-imovel"></select></div>
+  <div class="fl"><label>Número/ID *</label><input id="s-num" placeholder="Ex: 01, A, Sala 3"></div>
+  <div class="fl"><label>Andar</label><input id="s-andar" placeholder="Ex: Térreo, 1º Andar"></div>
+  <div class="fl"><label>Área (m²)</label><input id="s-area" type="number" step="0.01"></div>
+  <div class="fl"><label>Valor aluguel (R$)</label><input id="s-valor" type="number" step="0.01"></div>
+  <div class="fl"><label>Energia elétrica</label>
+    <select id="s-energia">
+      <option value="individual">Individual</option>
+      <option value="compartilhado">Compartilhada</option>
+    </select>
+  </div>
+  <div class="fl"><label>Água</label>
+    <select id="s-agua">
+      <option value="compartilhado">Compartilhada</option>
+      <option value="individual">Individual</option>
+    </select>
+  </div>
+  <div class="fl"><label>Status</label>
+    <select id="s-status">
+      <option value="disponivel">Disponível</option>
+      <option value="alugado">Alugado</option>
+      <option value="em_reforma">Em Reforma</option>
+    </select>
+  </div>
+  <div class="fl full"><label>Observações</label><textarea id="s-obs"></textarea></div>
+</div>
+</div>
+<div class="mo-foot">
+  <button class="btn btn-s" onclick="closeMo('mo-sala')">Cancelar</button>
+  <button class="btn btn-p" onclick="saveSala()">Salvar</button>
+</div>
+</div></div>
+
+<!-- Modal Inquilino -->
+<div class="mo" id="mo-inq">
+<div class="mo-box">
+<div class="mo-head"><h2 id="mo-inq-title">Inquilino</h2><button class="mo-close" onclick="closeMo('mo-inq')">✕</button></div>
+<div class="mo-body">
+<div class="fg">
+  <div class="fl full"><label>Nome / Razão Social *</label><input id="q-nome"></div>
+  <div class="fl"><label>CPF / CNPJ</label><input id="q-cpf" placeholder="000.000.000-00"></div>
+  <div class="fl"><label>RG / Insc. Estadual</label><input id="q-rg"></div>
+  <div class="fl"><label>Telefone</label><input id="q-tel" placeholder="(19) 99999-0000"></div>
+  <div class="fl"><label>E-mail</label><input id="q-email" type="email"></div>
+  <div class="fl full"><label>Endereço</label><input id="q-end"></div>
+  <div class="fl"><label>Profissão / Atividade</label><input id="q-prof"></div>
+  <div class="fl full"><label>Observações</label><textarea id="q-obs"></textarea></div>
+</div>
+</div>
+<div class="mo-foot">
+  <button class="btn btn-s" onclick="closeMo('mo-inq')">Cancelar</button>
+  <button class="btn btn-p" onclick="saveInquilino()">Salvar</button>
+</div>
+</div></div>
+
+<!-- Modal Contrato -->
+<div class="mo" id="mo-contrato">
+<div class="mo-box wide">
+<div class="mo-head"><h2 id="mo-contrato-title">Contrato</h2><button class="mo-close" onclick="closeMo('mo-contrato')">✕</button></div>
+<div class="mo-body">
+<div class="fg">
+  <div class="fl"><label>Tipo</label>
+    <select id="c-tipo">
+      <option value="sublocacao">Sublocação</option>
+      <option value="locacao">Locação</option>
+    </select>
+  </div>
+  <div class="fl"><label>Status</label>
+    <select id="c-status">
+      <option value="ativo">Ativo</option>
+      <option value="encerrado">Encerrado</option>
+      <option value="rescindido">Rescindido</option>
+    </select>
+  </div>
+  <div class="fl"><label>Imóvel *</label><select id="c-imovel" onchange="loadSalasContrato()"></select></div>
+  <div class="fl"><label>Inquilino *</label><select id="c-inquilino"></select></div>
+  <div class="fl full"><label>Salas/Unidades</label><div class="sala-check" id="c-salas-check"></div></div>
+  <div class="fl"><label>Data Início *</label><input id="c-inicio" type="date"></div>
+  <div class="fl"><label>Data Fim</label><input id="c-fim" type="date"></div>
+  <div class="fl"><label>Valor Aluguel (R$) *</label><input id="c-valor" type="number" step="0.01"></div>
+  <div class="fl"><label>Dia Vencimento *</label><input id="c-venc" type="number" min="1" max="28" value="10"></div>
+  <div class="fl"><label>Índice Reajuste</label>
+    <select id="c-indice">
+      <option value="IGPM">IGPM/FGV</option>
+      <option value="IPCA">IPCA/IBGE</option>
+      <option value="INPC">INPC</option>
+    </select>
+  </div>
+  <div class="fl"><label>Garantia</label>
+    <select id="c-garantia-tipo">
+      <option value="caucao">Caução</option>
+      <option value="fiador">Fiador</option>
+      <option value="seguro_fianca">Seguro Fiança</option>
+      <option value="nenhuma">Nenhuma</option>
+    </select>
+  </div>
+  <div class="fl"><label>Valor Garantia (R$)</label><input id="c-garantia-val" type="number" step="0.01"></div>
+  <div class="fl full"><label>Observações</label><textarea id="c-obs"></textarea></div>
+</div>
+</div>
+<div class="mo-foot">
+  <button class="btn btn-s" onclick="closeMo('mo-contrato')">Cancelar</button>
+  <button class="btn btn-p" onclick="saveContrato()">Salvar e Gerar Parcelas</button>
+</div>
+</div></div>
+
+<!-- Modal Receber -->
+<div class="mo" id="mo-receber">
+<div class="mo-box" style="width:420px">
+<div class="mo-head"><h2>Registrar Recebimento</h2><button class="mo-close" onclick="closeMo('mo-receber')">✕</button></div>
+<div class="mo-body">
+<div id="mo-rec-info" style="background:#f8fafc;padding:12px;border-radius:6px;margin-bottom:14px;font-size:13px"></div>
+<div class="fg">
+  <div class="fl"><label>Data Recebimento *</label><input id="r-data" type="date"></div>
+  <div class="fl"><label>Valor Recebido (R$) *</label><input id="r-valor" type="number" step="0.01"></div>
+  <div class="fl full"><label>Observação</label><input id="r-obs"></div>
+</div>
+</div>
+<div class="mo-foot">
+  <button class="btn btn-s" onclick="closeMo('mo-receber')">Cancelar</button>
+  <button class="btn btn-g" onclick="confirmarRecebimento()">Confirmar</button>
+</div>
+</div></div>
+
+<!-- Modal Pagar -->
+<div class="mo" id="mo-pagar">
+<div class="mo-box" style="width:420px">
+<div class="mo-head"><h2 id="mo-pagar-title">Registrar Pagamento</h2><button class="mo-close" onclick="closeMo('mo-pagar')">✕</button></div>
+<div class="mo-body">
+<div id="mo-pag-info" style="background:#f8fafc;padding:12px;border-radius:6px;margin-bottom:14px;font-size:13px"></div>
+<div class="fg">
+  <div class="fl"><label>Data Pagamento *</label><input id="p-data" type="date"></div>
+  <div class="fl"><label>Valor Pago (R$) *</label><input id="p-valor" type="number" step="0.01"></div>
+  <div class="fl full"><label>Observação</label><input id="p-obs"></div>
+</div>
+</div>
+<div class="mo-foot">
+  <button class="btn btn-s" onclick="closeMo('mo-pagar')">Cancelar</button>
+  <button class="btn btn-g" onclick="confirmarPagamento()">Confirmar</button>
+</div>
+</div></div>
+
+<!-- Modal Nova Despesa -->
+<div class="mo" id="mo-despesa">
+<div class="mo-box">
+<div class="mo-head"><h2 id="mo-despesa-title">Nova Despesa</h2><button class="mo-close" onclick="closeMo('mo-despesa')">✕</button></div>
+<div class="mo-body">
+<div class="fg">
+  <div class="fl full"><label>Imóvel</label><select id="d-imovel"><option value="">Sem vínculo</option></select></div>
+  <div class="fl full"><label>Descrição *</label><input id="d-desc" placeholder="Ex: IPTU 2026 - 1ª parcela"></div>
+  <div class="fl"><label>Categoria</label>
+    <select id="d-cat">
+      <option value="iptu">IPTU</option>
+      <option value="condominio">Condomínio</option>
+      <option value="manutencao">Manutenção</option>
+      <option value="seguro">Seguro</option>
+      <option value="taxa">Taxa/Tarifa</option>
+      <option value="outros">Outros</option>
+    </select>
+  </div>
+  <div class="fl"><label>Valor (R$) *</label><input id="d-valor" type="number" step="0.01"></div>
+  <div class="fl"><label>Vencimento *</label><input id="d-venc" type="date"></div>
+  <div class="fl"><label>Recorrente?</label>
+    <select id="d-rec">
+      <option value="false">Não</option>
+      <option value="true">Sim (mensal)</option>
+    </select>
+  </div>
+  <div class="fl full"><label>Observações</label><textarea id="d-obs"></textarea></div>
+</div>
+</div>
+<div class="mo-foot">
+  <button class="btn btn-s" onclick="closeMo('mo-despesa')">Cancelar</button>
+  <button class="btn btn-p" onclick="saveDespesa()">Salvar</button>
+</div>
+</div></div>
+
+<!-- Modal CSV Import -->
+<div class="mo" id="mo-csv">
+<div class="mo-box wide">
+<div class="mo-head"><h2>Importar Extrato CSV</h2><button class="mo-close" onclick="closeMo('mo-csv')">✕</button></div>
+<div class="mo-body">
+<div class="step">
+  <h3>1. Selecione o arquivo CSV</h3>
+  <input type="file" id="csv-file" accept=".csv,.txt" onchange="previewCSV()">
+  <div style="margin-top:8px;font-size:12px;color:#64748b">Formatos suportados: Nubank, Itaú, Bradesco, BB e genérico (delimitador ponto-e-vírgula ou vírgula)</div>
+</div>
+<div class="step" id="csv-step2" style="display:none">
+  <h3>2. Mapeie as colunas</h3>
+  <div class="fg" style="max-width:500px">
+    <div class="fl"><label>Coluna DATA</label><select id="csv-col-data"></select></div>
+    <div class="fl"><label>Coluna DESCRIÇÃO</label><select id="csv-col-desc"></select></div>
+    <div class="fl"><label>Coluna VALOR</label><select id="csv-col-valor"></select></div>
+    <div class="fl"><label>Separador decimal</label>
+      <select id="csv-dec">
+        <option value=",">Vírgula (1.234,56)</option>
+        <option value=".">Ponto (1,234.56)</option>
+      </select>
+    </div>
+  </div>
+</div>
+<div id="csv-preview" style="margin-top:12px;font-size:12.5px;max-height:240px;overflow-y:auto"></div>
+</div>
+<div class="mo-foot">
+  <button class="btn btn-s" onclick="closeMo('mo-csv')">Cancelar</button>
+  <button class="btn btn-p" id="csv-import-btn" onclick="importCSV()" style="display:none">Importar</button>
+</div>
+</div></div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Print area -->
+<div id="print-area"></div>
+
+<script>
+const SB_URL = "https://udxcebcsjsupnpmdnltd.supabase.co";
+const SB_KEY = "sb_publishable_gbKRbK9nRKsKc87MQYPZ-g_GrIJCdST";
+const SB_H = {"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json","Prefer":"return=representation"};
+
+let EDITING = {};
+let CACHE = {imoveis:[],salas:[],inquilinos:[],contratos:[]};
+let CSV_ROWS = [], CSV_HEADERS = [];
+
+// ── Supabase helpers ──────────────────────────────────────
+async function sbGet(table, qs=""){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?${qs}`,{headers:SB_H});
+  if(!r.ok) throw await r.json();
+  return r.json();
+}
+async function sbPost(table, data){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}`,{method:"POST",headers:SB_H,body:JSON.stringify(data)});
+  if(!r.ok) throw await r.json();
+  return r.json();
+}
+async function sbPatch(table, id, data){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`,{method:"PATCH",headers:{...SB_H,"Prefer":"return=representation"},body:JSON.stringify(data)});
+  if(!r.ok) throw await r.json();
+  return r.json();
+}
+async function sbDel(table, id){
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`,{method:"DELETE",headers:SB_H});
+  return r.ok;
+}
+
+// ── Utils ─────────────────────────────────────────────────
+const fmtR = v => v != null ? new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v) : '—';
+const fmtD = d => d ? new Date(d+'T12:00:00').toLocaleDateString('pt-BR') : '—';
+const today = () => new Date().toISOString().slice(0,10);
+
+function numExt(v){
+  const n = Math.round(v*100)/100;
+  const ext = ['zero','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+  const dez = ['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];
+  const cent = ['','cem','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+  if(n===0) return 'zero reais';
+  const intPart = Math.floor(n);
+  const cents = Math.round((n-intPart)*100);
+  function conv(x){
+    if(x===0) return '';
+    if(x<20) return ext[x];
+    if(x<100){const d=Math.floor(x/10),u=x%10;return dez[d]+(u?' e '+ext[u]:'');}
+    const c=Math.floor(x/100),r=x%100;
+    if(r===0) return cent[c];
+    return cent[c]+' e '+conv(r);
+  }
+  let s = conv(intPart)+(intPart===1?' real':' reais');
+  if(cents>0) s += ' e '+conv(cents)+(cents===1?' centavo':' centavos');
+  return s;
+}
+
+function toast(msg, type='ok'){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show '+(type==='err'?'err':'ok');
+  setTimeout(()=>t.className='toast',3000);
+}
+
+function openMo(id){ document.getElementById(id).classList.add('open'); }
+function closeMo(id){ document.getElementById(id).classList.remove('open'); }
+
+function badgeStatus(s){
+  const m = {disponivel:['bg','Disponível'],alugado:['bb','Alugado'],em_reforma:['by','Em Reforma'],inativo:['bgr','Inativo'],
+             ativo:['bg','Ativo'],encerrado:['bgr','Encerrado'],rescindido:['br','Rescindido'],
+             pendente:['by','Pendente'],recebido:['bg','Recebido'],pago:['bg','Pago'],vencido:['br','Vencido'],cancelado:['bgr','Cancelado'],
+             conciliado:['bg','Conciliado'],ignorado:['bgr','Ignorado']};
+  const [cls,lbl] = m[s]||['bgr',s];
+  return `<span class="badge ${cls}">${lbl}</span>`;
+}
+
+function badgeCat(c){
+  const m={iptu:'IPTU',condominio:'Condomínio',manutencao:'Manutenção',seguro:'Seguro',taxa:'Taxa',outros:'Outros'};
+  return `<span class="badge bgr">${m[c]||c}</span>`;
+}
+
+// ── Router ────────────────────────────────────────────────
+async function nav(view){
+  document.querySelectorAll('#sidebar nav a').forEach(a=>a.classList.remove('active'));
+  const el = document.getElementById('nav-'+view);
+  if(el) el.classList.add('active');
+  const titles = {dashboard:'Dashboard',imoveis:'Imóveis',salas:'Salas / Unidades',
+    inquilinos:'Inquilinos',contratos:'Contratos',receber:'Contas a Receber',
+    pagar:'Contas a Pagar',conciliacao:'Conciliação Bancária'};
+  document.getElementById('page-title').textContent = titles[view]||view;
+  document.getElementById('topbar-btn').innerHTML = '';
+  document.getElementById('content').innerHTML = '<div class="empty"><div class="ei">⏳</div><p>Carregando...</p></div>';
+  const fns = {dashboard:renderDashboard,imoveis:renderImoveis,salas:renderSalas,
+    inquilinos:renderInquilinos,contratos:renderContratos,
+    receber:renderReceber,pagar:renderPagar,conciliacao:renderConciliacao};
+  if(fns[view]) await fns[view]();
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────
+async function renderDashboard(){
+  const [imoveis,contratos,recM,pagM] = await Promise.all([
+    sbGet('imoveis','select=id,status'),
+    sbGet('contratos','select=id,status'),
+    sbGet('contas_receber',`select=valor,valor_recebido,status,data_vencimento&data_vencimento=gte.${today().slice(0,7)+'-01'}&data_vencimento=lte.${today().slice(0,7)+'-31'}`),
+    sbGet('contas_pagar',`select=valor,valor_pago,status,data_vencimento&data_vencimento=gte.${today().slice(0,7)+'-01'}&data_vencimento=lte.${today().slice(0,7)+'-31'}`)
+  ]);
+  const totalI = imoveis.length;
+  const algI = imoveis.filter(x=>x.status==='alugado').length;
+  const dispI = imoveis.filter(x=>x.status==='disponivel').length;
+  const totalRec = recM.reduce((a,x)=>a+Number(x.valor),0);
+  const recebido = recM.filter(x=>x.status==='recebido').reduce((a,x)=>a+Number(x.valor_recebido||x.valor),0);
+  const vencRec = recM.filter(x=>x.status==='vencido').reduce((a,x)=>a+Number(x.valor),0);
+  const totalPag = pagM.reduce((a,x)=>a+Number(x.valor),0);
+  const pago = pagM.filter(x=>x.status==='pago').reduce((a,x)=>a+Number(x.valor_pago||x.valor),0);
+
+  // Vencimentos próximos (7 dias)
+  const d7 = new Date(); d7.setDate(d7.getDate()+7);
+  const prox = await sbGet('contas_receber',`select=descricao,valor,data_vencimento,status,inquilino_id&status=in.(pendente,vencido)&data_vencimento=lte.${d7.toISOString().slice(0,10)}&order=data_vencimento.asc&limit=8`);
+  const inqs = prox.length ? await sbGet('inquilinos','select=id,nome') : [];
+
+  document.getElementById('content').innerHTML = `
+  <div class="cards">
+    <div class="card"><div class="card-label">Imóveis</div><div class="card-val">${totalI}</div><div class="card-sub">${algI} alugados · ${dispI} disponíveis</div></div>
+    <div class="card"><div class="card-label">A Receber (mês)</div><div class="card-val" style="font-size:18px">${fmtR(totalRec)}</div><div class="card-sub">Recebido: ${fmtR(recebido)}</div></div>
+    <div class="card"><div class="card-label">Inadimplência</div><div class="card-val" style="color:#dc2626;font-size:18px">${fmtR(vencRec)}</div><div class="card-sub">A Pagar (mês): ${fmtR(totalPag)}</div></div>
+    <div class="card"><div class="card-label">Resultado Mês</div><div class="card-val" style="font-size:18px;color:${recebido-pago>=0?'#16a34a':'#dc2626'}">${fmtR(recebido-pago)}</div><div class="card-sub">Rec. ${fmtR(recebido)} − Pago ${fmtR(pago)}</div></div>
+  </div>
+  <div class="section-box">
+    <div class="section-header"><span class="section-title">Vencimentos próximos (7 dias)</span></div>
+    ${prox.length===0?'<div class="empty"><p>Nenhum vencimento nos próximos 7 dias</p></div>':
+    '<table><thead><tr><th>Vencimento</th><th>Inquilino</th><th>Descrição</th><th>Valor</th><th>Status</th></tr></thead><tbody>'+
+    prox.map(r=>{const inq=inqs.find(i=>i.id===r.inquilino_id);return`<tr><td>${fmtD(r.data_vencimento)}</td><td>${inq?inq.nome:'—'}</td><td>${r.descricao}</td><td>${fmtR(r.valor)}</td><td>${badgeStatus(r.status)}</td></tr>`}).join('')+
+    '</tbody></table>'}
+  </div>`;
+}
+
+// ── IMÓVEIS ───────────────────────────────────────────────
+async function renderImoveis(){
+  CACHE.imoveis = await sbGet('imoveis','select=*&order=codigo.asc');
+  document.getElementById('topbar-btn').innerHTML = `<button class="btn btn-p" onclick="openImovelMo()">+ Novo Imóvel</button>`;
+  document.getElementById('content').innerHTML = `
+  <div class="section-box">
+    <div class="section-header"><span class="section-title">${CACHE.imoveis.length} imóveis cadastrados</span></div>
+    ${CACHE.imoveis.length===0?'<div class="empty"><div class="ei">🏠</div><p>Nenhum imóvel cadastrado</p></div>':
+    '<table><thead><tr><th>Código</th><th>Nome</th><th>Endereço</th><th>Tipo</th><th>Área</th><th>Valor Base</th><th>Status</th><th>Ações</th></tr></thead><tbody>'+
+    CACHE.imoveis.map(x=>`<tr>
+      <td><strong>${x.codigo}</strong></td>
+      <td>${x.nome||'—'}</td>
+      <td>${x.endereco}${x.bairro?', '+x.bairro:''}<br><small style="color:#64748b">${x.cidade||''}</small></td>
+      <td>${x.tipo||'—'}</td>
+      <td>${x.area_m2?x.area_m2+' m²':'—'}</td>
+      <td>${fmtR(x.valor_aluguel_base)}</td>
+      <td>${badgeStatus(x.status)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-s btn-sm" onclick="openImovelMo('${x.id}')">Editar</button>
+        <button class="btn btn-d btn-sm" onclick="deleteImovel('${x.id}')">Excluir</button>
+      </td>
+    </tr>`).join('')+'</tbody></table>'}
+  </div>`;
+}
+
+function openImovelMo(id){
+  const x = id ? CACHE.imoveis.find(i=>i.id===id) : null;
+  EDITING.imovel = id||null;
+  document.getElementById('mo-imovel-title').textContent = id?'Editar Imóvel':'Novo Imóvel';
+  document.getElementById('i-cod').value = x?.codigo||'';
+  document.getElementById('i-nome').value = x?.nome||'';
+  document.getElementById('i-end').value = x?.endereco||'';
+  document.getElementById('i-bairro').value = x?.bairro||'';
+  document.getElementById('i-cidade').value = x?.cidade||'Mogi Mirim';
+  document.getElementById('i-tipo').value = x?.tipo||'comercial';
+  document.getElementById('i-area').value = x?.area_m2||'';
+  document.getElementById('i-valor').value = x?.valor_aluguel_base||'';
+  document.getElementById('i-status').value = x?.status||'disponivel';
+  document.getElementById('i-obs').value = x?.obs||'';
+  openMo('mo-imovel');
+}
+
+async function saveImovel(){
+  const data = {
+    codigo: document.getElementById('i-cod').value.trim().toUpperCase(),
+    nome: document.getElementById('i-nome').value.trim()||null,
+    endereco: document.getElementById('i-end').value.trim(),
+    bairro: document.getElementById('i-bairro').value.trim()||null,
+    cidade: document.getElementById('i-cidade').value.trim()||null,
+    tipo: document.getElementById('i-tipo').value,
+    area_m2: document.getElementById('i-area').value||null,
+    valor_aluguel_base: document.getElementById('i-valor').value||null,
+    status: document.getElementById('i-status').value,
+    obs: document.getElementById('i-obs').value.trim()||null
+  };
+  if(!data.codigo||!data.endereco){toast('Código e endereço são obrigatórios','err');return;}
+  try{
+    if(EDITING.imovel) await sbPatch('imoveis',EDITING.imovel,data);
+    else await sbPost('imoveis',data);
+    closeMo('mo-imovel');
+    toast('Imóvel salvo!');
+    await renderImoveis();
+  }catch(e){toast(e.message||'Erro ao salvar','err');}
+}
+
+async function deleteImovel(id){
+  if(!confirm('Excluir imóvel? Esta ação não pode ser desfeita.')) return;
+  await sbDel('imoveis',id);
+  toast('Imóvel excluído');
+  await renderImoveis();
+}
+
+// ── SALAS ─────────────────────────────────────────────────
+async function renderSalas(){
+  if(!CACHE.imoveis.length) CACHE.imoveis = await sbGet('imoveis','select=id,codigo,nome&order=codigo.asc');
+  const filterIm = document.getElementById('f-sala-im')?.value||'';
+  const qs = 'select=*,imoveis(codigo,nome)&order=imovel_id.asc,numero.asc'+(filterIm?`&imovel_id=eq.${filterIm}`:'');
+  CACHE.salas = await sbGet('salas',qs);
+  document.getElementById('topbar-btn').innerHTML = `<button class="btn btn-p" onclick="openSalaMo()">+ Nova Sala</button>`;
+  document.getElementById('content').innerHTML = `
+  <div class="section-box">
+    <div class="section-header">
+      <span class="section-title">${CACHE.salas.length} salas</span>
+      <div class="filters">
+        <select id="f-sala-im" onchange="renderSalas()">
+          <option value="">Todos os imóveis</option>
+          ${CACHE.imoveis.map(x=>`<option value="${x.id}" ${x.id===filterIm?'selected':''}>${x.codigo} ${x.nome?'- '+x.nome:''}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    ${CACHE.salas.length===0?'<div class="empty"><div class="ei">🚪</div><p>Nenhuma sala cadastrada</p></div>':
+    '<table><thead><tr><th>Imóvel</th><th>Nº/ID</th><th>Andar</th><th>Área</th><th>Valor</th><th>Energia</th><th>Água</th><th>Status</th><th>Ações</th></tr></thead><tbody>'+
+    CACHE.salas.map(x=>`<tr>
+      <td>${x.imoveis?.codigo||'—'}</td>
+      <td><strong>${x.numero}</strong></td>
+      <td>${x.andar||'—'}</td>
+      <td>${x.area_m2?x.area_m2+' m²':'—'}</td>
+      <td>${fmtR(x.valor_aluguel)}</td>
+      <td><span class="badge ${x.tipo_energia==='individual'?'bb':'by'}">${x.tipo_energia==='individual'?'Individual':'Compartilhada'}</span></td>
+      <td><span class="badge ${x.tipo_agua==='individual'?'bb':'by'}">${x.tipo_agua==='individual'?'Individual':'Compartilhada'}</span></td>
+      <td>${badgeStatus(x.status)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-s btn-sm" onclick="openSalaMo('${x.id}')">Editar</button>
+        <button class="btn btn-d btn-sm" onclick="deleteSala('${x.id}')">Excluir</button>
+      </td>
+    </tr>`).join('')+'</tbody></table>'}
+  </div>`;
+}
+
+function openSalaMo(id){
+  if(!CACHE.imoveis.length){toast('Carregue os imóveis primeiro','err');return;}
+  const x = id ? CACHE.salas.find(s=>s.id===id) : null;
+  EDITING.sala = id||null;
+  document.getElementById('mo-sala-title').textContent = id?'Editar Sala':'Nova Sala';
+  document.getElementById('s-imovel').innerHTML = CACHE.imoveis.map(i=>`<option value="${i.id}" ${x?.imovel_id===i.id?'selected':''}>${i.codigo}${i.nome?' - '+i.nome:''}</option>`).join('');
+  document.getElementById('s-num').value = x?.numero||'';
+  document.getElementById('s-andar').value = x?.andar||'';
+  document.getElementById('s-area').value = x?.area_m2||'';
+  document.getElementById('s-valor').value = x?.valor_aluguel||'';
+  document.getElementById('s-energia').value = x?.tipo_energia||'individual';
+  document.getElementById('s-agua').value = x?.tipo_agua||'compartilhado';
+  document.getElementById('s-status').value = x?.status||'disponivel';
+  document.getElementById('s-obs').value = x?.obs||'';
+  openMo('mo-sala');
+}
+
+async function saveSala(){
+  const data = {
+    imovel_id: document.getElementById('s-imovel').value,
+    numero: document.getElementById('s-num').value.trim(),
+    andar: document.getElementById('s-andar').value.trim()||null,
+    area_m2: document.getElementById('s-area').value||null,
+    valor_aluguel: document.getElementById('s-valor').value||null,
+    tipo_energia: document.getElementById('s-energia').value,
+    tipo_agua: document.getElementById('s-agua').value,
+    status: document.getElementById('s-status').value,
+    obs: document.getElementById('s-obs').value.trim()||null
+  };
+  if(!data.imovel_id||!data.numero){toast('Imóvel e número são obrigatórios','err');return;}
+  try{
+    if(EDITING.sala) await sbPatch('salas',EDITING.sala,data);
+    else await sbPost('salas',data);
+    closeMo('mo-sala');
+    toast('Sala salva!');
+    await renderSalas();
+  }catch(e){toast(e.message||'Erro ao salvar','err');}
+}
+
+async function deleteSala(id){
+  if(!confirm('Excluir sala?')) return;
+  await sbDel('salas',id);
+  toast('Sala excluída');
+  await renderSalas();
+}
+
+// ── INQUILINOS ────────────────────────────────────────────
+async function renderInquilinos(){
+  CACHE.inquilinos = await sbGet('inquilinos','select=*&order=nome.asc');
+  document.getElementById('topbar-btn').innerHTML = `<button class="btn btn-p" onclick="openInqMo()">+ Novo Inquilino</button>`;
+  document.getElementById('content').innerHTML = `
+  <div class="section-box">
+    <div class="section-header"><span class="section-title">${CACHE.inquilinos.length} inquilinos</span></div>
+    ${CACHE.inquilinos.length===0?'<div class="empty"><div class="ei">👥</div><p>Nenhum inquilino cadastrado</p></div>':
+    '<table><thead><tr><th>Nome / Razão Social</th><th>CPF/CNPJ</th><th>Telefone</th><th>E-mail</th><th>Profissão</th><th>Ações</th></tr></thead><tbody>'+
+    CACHE.inquilinos.map(x=>`<tr>
+      <td><strong>${x.nome}</strong></td>
+      <td>${x.cpf_cnpj||'—'}</td>
+      <td>${x.telefone||'—'}</td>
+      <td>${x.email||'—'}</td>
+      <td>${x.profissao||'—'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-s btn-sm" onclick="openInqMo('${x.id}')">Editar</button>
+        <button class="btn btn-d btn-sm" onclick="deleteInq('${x.id}')">Excluir</button>
+      </td>
+    </tr>`).join('')+'</tbody></table>'}
+  </div>`;
+}
+
+function openInqMo(id){
+  const x = id ? CACHE.inquilinos.find(i=>i.id===id) : null;
+  EDITING.inq = id||null;
+  document.getElementById('mo-inq-title').textContent = id?'Editar Inquilino':'Novo Inquilino';
+  ['nome','cpf','rg','tel','email','end','prof','obs'].forEach(f=>{
+    const el = document.getElementById('q-'+f);
+    const keys = {nome:'nome',cpf:'cpf_cnpj',rg:'rg_ie',tel:'telefone',email:'email',end:'endereco',prof:'profissao',obs:'obs'};
+    if(el) el.value = x?.[keys[f]]||'';
+  });
+  openMo('mo-inq');
+}
+
+async function saveInquilino(){
+  const data = {
+    nome: document.getElementById('q-nome').value.trim(),
+    cpf_cnpj: document.getElementById('q-cpf').value.trim()||null,
+    rg_ie: document.getElementById('q-rg').value.trim()||null,
+    telefone: document.getElementById('q-tel').value.trim()||null,
+    email: document.getElementById('q-email').value.trim()||null,
+    endereco: document.getElementById('q-end').value.trim()||null,
+    profissao: document.getElementById('q-prof').value.trim()||null,
+    obs: document.getElementById('q-obs').value.trim()||null
+  };
+  if(!data.nome){toast('Nome é obrigatório','err');return;}
+  try{
+    if(EDITING.inq) await sbPatch('inquilinos',EDITING.inq,data);
+    else await sbPost('inquilinos',data);
+    closeMo('mo-inq');
+    toast('Inquilino salvo!');
+    await renderInquilinos();
+  }catch(e){toast(e.message||'Erro ao salvar','err');}
+}
+
+async function deleteInq(id){
+  if(!confirm('Excluir inquilino?')) return;
+  await sbDel('inquilinos',id);
+  toast('Inquilino excluído');
+  await renderInquilinos();
+}
+
+// ── CONTRATOS ─────────────────────────────────────────────
+async function renderContratos(){
+  const [imoveis,inquilinos,contratos] = await Promise.all([
+    sbGet('imoveis','select=id,codigo,nome&order=codigo.asc'),
+    sbGet('inquilinos','select=id,nome&order=nome.asc'),
+    sbGet('contratos','select=*,imoveis(codigo,nome),inquilinos(nome)&order=created_at.desc')
+  ]);
+  CACHE.imoveis = imoveis; CACHE.inquilinos = inquilinos; CACHE.contratos = contratos;
+  document.getElementById('topbar-btn').innerHTML = `<button class="btn btn-p" onclick="openContratoMo()">+ Novo Contrato</button>`;
+  document.getElementById('content').innerHTML = `
+  <div class="section-box">
+    <div class="section-header"><span class="section-title">${contratos.length} contratos</span></div>
+    ${contratos.length===0?'<div class="empty"><div class="ei">📋</div><p>Nenhum contrato cadastrado</p></div>':
+    '<table><thead><tr><th>Tipo</th><th>Inquilino</th><th>Imóvel</th><th>Valor</th><th>Venc.</th><th>Início</th><th>Fim</th><th>Status</th><th>Ações</th></tr></thead><tbody>'+
+    contratos.map(x=>`<tr>
+      <td><span class="badge ${x.tipo==='locacao'?'bb':'bo'}">${x.tipo==='locacao'?'Locação':'Sublocação'}</span></td>
+      <td>${x.inquilinos?.nome||'—'}</td>
+      <td>${x.imoveis?.codigo||'—'}${x.imoveis?.nome?' - '+x.imoveis.nome:''}</td>
+      <td>${fmtR(x.valor_aluguel)}</td>
+      <td>Dia ${x.dia_vencimento}</td>
+      <td>${fmtD(x.data_inicio)}</td>
+      <td>${fmtD(x.data_fim)}</td>
+      <td>${badgeStatus(x.status)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-s btn-sm" onclick="openContratoMo('${x.id}')">Editar</button>
+        <button class="btn btn-p btn-sm" onclick="gerarPDF('${x.id}')">PDF</button>
+        <button class="btn btn-d btn-sm" onclick="deleteContrato('${x.id}')">Excluir</button>
+      </td>
+    </tr>`).join('')+'</tbody></table>'}
+  </div>`;
+}
+
+async function openContratoMo(id){
+  EDITING.contrato = id||null;
+  const x = id ? CACHE.contratos.find(c=>c.id===id) : null;
+  document.getElementById('mo-contrato-title').textContent = id?'Editar Contrato':'Novo Contrato';
+  document.getElementById('c-tipo').value = x?.tipo||'sublocacao';
+  document.getElementById('c-status').value = x?.status||'ativo';
+  document.getElementById('c-imovel').innerHTML = '<option value="">Selecione...</option>'+CACHE.imoveis.map(i=>`<option value="${i.id}" ${x?.imovel_id===i.id?'selected':''}>${i.codigo}${i.nome?' - '+i.nome:''}</option>`).join('');
+  document.getElementById('c-inquilino').innerHTML = '<option value="">Selecione...</option>'+CACHE.inquilinos.map(i=>`<option value="${i.id}" ${x?.inquilino_id===i.id?'selected':''}>${i.nome}</option>`).join('');
+  document.getElementById('c-inicio').value = x?.data_inicio||'';
+  document.getElementById('c-fim').value = x?.data_fim||'';
+  document.getElementById('c-valor').value = x?.valor_aluguel||'';
+  document.getElementById('c-venc').value = x?.dia_vencimento||10;
+  document.getElementById('c-indice').value = x?.indice_reajuste||'IGPM';
+  document.getElementById('c-garantia-tipo').value = x?.garantia_tipo||'caucao';
+  document.getElementById('c-garantia-val').value = x?.garantia_valor||'';
+  document.getElementById('c-obs').value = x?.obs||'';
+  await loadSalasContrato(x?.salas_ids||[]);
+  openMo('mo-contrato');
+}
+
+async function loadSalasContrato(selectedIds){
+  const imId = document.getElementById('c-imovel').value;
+  const container = document.getElementById('c-salas-check');
+  if(!imId){container.innerHTML='<span style="color:#94a3b8;font-size:13px">Selecione um imóvel primeiro</span>';return;}
+  const salas = await sbGet('salas',`select=id,numero,andar,status&imovel_id=eq.${imId}&order=numero.asc`);
+  const sel = selectedIds || [];
+  container.innerHTML = salas.length===0?'<span style="color:#94a3b8;font-size:13px">Nenhuma sala cadastrada neste imóvel</span>':
+    '<div class="sala-check">'+salas.map(s=>`<label><input type="checkbox" value="${s.id}" ${sel.includes(s.id)?'checked':''}> Sala ${s.numero}${s.andar?' ('+s.andar+')':''} ${s.status!=='disponivel'&&!sel.includes(s.id)?'<span style="color:#ea580c"> ⚠</span>':''}</label>`).join('')+'</div>';
+}
+
+async function saveContrato(){
+  const imId = document.getElementById('c-imovel').value;
+  const inqId = document.getElementById('c-inquilino').value;
+  const inicio = document.getElementById('c-inicio').value;
+  const valor = document.getElementById('c-valor').value;
+  const venc = document.getElementById('c-venc').value;
+  if(!imId||!inqId||!inicio||!valor||!venc){toast('Preencha os campos obrigatórios','err');return;}
+  const salaIds = Array.from(document.querySelectorAll('#c-salas-check input:checked')).map(el=>el.value);
+  const data = {
+    tipo: document.getElementById('c-tipo').value,
+    status: document.getElementById('c-status').value,
+    imovel_id: imId,
+    inquilino_id: inqId,
+    salas_ids: salaIds,
+    data_inicio: inicio,
+    data_fim: document.getElementById('c-fim').value||null,
+    valor_aluguel: Number(valor),
+    dia_vencimento: Number(venc),
+    indice_reajuste: document.getElementById('c-indice').value,
+    garantia_tipo: document.getElementById('c-garantia-tipo').value,
+    garantia_valor: document.getElementById('c-garantia-val').value||null,
+    obs: document.getElementById('c-obs').value.trim()||null
+  };
+  try{
+    let cId;
+    if(EDITING.contrato){
+      await sbPatch('contratos',EDITING.contrato,data);
+      cId = EDITING.contrato;
+    } else {
+      const res = await sbPost('contratos',data);
+      cId = Array.isArray(res)?res[0].id:res.id;
+      if(cId && data.data_inicio && data.data_fim) await gerarParcelas(cId, data);
+    }
+    // Atualizar salas para alugado
+    if(salaIds.length) await Promise.all(salaIds.map(sid=>sbPatch('salas',sid,{status:'alugado'})));
+    closeMo('mo-contrato');
+    toast(EDITING.contrato?'Contrato atualizado!':'Contrato criado e parcelas geradas!');
+    await renderContratos();
+  }catch(e){toast(e.message||'Erro ao salvar','err');}
+}
+
+async function gerarParcelas(contratoId, data){
+  const parcelas = [];
+  let dt = new Date(data.data_inicio+'T12:00:00');
+  const fim = new Date(data.data_fim+'T12:00:00');
+  let n = 1;
+  while(dt <= fim){
+    const vencDt = new Date(dt.getFullYear(), dt.getMonth(), data.dia_vencimento);
+    parcelas.push({
+      contrato_id: contratoId,
+      imovel_id: data.imovel_id,
+      inquilino_id: data.inquilino_id,
+      descricao: `Aluguel ${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()} (parcela ${n})`,
+      tipo: 'aluguel',
+      valor: data.valor_aluguel,
+      data_vencimento: vencDt.toISOString().slice(0,10),
+      status: 'pendente'
+    });
+    dt.setMonth(dt.getMonth()+1);
+    n++;
+  }
+  if(parcelas.length) await sbPost('contas_receber',parcelas);
+}
+
+async function deleteContrato(id){
+  if(!confirm('Excluir contrato? As parcelas geradas NÃO serão excluídas.')) return;
+  await sbDel('contratos',id);
+  toast('Contrato excluído');
+  await renderContratos();
+}
+
+// ── PDF ───────────────────────────────────────────────────
+async function gerarPDF(cId){
+  const contrato = CACHE.contratos.find(c=>c.id===cId);
+  if(!contrato){toast('Contrato não encontrado','err');return;}
+  const [inq, imovel, salas] = await Promise.all([
+    sbGet('inquilinos',`select=*&id=eq.${contrato.inquilino_id}`),
+    sbGet('imoveis',`select=*&id=eq.${contrato.imovel_id}`),
+    contrato.salas_ids?.length ? sbGet('salas',`select=*&id=in.(${contrato.salas_ids.join(',')})`) : Promise.resolve([])
+  ]);
+  const q = inq[0]||{}, im = imovel[0]||{};
+  const dtAss = new Date().toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'});
+  const caucaoVal = contrato.garantia_valor || (contrato.valor_aluguel*2);
+  const salasTable = salas.length ? `<table><thead><tr><th>Sala</th><th>Andar</th><th>Área</th></tr></thead><tbody>${salas.map(s=>`<tr><td>${s.numero}</td><td>${s.andar||'—'}</td><td>${s.area_m2?s.area_m2+' m²':'—'}</td></tr>`).join('')}</tbody></table>` : `<p>Imóvel: ${im.endereco}</p>`;
+  const isSub = contrato.tipo === 'sublocacao';
+  const html = isSub ? tplSublocacao({q,im,contrato,dtAss,caucaoVal,salasTable}) : tplLocacao({q,im,contrato,dtAss,caucaoVal,salasTable});
+  document.getElementById('print-area').innerHTML = html;
+  window.print();
+}
+
+function tplSublocacao({q,im,contrato,dtAss,caucaoVal,salasTable}){
+  return `<div class="contract-page">
+<h1>CONTRATO DE SUBLOCAÇÃO COMERCIAL</h1>
+<p class="sub">${im.nome||im.codigo||''} – ${im.cidade||'Mogi Mirim'}/SP</p>
+<h2>CLÁUSULA 1 – DAS PARTES</h2>
+<p><strong>1.1 SUBLOCADOR</strong><br>
+Razão Social: PROSPECT ADMINISTRAÇÃO DE IMÓVEIS LTDA<br>
+CNPJ: 09.423.748/0001-71<br>
+Endereço: Av. Caetano Schincariol, 280 – Parque Empresa – Mogi Mirim/SP – CEP 13.803-340<br>
+E-mail: prospect.acess@gmail.com | Telefone: (19) 9183-4397</p>
+<p><strong>1.2 SUBLOCATÁRIO</strong><br>
+Nome / Razão Social: ${q.nome||'_________________________________'}<br>
+CPF / CNPJ: ${q.cpf_cnpj||'_________________________________'}<br>
+RG / Insc. Estadual: ${q.rg_ie||'_________________________________'}<br>
+Endereço: ${q.endereco||'_________________________________'}<br>
+E-mail: ${q.email||'_________________________________'} | Telefone: ${q.telefone||'_________________________________'}</p>
+<p>As partes acima qualificadas celebram o presente Contrato de Sublocação Comercial, regido pela Lei nº 8.245/1991 (Lei do Inquilinato) e demais legislações aplicáveis.</p>
+<h2>CLÁUSULA 2 – DO IMÓVEL E SALAS OBJETO DO CONTRATO</h2>
+<p>2.1 O imóvel denominado "${im.nome||im.codigo||''}", situado em ${im.endereco}${im.bairro?', '+im.bairro:''}, ${im.cidade||'Mogi Mirim'}/SP, é administrado pela SUBLOCADORA, que detém contrato com os proprietários do imóvel.</p>
+<p>2.2 As salas objeto deste contrato:</p>
+${salasTable}
+<h2>CLÁUSULA 3 – DO PRAZO</h2>
+<p>3.1 O presente contrato terá vigência de ${contrato.data_inicio&&contrato.data_fim?Math.round((new Date(contrato.data_fim)-new Date(contrato.data_inicio))/(30*24*3600*1000))+' ('+numExt(Math.round((new Date(contrato.data_fim)-new Date(contrato.data_inicio))/(30*24*3600*1000)))+') meses':'____ meses'}, com início em ${contrato.data_inicio?new Date(contrato.data_inicio+'T12:00:00').toLocaleDateString('pt-BR'):'___/___/______'} e término em ${contrato.data_fim?new Date(contrato.data_fim+'T12:00:00').toLocaleDateString('pt-BR'):'___/___/______'}.</p>
+<p>3.2 O contrato NÃO se renova automaticamente ao término do prazo. Havendo interesse em prorrogar, novo contrato deverá ser firmado.</p>
+<h2>CLÁUSULA 4 – DO ALUGUEL E FORMA DE PAGAMENTO</h2>
+<p>4.1 O valor mensal do aluguel é de <strong>${fmtR(contrato.valor_aluguel)} (${numExt(contrato.valor_aluguel)})</strong>, a ser pago até o dia <strong>${contrato.dia_vencimento}</strong> de cada mês.</p>
+<p>4.2 O pagamento deverá ser realizado mediante PIX: <strong>C6 Bank | CNPJ: 09.423.748/0001-71 | Chave PIX: 09423748000171</strong></p>
+<p>4.3 O não pagamento no prazo sujeitará o SUBLOCATÁRIO a multa de 2% sobre o valor em atraso, acrescida de juros de mora de 1% ao mês e correção pelo ${contrato.indice_reajuste||'IGPM'}/FGV.</p>
+<p>4.4 O valor do aluguel será reajustado anualmente com base na variação do ${contrato.indice_reajuste||'IGPM'}/FGV.</p>
+<h2>CLÁUSULA 5 – DA GARANTIA LOCATÍCIA</h2>
+<p>5.1 A título de caução, o SUBLOCATÁRIO depositará <strong>${fmtR(caucaoVal)} (${numExt(caucaoVal)})</strong>, equivalente a 2 (dois) aluguéis, no ato da assinatura deste contrato.</p>
+<p>5.2 A caução será devolvida em até 30 dias após a entrega das chaves, descontadas eventuais pendências.</p>
+<h2>CLÁUSULA 6 – DA INADIMPLÊNCIA E RESCISÃO</h2>
+<p>6.1 O atraso de 1 (um) aluguel faculta à SUBLOCADORA a rescisão imediata do contrato.</p>
+<p>6.2 Rescisão antecipada pelo SUBLOCATÁRIO: aviso prévio de 30 dias e multa equivalente a 2 (dois) aluguéis, proporcionalmente ao período restante.</p>
+<h2>CLÁUSULA 7 – DO ESTADO DO IMÓVEL E RESPONSABILIDADES</h2>
+<p>7.1 Será realizada vistoria inicial com laudo assinado por ambas as partes.</p>
+<p>7.2 O SUBLOCATÁRIO devolverá as salas nas mesmas condições recebidas, ressalvado desgaste natural pelo uso.</p>
+<p>7.3 É vedada a sublocação, cessão ou transferência a terceiros sem autorização prévia e escrita da SUBLOCADORA.</p>
+<h2>CLÁUSULA 8 – DISPOSIÇÕES GERAIS</h2>
+<p>8.1 Os casos omissos serão resolvidos pela Lei nº 8.245/1991 e pelo Código Civil Brasileiro.</p>
+<p>8.2 Fica eleito o foro da Comarca de Mogi Mirim/SP para dirimir quaisquer litígios.</p>
+<p style="margin-top:20px">Mogi Mirim/SP, ${dtAss}</p>
+<div class="sig">
+<div class="sig-row">
+  <div style="text-align:center;width:46%">
+    <div style="border-top:1px solid #000;padding-top:6px;margin-top:40px">PROSPECT ADMINISTRAÇÃO DE IMÓVEIS LTDA<br><small>CNPJ: 09.423.748/0001-71 – SUBLOCADORA</small></div>
+  </div>
+  <div style="text-align:center;width:46%">
+    <div style="border-top:1px solid #000;padding-top:6px;margin-top:40px">${q.nome||'_________________________________'}<br><small>${q.cpf_cnpj||''} – SUBLOCATÁRIO</small></div>
+  </div>
+</div>
+<p style="margin-top:32px"><strong>TESTEMUNHAS:</strong></p>
+<div class="sig-row">
+  <div style="text-align:center;width:46%"><div style="border-top:1px solid #000;padding-top:6px;margin-top:40px">Nome:<br>CPF:</div></div>
+  <div style="text-align:center;width:46%"><div style="border-top:1px solid #000;padding-top:6px;margin-top:40px">Nome:<br>CPF:</div></div>
+</div>
+</div>
+</div>`;
+}
+
+function tplLocacao({q,im,contrato,dtAss,caucaoVal,salasTable}){
+  return `<div class="contract-page">
+<h1>CONTRATO DE LOCAÇÃO COMERCIAL</h1>
+<p class="sub">${im.nome||im.codigo||''} – ${im.cidade||'Mogi Mirim'}/SP</p>
+<h2>CLÁUSULA 1 – DAS PARTES</h2>
+<p><strong>1.1 LOCADOR</strong><br>
+Razão Social: PROSPECT ADMINISTRAÇÃO DE IMÓVEIS LTDA<br>
+CNPJ: 09.423.748/0001-71<br>
+Endereço: Av. Caetano Schincariol, 280 – Parque Empresa – Mogi Mirim/SP – CEP 13.803-340<br>
+E-mail: prospect.acess@gmail.com | Telefone: (19) 9183-4397</p>
+<p><strong>1.2 LOCATÁRIO</strong><br>
+Nome / Razão Social: ${q.nome||'_________________________________'}<br>
+CPF / CNPJ: ${q.cpf_cnpj||'_________________________________'}<br>
+RG / Insc. Estadual: ${q.rg_ie||'_________________________________'}<br>
+Endereço: ${q.endereco||'_________________________________'}<br>
+E-mail: ${q.email||'_________________________________'} | Telefone: ${q.telefone||'_________________________________'}</p>
+<p>As partes celebram o presente Contrato de Locação Comercial, regido pela Lei nº 8.245/1991 e demais legislações aplicáveis.</p>
+<h2>CLÁUSULA 2 – DO IMÓVEL OBJETO DO CONTRATO</h2>
+<p>2.1 O imóvel objeto da locação está situado em ${im.endereco}${im.bairro?', '+im.bairro:''}, ${im.cidade||'Mogi Mirim'}/SP.</p>
+${salasTable}
+<p>2.2 O imóvel é destinado exclusivamente ao uso comercial/empresarial, sendo vedado uso residencial ou atividade incompatível com o zoneamento.</p>
+<h2>CLÁUSULA 3 – DO PRAZO</h2>
+<p>3.1 Este contrato terá vigência de ${contrato.data_inicio&&contrato.data_fim?Math.round((new Date(contrato.data_fim)-new Date(contrato.data_inicio))/(30*24*3600*1000))+' meses':'____ meses'}, com início em ${contrato.data_inicio?new Date(contrato.data_inicio+'T12:00:00').toLocaleDateString('pt-BR'):'___/___/______'} e término em ${contrato.data_fim?new Date(contrato.data_fim+'T12:00:00').toLocaleDateString('pt-BR'):'___/___/______'}.</p>
+<p>3.2 Findo o prazo, caso nenhuma das partes manifeste interesse de encerramento, o contrato converter-se-á em prazo indeterminado, nos termos do art. 56 da Lei do Inquilinato.</p>
+<h2>CLÁUSULA 4 – DO ALUGUEL E PAGAMENTO</h2>
+<p>4.1 O aluguel mensal é de <strong>${fmtR(contrato.valor_aluguel)} (${numExt(contrato.valor_aluguel)})</strong>, a ser pago até o dia <strong>${contrato.dia_vencimento}</strong> de cada mês.</p>
+<p>4.2 Pagamento mediante PIX: <strong>C6 Bank | CNPJ: 09.423.748/0001-71 | Chave: 09423748000171</strong></p>
+<p>4.3 Atraso: multa de 2%, juros de 1% ao mês e correção pelo ${contrato.indice_reajuste||'IGPM'}/FGV.</p>
+<p>4.4 Reajuste anual pelo ${contrato.indice_reajuste||'IGPM'}/FGV.</p>
+<h2>CLÁUSULA 5 – DA GARANTIA</h2>
+<p>5.1 Caução de <strong>${fmtR(caucaoVal)} (${numExt(caucaoVal)})</strong> a ser depositado no ato da assinatura, devolvido em até 30 dias após entrega das chaves.</p>
+<h2>CLÁUSULA 6 – DA RESCISÃO</h2>
+<p>6.1 Inadimplência de 1 aluguel autoriza rescisão imediata pelo LOCADOR.</p>
+<p>6.2 Rescisão antecipada pelo LOCATÁRIO: aviso de 30 dias e multa de 2 aluguéis proporcional ao período restante.</p>
+<h2>CLÁUSULA 7 – OBRIGAÇÕES DO LOCATÁRIO</h2>
+<p>7.1 Manter licenças e alvarás regulares junto aos órgãos competentes.</p>
+<p>7.2 Devolver o imóvel nas mesmas condições recebidas, ressalvado desgaste normal.</p>
+<p>7.3 Não sublocar, ceder ou transferir sem autorização escrita do LOCADOR.</p>
+<h2>CLÁUSULA 8 – DISPOSIÇÕES GERAIS</h2>
+<p>8.1 Foro: Comarca de Mogi Mirim/SP.</p>
+<p style="margin-top:20px">Mogi Mirim/SP, ${dtAss}</p>
+<div class="sig">
+<div class="sig-row">
+  <div style="text-align:center;width:46%"><div style="border-top:1px solid #000;padding-top:6px;margin-top:40px">PROSPECT ADMINISTRAÇÃO DE IMÓVEIS LTDA<br><small>CNPJ: 09.423.748/0001-71 – LOCADOR</small></div></div>
+  <div style="text-align:center;width:46%"><div style="border-top:1px solid #000;padding-top:6px;margin-top:40px">${q.nome||'_________________________________'}<br><small>${q.cpf_cnpj||''} – LOCATÁRIO</small></div></div>
+</div>
+<p style="margin-top:32px"><strong>TESTEMUNHAS:</strong></p>
+<div class="sig-row">
+  <div style="text-align:center;width:46%"><div style="border-top:1px solid #000;padding-top:6px;margin-top:40px">Nome:<br>CPF:</div></div>
+  <div style="text-align:center;width:46%"><div style="border-top:1px solid #000;padding-top:6px;margin-top:40px">Nome:<br>CPF:</div></div>
+</div>
+</div>
+</div>`;
+}
+
+// ── A RECEBER ─────────────────────────────────────────────
+async function renderReceber(){
+  const mes = document.getElementById('f-rec-mes')?.value || today().slice(0,7);
+  const imId = document.getElementById('f-rec-im')?.value||'';
+  const st = document.getElementById('f-rec-st')?.value||'';
+  if(!CACHE.imoveis.length) CACHE.imoveis = await sbGet('imoveis','select=id,codigo,nome&order=codigo.asc');
+  let qs = `select=*,imoveis(codigo),inquilinos(nome)&order=data_vencimento.asc`;
+  if(mes) qs += `&data_vencimento=gte.${mes}-01&data_vencimento=lte.${mes}-31`;
+  if(imId) qs += `&imovel_id=eq.${imId}`;
+  if(st) qs += `&status=eq.${st}`;
+  const rows = await sbGet('contas_receber',qs);
+  // Auto-vencido
+  const hoje = today();
+  const toUpdate = rows.filter(r=>r.status==='pendente'&&r.data_vencimento<hoje);
+  if(toUpdate.length) await Promise.all(toUpdate.map(r=>sbPatch('contas_receber',r.id,{status:'vencido'})));
+  const total = rows.reduce((a,r)=>a+Number(r.valor),0);
+  const recebido = rows.filter(r=>r.status==='recebido').reduce((a,r)=>a+Number(r.valor_recebido||r.valor),0);
+  document.getElementById('topbar-btn').innerHTML='';
+  document.getElementById('content').innerHTML = `
+  <div class="cards">
+    <div class="card"><div class="card-label">Total</div><div class="card-val" style="font-size:18px">${fmtR(total)}</div></div>
+    <div class="card"><div class="card-label">Recebido</div><div class="card-val" style="font-size:18px;color:#16a34a">${fmtR(recebido)}</div></div>
+    <div class="card"><div class="card-label">Pendente</div><div class="card-val" style="font-size:18px;color:#a16207">${fmtR(total-recebido)}</div></div>
+  </div>
+  <div class="section-box">
+    <div class="section-header">
+      <span class="section-title">${rows.length} lançamentos</span>
+      <div class="filters">
+        <input type="month" id="f-rec-mes" value="${mes}" onchange="renderReceber()">
+        <select id="f-rec-im" onchange="renderReceber()">
+          <option value="">Todos imóveis</option>
+          ${CACHE.imoveis.map(x=>`<option value="${x.id}" ${x.id===imId?'selected':''}>${x.codigo}</option>`).join('')}
+        </select>
+        <select id="f-rec-st" onchange="renderReceber()">
+          <option value="">Todos status</option>
+          <option value="pendente" ${st==='pendente'?'selected':''}>Pendente</option>
+          <option value="recebido" ${st==='recebido'?'selected':''}>Recebido</option>
+          <option value="vencido" ${st==='vencido'?'selected':''}>Vencido</option>
+          <option value="cancelado" ${st==='cancelado'?'selected':''}>Cancelado</option>
+        </select>
+      </div>
+    </div>
+    ${rows.length===0?'<div class="empty"><p>Nenhum lançamento encontrado</p></div>':
+    '<table><thead><tr><th>Vencimento</th><th>Inquilino</th><th>Imóvel</th><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Recebido</th><th>Status</th><th>Ações</th></tr></thead><tbody>'+
+    rows.map(r=>`<tr>
+      <td>${fmtD(r.data_vencimento)}</td>
+      <td>${r.inquilinos?.nome||'—'}</td>
+      <td>${r.imoveis?.codigo||'—'}</td>
+      <td>${r.descricao}</td>
+      <td><span class="badge bgr">${r.tipo}</span></td>
+      <td>${fmtR(r.valor)}</td>
+      <td>${r.data_recebimento?fmtD(r.data_recebimento)+' '+fmtR(r.valor_recebido||r.valor):'—'}</td>
+      <td>${badgeStatus(r.status)}</td>
+      <td style="white-space:nowrap">
+        ${r.status!=='recebido'?`<button class="btn btn-g btn-sm" onclick="openReceberMo('${r.id}','${r.descricao.replace(/'/g,'').slice(0,40)}',${r.valor})">Receber</button>`:''}
+        <button class="btn btn-d btn-sm" onclick="cancelarRec('${r.id}')">✕</button>
+      </td>
+    </tr>`).join('')+'</tbody></table>'}
+  </div>`;
+}
+
+let EDITING_REC={};
+function openReceberMo(id,desc,valor){
+  EDITING_REC={id,valor};
+  document.getElementById('mo-rec-info').innerHTML=`<strong>${desc}</strong><br>Valor: ${fmtR(valor)}`;
+  document.getElementById('r-data').value=today();
+  document.getElementById('r-valor').value=valor;
+  document.getElementById('r-obs').value='';
+  openMo('mo-receber');
+}
+async function confirmarRecebimento(){
+  const data=document.getElementById('r-data').value;
+  const valor=document.getElementById('r-valor').value;
+  if(!data||!valor){toast('Preencha data e valor','err');return;}
+  await sbPatch('contas_receber',EDITING_REC.id,{status:'recebido',data_recebimento:data,valor_recebido:Number(valor),obs:document.getElementById('r-obs').value||null});
+  closeMo('mo-receber');toast('Recebimento registrado!');await renderReceber();
+}
+async function cancelarRec(id){
+  if(!confirm('Cancelar lançamento?')) return;
+  await sbPatch('contas_receber',id,{status:'cancelado'});
+  toast('Cancelado');await renderReceber();
+}
+
+// ── A PAGAR ───────────────────────────────────────────────
+async function renderPagar(){
+  const mes = document.getElementById('f-pag-mes')?.value || today().slice(0,7);
+  const imId = document.getElementById('f-pag-im')?.value||'';
+  const cat = document.getElementById('f-pag-cat')?.value||'';
+  const st = document.getElementById('f-pag-st')?.value||'';
+  if(!CACHE.imoveis.length) CACHE.imoveis = await sbGet('imoveis','select=id,codigo,nome&order=codigo.asc');
+  let qs = `select=*,imoveis(codigo)&order=data_vencimento.asc`;
+  if(mes) qs += `&data_vencimento=gte.${mes}-01&data_vencimento=lte.${mes}-31`;
+  if(imId) qs += `&imovel_id=eq.${imId}`;
+  if(cat) qs += `&categoria=eq.${cat}`;
+  if(st) qs += `&status=eq.${st}`;
+  const rows = await sbGet('contas_pagar',qs);
+  const hoje = today();
+  const toUpdate = rows.filter(r=>r.status==='pendente'&&r.data_vencimento<hoje);
+  if(toUpdate.length) await Promise.all(toUpdate.map(r=>sbPatch('contas_pagar',r.id,{status:'vencido'})));
+  const total = rows.reduce((a,r)=>a+Number(r.valor),0);
+  const pago = rows.filter(r=>r.status==='pago').reduce((a,r)=>a+Number(r.valor_pago||r.valor),0);
+  document.getElementById('topbar-btn').innerHTML=`<button class="btn btn-p" onclick="openDespesaMo()">+ Nova Despesa</button>`;
+  document.getElementById('content').innerHTML = `
+  <div class="cards">
+    <div class="card"><div class="card-label">Total</div><div class="card-val" style="font-size:18px">${fmtR(total)}</div></div>
+    <div class="card"><div class="card-label">Pago</div><div class="card-val" style="font-size:18px;color:#16a34a">${fmtR(pago)}</div></div>
+    <div class="card"><div class="card-label">Em Aberto</div><div class="card-val" style="font-size:18px;color:#dc2626">${fmtR(total-pago)}</div></div>
+  </div>
+  <div class="section-box">
+    <div class="section-header">
+      <span class="section-title">${rows.length} despesas</span>
+      <div class="filters">
+        <input type="month" id="f-pag-mes" value="${mes}" onchange="renderPagar()">
+        <select id="f-pag-im" onchange="renderPagar()">
+          <option value="">Todos imóveis</option>
+          ${CACHE.imoveis.map(x=>`<option value="${x.id}" ${x.id===imId?'selected':''}>${x.codigo}</option>`).join('')}
+        </select>
+        <select id="f-pag-cat" onchange="renderPagar()">
+          <option value="">Todas categorias</option>
+          <option value="iptu" ${cat==='iptu'?'selected':''}>IPTU</option>
+          <option value="condominio" ${cat==='condominio'?'selected':''}>Condomínio</option>
+          <option value="manutencao" ${cat==='manutencao'?'selected':''}>Manutenção</option>
+          <option value="seguro" ${cat==='seguro'?'selected':''}>Seguro</option>
+          <option value="taxa" ${cat==='taxa'?'selected':''}>Taxa</option>
+          <option value="outros" ${cat==='outros'?'selected':''}>Outros</option>
+        </select>
+        <select id="f-pag-st" onchange="renderPagar()">
+          <option value="">Todos status</option>
+          <option value="pendente" ${st==='pendente'?'selected':''}>Pendente</option>
+          <option value="pago" ${st==='pago'?'selected':''}>Pago</option>
+          <option value="vencido" ${st==='vencido'?'selected':''}>Vencido</option>
+        </select>
+      </div>
+    </div>
+    ${rows.length===0?'<div class="empty"><p>Nenhuma despesa encontrada</p></div>':
+    '<table><thead><tr><th>Vencimento</th><th>Imóvel</th><th>Descrição</th><th>Categoria</th><th>Valor</th><th>Pago em</th><th>Status</th><th>Ações</th></tr></thead><tbody>'+
+    rows.map(r=>`<tr>
+      <td>${fmtD(r.data_vencimento)}</td>
+      <td>${r.imoveis?.codigo||'—'}</td>
+      <td>${r.descricao}</td>
+      <td>${badgeCat(r.categoria)}</td>
+      <td>${fmtR(r.valor)}</td>
+      <td>${r.data_pagamento?fmtD(r.data_pagamento):'—'}</td>
+      <td>${badgeStatus(r.status)}</td>
+      <td style="white-space:nowrap">
+        ${r.status!=='pago'?`<button class="btn btn-g btn-sm" onclick="openPagarMo('${r.id}','${r.descricao.replace(/'/g,'').slice(0,40)}',${r.valor})">Pagar</button>`:''}
+        <button class="btn btn-s btn-sm" onclick="openDespesaMo('${r.id}')">Editar</button>
+        <button class="btn btn-d btn-sm" onclick="deletePagar('${r.id}')">✕</button>
+      </td>
+    </tr>`).join('')+'</tbody></table>'}
+  </div>`;
+}
+
+let EDITING_PAG={};
+function openPagarMo(id,desc,valor){
+  EDITING_PAG={id,valor};
+  document.getElementById('mo-pagar-title').textContent='Registrar Pagamento';
+  document.getElementById('mo-pag-info').innerHTML=`<strong>${desc}</strong><br>Valor: ${fmtR(valor)}`;
+  document.getElementById('p-data').value=today();
+  document.getElementById('p-valor').value=valor;
+  document.getElementById('p-obs').value='';
+  openMo('mo-pagar');
+}
+async function confirmarPagamento(){
+  const data=document.getElementById('p-data').value;
+  const valor=document.getElementById('p-valor').value;
+  if(!data||!valor){toast('Preencha data e valor','err');return;}
+  await sbPatch('contas_pagar',EDITING_PAG.id,{status:'pago',data_pagamento:data,valor_pago:Number(valor),obs:document.getElementById('p-obs').value||null});
+  closeMo('mo-pagar');toast('Pagamento registrado!');await renderPagar();
+}
+
+async function openDespesaMo(id){
+  if(!CACHE.imoveis.length) CACHE.imoveis = await sbGet('imoveis','select=id,codigo,nome&order=codigo.asc');
+  EDITING.despesa = id||null;
+  let x = null;
+  if(id){
+    const rows = await sbGet('contas_pagar',`select=*&id=eq.${id}`);
+    x = rows[0];
+  }
+  document.getElementById('mo-despesa-title').textContent = id?'Editar Despesa':'Nova Despesa';
+  document.getElementById('d-imovel').innerHTML = '<option value="">Sem vínculo</option>'+CACHE.imoveis.map(i=>`<option value="${i.id}" ${x?.imovel_id===i.id?'selected':''}>${i.codigo}${i.nome?' - '+i.nome:''}</option>`).join('');
+  document.getElementById('d-desc').value = x?.descricao||'';
+  document.getElementById('d-cat').value = x?.categoria||'outros';
+  document.getElementById('d-valor').value = x?.valor||'';
+  document.getElementById('d-venc').value = x?.data_vencimento||'';
+  document.getElementById('d-rec').value = x?.recorrente?'true':'false';
+  document.getElementById('d-obs').value = x?.obs||'';
+  openMo('mo-despesa');
+}
+
+async function saveDespesa(){
+  const desc = document.getElementById('d-desc').value.trim();
+  const valor = document.getElementById('d-valor').value;
+  const venc = document.getElementById('d-venc').value;
+  if(!desc||!valor||!venc){toast('Descrição, valor e vencimento são obrigatórios','err');return;}
+  const data = {
+    imovel_id: document.getElementById('d-imovel').value||null,
+    descricao: desc,
+    categoria: document.getElementById('d-cat').value,
+    valor: Number(valor),
+    data_vencimento: venc,
+    recorrente: document.getElementById('d-rec').value==='true',
+    obs: document.getElementById('d-obs').value.trim()||null
+  };
+  try{
+    if(EDITING.despesa) await sbPatch('contas_pagar',EDITING.despesa,data);
+    else await sbPost('contas_pagar',data);
+    closeMo('mo-despesa');toast('Despesa salva!');await renderPagar();
+  }catch(e){toast(e.message||'Erro','err');}
+}
+
+async function deletePagar(id){
+  if(!confirm('Excluir despesa?')) return;
+  await sbDel('contas_pagar',id);toast('Excluída');await renderPagar();
+}
+
+// ── CONCILIAÇÃO ───────────────────────────────────────────
+async function renderConciliacao(){
+  document.getElementById('topbar-btn').innerHTML=`<button class="btn btn-p" onclick="openMo('mo-csv')">Importar CSV</button>`;
+  const txs = await sbGet('transacoes','select=*,contas_receber(descricao,valor),contas_pagar(descricao,valor)&order=data.desc&limit=100');
+  const pend = txs.filter(t=>t.status_conciliacao==='pendente');
+  const conc = txs.filter(t=>t.status_conciliacao==='conciliado');
+  document.getElementById('content').innerHTML = `
+  <div class="cards">
+    <div class="card"><div class="card-label">Transações Importadas</div><div class="card-val">${txs.length}</div></div>
+    <div class="card"><div class="card-label">Pendentes</div><div class="card-val" style="color:#a16207">${pend.length}</div></div>
+    <div class="card"><div class="card-label">Conciliadas</div><div class="card-val" style="color:#16a34a">${conc.length}</div></div>
+  </div>
+  <div class="section-box">
+    <div class="section-header"><span class="section-title">Extrato Importado</span></div>
+    ${txs.length===0?'<div class="empty"><div class="ei">⚖️</div><p>Nenhum extrato importado. Use o botão "Importar CSV".</p></div>':
+    '<table><thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th>Tipo</th><th>Vinculado a</th><th>Status</th><th>Ações</th></tr></thead><tbody>'+
+    txs.map(t=>`<tr>
+      <td>${fmtD(t.data)}</td>
+      <td>${t.descricao||'—'}</td>
+      <td style="color:${Number(t.valor)>=0?'#16a34a':'#dc2626'};font-weight:600">${fmtR(Math.abs(t.valor))}</td>
+      <td><span class="badge ${Number(t.valor)>=0?'bg':'br'}">${Number(t.valor)>=0?'Crédito':'Débito'}</span></td>
+      <td>${t.contas_receber?'↑ '+t.contas_receber.descricao:t.contas_pagar?'↓ '+t.contas_pagar.descricao:'—'}</td>
+      <td>${badgeStatus(t.status_conciliacao)}</td>
+      <td style="white-space:nowrap">
+        ${t.status_conciliacao==='pendente'?`
+          <button class="btn btn-s btn-sm" onclick="matchTx('${t.id}',${Number(t.valor)})">Vincular</button>
+          <button class="btn btn-d btn-sm" onclick="ignorarTx('${t.id}')">Ignorar</button>`
+        :'<button class="btn btn-d btn-sm" onclick="desvincularTx(\''+t.id+'\')">Desvincular</button>'}
+      </td>
+    </tr>`).join('')+'</tbody></table>'}
+  </div>`;
+}
+
+async function ignorarTx(id){
+  await sbPatch('transacoes',id,{status_conciliacao:'ignorado'});
+  toast('Transação ignorada');await renderConciliacao();
+}
+async function desvincularTx(id){
+  await sbPatch('transacoes',id,{status_conciliacao:'pendente',conta_receber_id:null,conta_pagar_id:null});
+  toast('Desvinculado');await renderConciliacao();
+}
+
+async function matchTx(txId, valor){
+  const tipo = valor >= 0 ? 'receber' : 'pagar';
+  const rows = tipo==='receber'
+    ? await sbGet('contas_receber','select=id,descricao,valor,data_vencimento,status&status=in.(pendente,vencido)&order=data_vencimento.asc&limit=20')
+    : await sbGet('contas_pagar','select=id,descricao,valor,data_vencimento,status&status=in.(pendente,vencido)&order=data_vencimento.asc&limit=20');
+  const opts = rows.map(r=>`<div class="match-row">
+    <div class="tx">${r.descricao}<br><small style="color:#64748b">${fmtD(r.data_vencimento)}</small></div>
+    <div class="val">${fmtR(r.valor)}</div>
+    <button class="btn btn-p btn-sm" onclick="confirmMatch('${txId}','${r.id}','${tipo}')">Vincular</button>
+  </div>`).join('');
+  const d = document.createElement('div');
+  d.className='mo open';d.id='mo-match';
+  d.innerHTML=`<div class="mo-box" style="width:520px"><div class="mo-head"><h2>Vincular a ${tipo==='receber'?'Conta a Receber':'Conta a Pagar'}</h2><button class="mo-close" onclick="document.getElementById('mo-match').remove()">✕</button></div><div class="mo-body" style="max-height:400px;overflow-y:auto">${opts||'<p style="color:#94a3b8">Nenhuma conta pendente encontrada</p>'}</div></div>`;
+  document.body.appendChild(d);
+}
+
+async function confirmMatch(txId, contaId, tipo){
+  const patch = tipo==='receber' ? {conta_receber_id:contaId,status_conciliacao:'conciliado'} : {conta_pagar_id:contaId,status_conciliacao:'conciliado'};
+  await sbPatch('transacoes',txId,patch);
+  document.getElementById('mo-match')?.remove();
+  toast('Transação vinculada!');await renderConciliacao();
+}
+
+// ── CSV IMPORT ────────────────────────────────────────────
+function previewCSV(){
+  const file = document.getElementById('csv-file').files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    const lines = text.split('\n').filter(l=>l.trim());
+    const sep = lines[0].includes(';') ? ';' : ',';
+    CSV_ROWS = lines.map(l=>l.split(sep).map(c=>c.trim().replace(/^"|"$/g,'')));
+    CSV_HEADERS = CSV_ROWS[0];
+    const opts = CSV_HEADERS.map((h,i)=>`<option value="${i}">${h}</option>`).join('');
+    ['csv-col-data','csv-col-desc','csv-col-valor'].forEach(id=>document.getElementById(id).innerHTML=opts);
+    // Auto-detect common formats
+    CSV_HEADERS.forEach((h,i)=>{
+      const hl=h.toLowerCase();
+      if(hl.includes('data')||hl==='date') document.getElementById('csv-col-data').value=i;
+      if(hl.includes('descri')||hl.includes('hist')||hl.includes('memo')) document.getElementById('csv-col-desc').value=i;
+      if(hl.includes('valor')||hl.includes('amount')||hl.includes('valu')) document.getElementById('csv-col-valor').value=i;
+    });
+    document.getElementById('csv-step2').style.display='block';
+    document.getElementById('csv-import-btn').style.display='inline-flex';
+    const prev = CSV_ROWS.slice(1,6).map(r=>`<tr>${r.map(c=>`<td style="padding:4px 8px;border:1px solid #e2e8f0">${c}</td>`).join('')}</tr>`).join('');
+    document.getElementById('csv-preview').innerHTML=`<p style="margin-bottom:6px;font-weight:500">Prévia (5 primeiras linhas):</p><table style="border-collapse:collapse;width:100%;font-size:12px"><thead><tr>${CSV_HEADERS.map(h=>`<th style="padding:4px 8px;border:1px solid #e2e8f0;background:#f8fafc">${h}</th>`).join('')}</tr></thead><tbody>${prev}</tbody></table>`;
+  };
+  reader.readAsText(file,'UTF-8');
+}
+
+async function importCSV(){
+  if(!CSV_ROWS.length){toast('Selecione um arquivo primeiro','err');return;}
+  const ci = Number(document.getElementById('csv-col-data').value);
+  const di = Number(document.getElementById('csv-col-desc').value);
+  const vi = Number(document.getElementById('csv-col-valor').value);
+  const decSep = document.getElementById('csv-dec').value;
+  const txs = [];
+  for(let i=1;i<CSV_ROWS.length;i++){
+    const row = CSV_ROWS[i];
+    if(row.length < 2) continue;
+    let rawDate = row[ci]?.trim();
+    let rawValor = row[vi]?.trim().replace(/[R$\s]/g,'');
+    if(decSep===',') rawValor=rawValor.replace(/\./g,'').replace(',','.');
+    else rawValor=rawValor.replace(',','');
+    const valor = parseFloat(rawValor);
+    if(!rawDate||isNaN(valor)) continue;
+    // Parse date formats: dd/mm/yyyy or yyyy-mm-dd
+    let dt;
+    if(rawDate.includes('/')) {const p=rawDate.split('/');dt=`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;}
+    else dt=rawDate.slice(0,10);
+    txs.push({data:dt,descricao:row[di]||'',valor,tipo:valor>=0?'credito':'debito',status_conciliacao:'pendente'});
+  }
+  if(!txs.length){toast('Nenhuma transação válida encontrada','err');return;}
+  await sbPost('transacoes',txs);
+  closeMo('mo-csv');
+  CSV_ROWS=[];CSV_HEADERS=[];
+  toast(`${txs.length} transações importadas!`);
+  await renderConciliacao();
+}
+
+// ── INIT ──────────────────────────────────────────────────
+nav('dashboard');
+</script>
+</body>
+</html>
