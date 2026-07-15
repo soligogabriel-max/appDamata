@@ -58,6 +58,14 @@ button{cursor:pointer;}
 #sc-login.portal-mode #login-form-wrap{display:flex;flex:1;width:100%;min-width:unset;min-height:100vh;}
 #sc-login.portal-mode #btn-back-portal{display:block!important;}
 @media(max-width:768px){#sc-login{flex-direction:column;}#login-landing{min-height:unset;padding:24px 20px 32px;}#ll-logo{position:static;transform:none;margin:0 auto 6px;}#ll-main{flex-direction:column;gap:16px;}#ll-buttons{width:100%;order:-1;}#ll-carousel-area{width:100%;}#ll-media-grid{grid-template-columns:1fr;}#login-form-wrap .acard{min-height:auto;}#login-form-wrap{width:100%;min-width:unset;padding:16px 20px 28px;}#ll-version{position:static;margin-top:8px;}}
+.dash-card{background:var(--bg2);border:1px solid var(--br);border-radius:14px;padding:20px 18px;transition:box-shadow .15s;}
+.dash-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.10);}
+.dc-icon{font-size:22px;margin-bottom:6px;}
+.dc-val{font-size:30px;font-weight:700;color:var(--a);line-height:1.1;margin-bottom:4px;}
+.dc-label{font-size:11px;color:var(--dl);font-weight:600;letter-spacing:.3px;text-transform:uppercase;margin-bottom:4px;}
+.dc-sub{font-size:11px;color:var(--dl);min-height:14px;}
+.dc-up{color:#16a34a;font-weight:700;}
+.dc-dn{color:#dc2626;font-weight:700;}
 .acard{background:#fff;border-radius:24px;padding:32px 26px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(46,60,68,.22);}
 .logo-w{display:flex;flex-direction:column;align-items:center;margin-bottom:20px;}
 .logo-n{font-size:18px;font-weight:700;color:var(--dk);letter-spacing:4px;margin-top:9px;}
@@ -341,7 +349,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.15c</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.15d</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -508,7 +516,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.15c</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.15d</div>
       </div>
     </div>
     <div class="uarea">
@@ -522,6 +530,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   </div>
   <div id="tnav" style="display:none;">
    <div id="tnav-inner">
+    <button class="tab" onclick="setTab('dashboard')" id="t-dashboard" style="display:none;">🏠 Dashboard</button>
     <button class="tab on" onclick="setTab('agenda')" id="t-agenda">📅 Agenda</button>
     <button class="tab" onclick="setTab('pedidos')" id="t-pedidos-eq" style="display:none;">🛒 Pedidos</button>
 
@@ -579,6 +588,47 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
    </div>
   </div>
   <div id="app-content">
+    <div id="p-dashboard" class="panel">
+      <div class="uwrap" style="max-width:900px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:24px;">
+          <div>
+            <div class="sec-t" style="margin-bottom:2px;">🏠 Dashboard</div>
+            <div style="font-size:12px;color:var(--dl);">Resumo do portal — atualizado agora</div>
+          </div>
+          <button onclick="renderDashboard()" style="margin-left:auto;padding:6px 14px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dl);">↻ Atualizar</button>
+        </div>
+        <div id="dash-cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-bottom:32px;">
+          <div class="dash-card" id="dc-eventos">
+            <div class="dc-icon">📅</div>
+            <div class="dc-val" id="dc-eventos-val">—</div>
+            <div class="dc-label">Eventos futuros</div>
+            <div class="dc-sub" id="dc-eventos-sub"></div>
+          </div>
+          <div class="dash-card" id="dc-receber">
+            <div class="dc-icon">💰</div>
+            <div class="dc-val" id="dc-receber-val">—</div>
+            <div class="dc-label">Total a receber</div>
+            <div class="dc-sub" id="dc-receber-sub">parcelas não pagas</div>
+          </div>
+          <div class="dash-card" id="dc-visitas">
+            <div class="dc-icon">👁</div>
+            <div class="dc-val" id="dc-visitas-val">—</div>
+            <div class="dc-label">Visitantes este mês</div>
+            <div class="dc-sub" id="dc-visitas-sub"></div>
+          </div>
+          <div class="dash-card" id="dc-orc">
+            <div class="dc-icon">💬</div>
+            <div class="dc-val" id="dc-orc-val">—</div>
+            <div class="dc-label">Orçamentos este mês</div>
+            <div class="dc-sub" id="dc-orc-sub"></div>
+          </div>
+        </div>
+        <div id="dash-prox">
+          <div class="sec-t" style="font-size:14px;margin-bottom:12px;">📆 Próximos eventos</div>
+          <div id="dash-prox-list"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
+        </div>
+      </div>
+    </div>
     <div id="p-agenda" class="panel on">
       <div class="mnav">
         <button class="marr" onclick="cmo(-1)">&#8249;</button>
@@ -1758,7 +1808,8 @@ function exitSim(){
   document.getElementById("btn-gcal-sync").style.display="inline-flex";
   var adminBtns=document.getElementById("evd-admin-btns");
   if(adminBtns) adminBtns.style.display="";
-  setTab("agenda"); renderCal(null);
+  document.getElementById("t-dashboard").style.display="";
+  setTab("dashboard"); renderCal(null);
 }
 
 function abrirPortal(){
@@ -2081,7 +2132,7 @@ async function openApp(u) {
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
   const tn = document.getElementById("tnav");
   const bne = document.getElementById("btn-new-ev");
-  if (isAdmin(u)) { tn.style.display="block"; bne.style.display="inline-flex"; document.getElementById("btn-gcal-sync").style.display="inline-flex"; document.getElementById("btn-sim").style.display=""; setTab("agenda"); updBadge(); }
+  if (isAdmin(u)) { tn.style.display="block"; bne.style.display="inline-flex"; document.getElementById("btn-gcal-sync").style.display="inline-flex"; document.getElementById("btn-sim").style.display=""; document.getElementById("t-dashboard").style.display=""; setTab("dashboard"); updBadge(); }
   else if (u.role==="cliente") { tn.style.display="none"; bne.style.display="none"; document.getElementById("p-client").classList.add("on"); renderCli(u); }
   else { tn.style.display="block"; bne.style.display="none"; await _setupUserAccess(u); }
   showSc("app");
@@ -2120,7 +2171,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas"};
+  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(cfilter);
   if(t==="receber") renderReceber();
@@ -2144,6 +2195,7 @@ function setTab(t) {
   if(t==="naturezas") renderNaturezas();
   if(t==="socios") renderContaSocios();
   if(t==="visitas") renderVisitas();
+  if(t==="dashboard") renderDashboard();
 }
 
 /* ── Certificado Digital NFS-e ─────────────────────────────── */
@@ -3215,6 +3267,108 @@ async function renderUsers(){
       wr.appendChild(c);
     });
   } catch(e){wr.innerHTML='<div class="empty">Erro ao carregar.</div>';}
+}
+
+// ── Dashboard ────────────────────────────────────────────────
+async function renderDashboard() {
+  const fmtR = v => "R$ " + (v||0).toLocaleString("pt-BR",{minimumFractionDigits:0,maximumFractionDigits:0});
+  const pct = (cur, prev) => prev === 0 ? null : Math.round((cur - prev) / prev * 100);
+  const trend = (cur, prev) => {
+    const p = pct(cur, prev); if(p===null) return '';
+    const cls = p >= 0 ? "dc-up" : "dc-dn";
+    const arrow = p >= 0 ? "↑" : "↓";
+    return ` <span class="${cls}">${arrow}${Math.abs(p)}%</span> vs média 3m`;
+  };
+
+  const hoje = new Date();
+  const mesIni = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().slice(0,10);
+  const hojStr = hoje.toISOString().slice(0,10);
+
+  // Helpers para mês de offset (0=atual, -1=anterior, etc.)
+  const mesRange = offset => {
+    const d = new Date(hoje.getFullYear(), hoje.getMonth() + offset, 1);
+    const fim = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+    return [d.toISOString().slice(0,10), fim.toISOString().slice(0,10)];
+  };
+
+  try {
+    const [agendaRows, receberRows, visitasRows, orcRows] = await Promise.all([
+      dbGet("agenda", "data_evento=gte."+hojStr+"&select=cod,nome_evento,data_evento,tipo_evento,status&order=data_evento.asc&limit=200"),
+      dbGet("contas_a_receber", "status=eq.NP&select=valor,vencimento"),
+      dbGet("site_visits", "visited_at=gte."+new Date(hoje.getFullYear(), hoje.getMonth()-3, 1).toISOString().slice(0,10)+"&select=visited_at,session_id&limit=10000"),
+      dbGet("orcamentos", "created_at=gte."+new Date(hoje.getFullYear(), hoje.getMonth()-3, 1).toISOString().slice(0,10)+"&select=created_at,valor_total,status,visitor_id&limit=2000")
+    ]);
+
+    // — Eventos futuros
+    const evCount = agendaRows.length;
+    document.getElementById("dc-eventos-val").textContent = evCount;
+    const prox = agendaRows[0];
+    document.getElementById("dc-eventos-sub").textContent = prox
+      ? "próximo: " + (prox.nome_evento||prox.cod) + " em " + new Date(prox.data_evento+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})
+      : "nenhum agendado";
+
+    // — A receber
+    const totalRec = receberRows.reduce((s,r)=>s+(r.valor||0), 0);
+    document.getElementById("dc-receber-val").textContent = fmtR(totalRec);
+    const atrasadas = receberRows.filter(r => r.vencimento && r.vencimento < hojStr).reduce((s,r)=>s+(r.valor||0),0);
+    document.getElementById("dc-receber-sub").textContent = atrasadas > 0
+      ? fmtR(atrasadas) + " em atraso"
+      : "nenhuma em atraso";
+
+    // — Visitantes: agrupa por mês
+    const uniqMes = offset => {
+      const [ini, fim] = mesRange(offset);
+      return new Set(visitasRows.filter(r => r.visited_at >= ini && r.visited_at < fim).map(r=>r.session_id)).size;
+    };
+    const visAtual = uniqMes(0);
+    const visMed3 = (uniqMes(-1) + uniqMes(-2) + uniqMes(-3)) / 3;
+    const diasDecorridos = hoje.getDate();
+    const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth()+1, 0).getDate();
+    const mediaDia = Math.round(visAtual / diasDecorridos);
+    document.getElementById("dc-visitas-val").textContent = visAtual;
+    document.getElementById("dc-visitas-sub").innerHTML =
+      mediaDia + "/dia em média" + trend(visAtual, visMed3);
+
+    // — Orçamentos
+    const orcMes = offset => {
+      const [ini, fim] = mesRange(offset);
+      const rows = orcRows.filter(r => r.created_at >= ini && r.created_at < fim);
+      return { count: rows.length, total: rows.reduce((s,r)=>s+(r.valor_total||0),0), rows };
+    };
+    const orcAt = orcMes(0);
+    const orc1 = orcMes(-1), orc2 = orcMes(-2), orc3 = orcMes(-3);
+    const orcMed3 = (orc1.count + orc2.count + orc3.count) / 3;
+    const uniqVisOrc = new Set(orcAt.rows.filter(r=>r.visitor_id).map(r=>r.visitor_id)).size;
+    document.getElementById("dc-orc-val").textContent = orcAt.count;
+    const uniqStr = uniqVisOrc > 0 ? ` · ${uniqVisOrc} visitante${uniqVisOrc!==1?"s":""}` : "";
+    document.getElementById("dc-orc-sub").innerHTML =
+      fmtR(orcAt.total) + uniqStr + trend(orcAt.count, orcMed3);
+
+    // — Tabela próximos eventos
+    const prxList = document.getElementById("dash-prox-list");
+    if(!agendaRows.length) {
+      prxList.innerHTML = '<div class="empty"><div class="eicon">📅</div>Nenhum evento futuro.</div>';
+    } else {
+      const fmt = d => new Date(d+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short",year:"numeric"});
+      prxList.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:var(--bg2);color:var(--dl);">
+          <th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--br);">Evento</th>
+          <th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--br);">Data</th>
+          <th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--br);">Tipo</th>
+          <th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--br);">Status</th>
+        </tr></thead>
+        <tbody>${agendaRows.slice(0,10).map((r,i)=>`<tr style="background:${i%2?"var(--bg2)":"transparent"}">
+          <td style="padding:7px 10px;border-bottom:1px solid var(--br);font-weight:600;">${r.nome_evento||r.cod}</td>
+          <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${fmt(r.data_evento)}</td>
+          <td style="padding:7px 10px;border-bottom:1px solid var(--br);color:var(--dl);">${r.tipo_evento||"—"}</td>
+          <td style="padding:7px 10px;border-bottom:1px solid var(--br);color:var(--dl);">${r.status||"—"}</td>
+        </tr>`).join("")}</tbody>
+      </table>${agendaRows.length>10?`<div style="font-size:12px;color:var(--dl);padding:8px 10px;">+${agendaRows.length-10} eventos • <a href="#" onclick="setTab('agenda');return false;" style="color:var(--a);">ver todos na agenda</a></div>`:""}`;
+    }
+  } catch(e) {
+    console.error("renderDashboard:", e);
+    document.getElementById("dash-prox-list").innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar: '+e.message+'</div>';
+  }
 }
 
 // ── Visitas ao Site ──────────────────────────────────────────
@@ -5385,7 +5539,8 @@ async function _orcUpsertLead(){
     validade:validade.toISOString().slice(0,10),
     whatsapp:_orc.whatsapp||null,
     email:_orc.email||null,
-    status:_orc._stage||"lead"
+    status:_orc._stage||"lead",
+    visitor_id: (()=>{try{return localStorage.getItem('dmv_sid');}catch(e){return null;}})()
   };
   try{
     if(_orc._dbId){
