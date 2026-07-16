@@ -58,6 +58,14 @@ button{cursor:pointer;}
 #sc-login.portal-mode #login-form-wrap{display:flex;flex:1;width:100%;min-width:unset;min-height:100vh;}
 #sc-login.portal-mode #btn-back-portal{display:block!important;}
 @media(max-width:768px){#sc-login{flex-direction:column;}#login-landing{min-height:unset;padding:24px 20px 32px;}#ll-logo{position:static;transform:none;margin:0 auto 6px;}#ll-main{flex-direction:column;gap:16px;}#ll-buttons{width:100%;order:-1;}#ll-carousel-area{width:100%;}#ll-media-grid{grid-template-columns:1fr;}#login-form-wrap .acard{min-height:auto;}#login-form-wrap{width:100%;min-width:unset;padding:16px 20px 28px;}#ll-version{position:static;margin-top:8px;}}
+.vc-slot-day{padding:10px 16px;border-radius:10px;background:var(--bg2);border:2px solid var(--br);cursor:pointer;font-size:13px;font-weight:600;transition:all .15s;white-space:nowrap;}
+.vc-slot-day:hover,.vc-slot-day.on{border-color:var(--a);background:var(--a);color:#fff;}
+.vc-slot-time{padding:8px 18px;border-radius:8px;background:var(--bg2);border:2px solid var(--br);cursor:pointer;font-size:14px;font-weight:700;transition:all .15s;}
+.vc-slot-time:hover,.vc-slot-time.on{border-color:var(--a);background:var(--a);color:#fff;}
+.vc-slot-time.taken{opacity:.35;cursor:not-allowed;border-style:dashed;}
+.vc-subtab-btn{padding:7px 18px;border:none;background:transparent;font-size:13px;font-weight:600;color:var(--dl);border-bottom:2px solid transparent;cursor:pointer;transition:all .15s;}
+.vc-subtab-btn.on{color:var(--a);border-bottom-color:var(--a);}
+
 .dash-card{background:var(--bg2);border:1px solid var(--br);border-radius:14px;padding:20px 18px;transition:box-shadow .15s;}
 .dash-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.10);}
 .dc-icon{font-size:22px;margin-bottom:6px;}
@@ -349,7 +357,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.16a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.16b</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -481,6 +489,8 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div class="orc-step-ind" id="osi-2">2 · Itens</div>
     <div class="orc-step-sep">›</div>
     <div class="orc-step-ind" id="osi-3">3 · Resumo</div>
+    <div class="orc-step-sep" id="osi-sep-4" style="display:none">›</div>
+    <div class="orc-step-ind" id="osi-4" style="display:none">4 · Visita</div>
   </div>
   <!-- Step content -->
   <div style="flex:1;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;">
@@ -516,7 +526,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.16a</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.16b</div>
       </div>
     </div>
     <div class="uarea">
@@ -541,6 +551,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <button class="tab" onclick="setTab('pedidos');closeGrps()" id="t-pedidos">🛒 Pedidos</button>
         <button class="tab" onclick="setTab('vt');closeGrps()" id="t-vt">🔍 Visita Técnica</button>
         <button class="tab" onclick="setTab('orcamentos');closeGrps()" id="t-orcamentos">💬 Orçamentos</button>
+        <button class="tab" onclick="setTab('vc');closeGrps()" id="t-vc">📅 Visitas Comerciais</button>
       </div>
     </div>
 
@@ -1032,6 +1043,43 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 
     <div id="p-pend" class="panel"><div class="uwrap"><div class="sec-t">Solicitações pendentes</div><div id="pend-list"></div></div></div>
     <div id="p-users" class="panel"><div class="uwrap"><div class="sec-t">Usuários aprovados</div><div id="users-list"></div></div></div>
+    <div id="p-vc" class="panel">
+      <div class="uwrap" style="max-width:820px">
+        <div class="sec-t">📅 Visitas Comerciais</div>
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--br);margin-bottom:20px;">
+          <button class="vc-subtab-btn on" id="vcsub-disp" onclick="vcSubTab('disp')">Disponibilidade</button>
+          <button class="vc-subtab-btn" id="vcsub-ag" onclick="vcSubTab('ag')">Agendadas</button>
+        </div>
+
+        <!-- Sub: Disponibilidade -->
+        <div id="vc-disp">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;">
+            <div>
+              <div class="lbl">Data</div>
+              <input type="date" id="vc-nova-data" class="inp" style="width:160px;margin-bottom:0"/>
+            </div>
+            <div>
+              <div class="lbl">De</div>
+              <input type="time" id="vc-nova-ini" class="inp" style="width:110px;margin-bottom:0" value="09:00"/>
+            </div>
+            <div>
+              <div class="lbl">Até</div>
+              <input type="time" id="vc-nova-fim" class="inp" style="width:110px;margin-bottom:0" value="12:00"/>
+            </div>
+            <button onclick="vcGerarSlots()" style="padding:10px 22px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;height:40px;">Gerar slots (30min)</button>
+          </div>
+          <div id="vc-slots-lista"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
+        </div>
+
+        <!-- Sub: Agendadas -->
+        <div id="vc-ag" style="display:none">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
+            <button onclick="vcNovaManual()" style="padding:8px 18px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;">+ Agendar manualmente</button>
+          </div>
+          <div id="vc-ag-lista"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
+        </div>
+      </div>
+    </div>
     <div id="p-visitas" class="panel">
       <div class="uwrap" style="max-width:800px">
         <div class="sec-t">📊 Visitas ao Site</div>
@@ -2150,7 +2198,7 @@ async function openApp(u) {
 
 // ── Grupos do menu ──
 const TAB_GRP={
-  contratos:"grp-eventos", pedidos:"grp-eventos", vt:"grp-eventos", orcamentos:"grp-eventos",
+  contratos:"grp-eventos", pedidos:"grp-eventos", vt:"grp-eventos", orcamentos:"grp-eventos", vc:"grp-eventos",
   receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro", socios:"grp-financeiro",
   fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros", naturezas:"grp-cadastros", assessorias:"grp-cadastros",
   pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin", visitas:"grp-admin",
@@ -2181,7 +2229,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas"};
+  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",vc:"p-vc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(cfilter);
   if(t==="receber") renderReceber();
@@ -2206,6 +2254,7 @@ function setTab(t) {
   if(t==="socios") renderContaSocios();
   if(t==="visitas") renderVisitas();
   if(t==="dashboard") renderDashboard();
+  if(t==="vc") renderVC();
 }
 
 /* ── Certificado Digital NFS-e ─────────────────────────────── */
@@ -3277,6 +3326,306 @@ async function renderUsers(){
       wr.appendChild(c);
     });
   } catch(e){wr.innerHTML='<div class="empty">Erro ao carregar.</div>';}
+}
+
+// ── Visitas Comerciais (admin) ────────────────────────────────
+let _vcSlotsCache = null;
+
+function vcSubTab(t) {
+  ["disp","ag"].forEach(s => {
+    document.getElementById("vc-"+s).style.display = s===t ? "" : "none";
+    document.getElementById("vcsub-"+s).classList.toggle("on", s===t);
+  });
+  if(t==="disp" && !_vcSlotsCache) _vcLoadDisponibilidade();
+  if(t==="ag") _vcLoadAgendadas();
+}
+
+async function renderVC() {
+  _vcSlotsCache = null;
+  vcSubTab("disp");
+}
+
+async function _vcLoadDisponibilidade() {
+  const el = document.getElementById("vc-slots-lista");
+  el.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  try {
+    const hoje = localDate();
+    const [slots, agendadas] = await Promise.all([
+      dbGet("slots_visita", "data=gte."+hoje+"&order=data.asc,hora.asc&limit=500"),
+      dbGet("visitas_comerciais", "status=neq.cancelada&select=slot_id")
+    ]);
+    _vcSlotsCache = slots;
+    const bookedIds = new Set(agendadas.map(a => a.slot_id));
+
+    if(!slots.length) { el.innerHTML = '<div class="empty"><div class="eicon">📅</div>Nenhum horário futuro cadastrado.</div>'; return; }
+
+    // Agrupar por data
+    const byDate = {};
+    slots.forEach(s => { if(!byDate[s.data]) byDate[s.data]=[]; byDate[s.data].push(s); });
+    const fmtDate = d => new Date(d+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"short"});
+    const fmtTime = t => t.slice(0,5);
+
+    el.innerHTML = Object.entries(byDate).map(([data, sls]) => `
+      <div style="margin-bottom:20px;">
+        <div style="font-weight:700;font-size:13px;color:var(--dk);margin-bottom:8px;text-transform:capitalize;">${fmtDate(data)}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+          ${sls.map(s => {
+            const booked = bookedIds.has(s.id);
+            return `<div style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;border:1.5px solid ${booked?"var(--a)":"var(--br)"};background:${booked?"#fff8ec":"var(--bg2)"};font-size:13px;">
+              <span style="font-weight:700">${fmtTime(s.hora)}</span>
+              ${booked ? '<span style="font-size:11px;color:var(--a);font-weight:600;">• reservado</span>' : ''}
+              ${!booked ? `<button onclick="vcDeletarSlot('${s.id}')" style="background:none;border:none;cursor:pointer;color:var(--dl);padding:0 2px;font-size:13px;" title="Remover">✕</button>` : ''}
+            </div>`;
+          }).join("")}
+        </div>
+      </div>`).join("");
+  } catch(e) {
+    el.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro: '+e.message+'</div>';
+  }
+}
+
+async function vcGerarSlots() {
+  const data = document.getElementById("vc-nova-data").value;
+  const ini  = document.getElementById("vc-nova-ini").value;
+  const fim  = document.getElementById("vc-nova-fim").value;
+  if(!data || !ini || !fim) { toast("Preencha data, horário inicial e final."); return; }
+  const [ih,im] = ini.split(":").map(Number);
+  const [fh,fm] = fim.split(":").map(Number);
+  const iniMin = ih*60+im, fimMin = fh*60+fm;
+  if(fimMin <= iniMin) { toast("Horário final deve ser após o inicial."); return; }
+  const slots = [];
+  for(let m = iniMin; m < fimMin; m += 30) {
+    const h = String(Math.floor(m/60)).padStart(2,"0");
+    const mm = String(m%60).padStart(2,"0");
+    slots.push({ data, hora: h+":"+mm+":00" });
+  }
+  try {
+    await sbFetch("slots_visita", { method:"POST", body: slots, prefer:"return=minimal" });
+    _vcSlotsCache = null;
+    toast("✅ "+slots.length+" slots criados para "+new Date(data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"})+".");
+    _vcLoadDisponibilidade();
+  } catch(e) { toast("Erro ao criar slots: "+e.message); }
+}
+
+async function vcDeletarSlot(id) {
+  if(!confirm("Remover este horário?")) return;
+  try {
+    await sbFetch("slots_visita?id=eq."+id, { method:"DELETE", prefer:"return=minimal" });
+    _vcSlotsCache = null;
+    _vcLoadDisponibilidade();
+  } catch(e) { toast("Erro: "+e.message); }
+}
+
+async function _vcLoadAgendadas() {
+  const el = document.getElementById("vc-ag-lista");
+  el.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  try {
+    const hoje = localDate();
+    const [visitas, slots] = await Promise.all([
+      dbGet("visitas_comerciais", "order=created_at.desc&limit=200&select=*"),
+      dbGet("slots_visita", "select=id,data,hora")
+    ]);
+    const slotMap = {}; slots.forEach(s => slotMap[s.id] = s);
+    if(!visitas.length) { el.innerHTML = '<div class="empty"><div class="eicon">📅</div>Nenhuma visita agendada.</div>'; return; }
+    const statusLabel = { agendada:"🟡 Agendada", realizada:"✅ Realizada", cancelada:"❌ Cancelada", nao_compareceu:"⚠️ Não compareceu" };
+    const fmtSlot = id => { const s=slotMap[id]; return s ? new Date(s.data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"})+" às "+s.hora.slice(0,5) : "—"; };
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <thead><tr style="background:var(--bg2);color:var(--dl);">
+        <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--br);">Data / Hora</th>
+        <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--br);">Cliente</th>
+        <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--br);">WhatsApp</th>
+        <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--br);">Status</th>
+        <th style="padding:8px 10px;border-bottom:1px solid var(--br);"></th>
+      </tr></thead>
+      <tbody>${visitas.map((v,i)=>`<tr style="background:${i%2?"var(--bg2)":"transparent"}">
+        <td style="padding:7px 10px;border-bottom:1px solid var(--br);font-weight:600;">${fmtSlot(v.slot_id)}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.nome||"—"}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.whatsapp?`<a href="https://wa.me/55${v.whatsapp.replace(/\D/g,'')}" target="_blank" style="color:var(--a);">${v.whatsapp}</a>`:"—"}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${statusLabel[v.status]||v.status}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">
+          <select onchange="vcMudarStatus('${v.id}',this.value)" style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--br);background:var(--bg2);">
+            <option value="">Mudar...</option>
+            <option value="agendada">Agendada</option>
+            <option value="realizada">Realizada</option>
+            <option value="cancelada">Cancelada</option>
+            <option value="nao_compareceu">Não compareceu</option>
+          </select>
+        </td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+  } catch(e) {
+    el.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro: '+e.message+'</div>';
+  }
+}
+
+async function vcMudarStatus(id, status) {
+  if(!status) return;
+  try {
+    await sbFetch("visitas_comerciais?id=eq."+id, { method:"PATCH", body:{ status }, prefer:"return=minimal" });
+    _vcLoadAgendadas();
+    toast("✅ Status atualizado.");
+  } catch(e) { toast("Erro: "+e.message); }
+}
+
+function vcNovaManual() {
+  const html = `<div class="acard" style="max-width:420px;margin:0 auto;">
+    <div class="sec-t" style="font-size:15px;margin-bottom:16px;">Agendar visita manualmente</div>
+    <label class="lbl">Nome do cliente</label>
+    <input type="text" id="vcm-nome" class="inp" placeholder="Nome completo"/>
+    <label class="lbl">WhatsApp</label>
+    <input type="tel" id="vcm-wpp" class="inp" placeholder="(11) 91234-5678"/>
+    <label class="lbl">Horário disponível</label>
+    <select id="vcm-slot" class="inp"><option value="">Carregando slots...</option></select>
+    <label class="lbl">Observação</label>
+    <textarea id="vcm-obs" class="inp" rows="2" style="resize:vertical;"></textarea>
+    <div id="vcm-err" class="err"></div>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button onclick="vcSalvarManual()" style="flex:1;padding:11px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;" id="vcm-btn">Agendar</button>
+      <button onclick="closeModal('m-vc-manual')" style="padding:11px 18px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;">Cancelar</button>
+    </div>
+  </div>`;
+  let m = document.getElementById("m-vc-manual");
+  if(!m){ m=document.createElement("div"); m.id="m-vc-manual"; m.className="modal"; m.innerHTML='<div class="modal-inner" style="max-width:460px">'+html+'</div>'; document.body.appendChild(m); }
+  else m.querySelector(".modal-inner").innerHTML = html;
+  m.classList.add("open");
+  // Carregar slots disponíveis
+  (async()=>{
+    const hoje = localDate();
+    const [slots, ag] = await Promise.all([
+      dbGet("slots_visita","data=gte."+hoje+"&order=data.asc,hora.asc&limit=200"),
+      dbGet("visitas_comerciais","status=neq.cancelada&select=slot_id")
+    ]);
+    const bookedIds = new Set(ag.map(a=>a.slot_id));
+    const livres = slots.filter(s=>!bookedIds.has(s.id));
+    const sel = document.getElementById("vcm-slot");
+    if(!sel) return;
+    if(!livres.length){ sel.innerHTML='<option value="">Nenhum horário disponível</option>'; return; }
+    sel.innerHTML = '<option value="">Selecione um horário</option>' +
+      livres.map(s=>`<option value="${s.id}">${new Date(s.data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"})} às ${s.hora.slice(0,5)}</option>`).join("");
+  })();
+}
+
+async function vcSalvarManual() {
+  const nome = document.getElementById("vcm-nome").value.trim();
+  const wpp  = document.getElementById("vcm-wpp").value.trim();
+  const slot = document.getElementById("vcm-slot").value;
+  const obs  = document.getElementById("vcm-obs").value.trim();
+  const err  = document.getElementById("vcm-err");
+  err.style.display="none";
+  if(!nome||!slot){ err.style.display="block"; err.textContent="Nome e horário são obrigatórios."; return; }
+  const btn = document.getElementById("vcm-btn"); btn.disabled=true; btn.textContent="Salvando...";
+  try {
+    await sbFetch("visitas_comerciais",{ method:"POST", body:{ slot_id:slot, nome, whatsapp:wpp||null, obs:obs||null, status:"agendada" }, prefer:"return=minimal" });
+    closeModal("m-vc-manual");
+    _vcLoadAgendadas();
+    toast("✅ Visita agendada.");
+  } catch(e){ err.style.display="block"; err.textContent="Erro: "+e.message; btn.disabled=false; btn.textContent="Agendar"; }
+}
+
+// ── Wizard orçamento — step 4: escolher horário de visita ────────────────
+let _vcSelectedSlotId = null;
+
+async function _orcLoadSlots() {
+  const body = document.getElementById("orc-wizard-body");
+  body.innerHTML = `<div class="orc-card">
+    <div style="text-align:center;padding:8px 0 20px;">
+      <div style="font-size:22px;margin-bottom:6px;">📅</div>
+      <div style="font-size:18px;font-weight:700;color:var(--dk);margin-bottom:6px;">Quer conhecer a Fazenda Damata?</div>
+      <div style="font-size:13px;color:var(--dl);">Agende uma visita guiada ao espaço — sem compromisso.</div>
+    </div>
+    <div id="orc-slots-datas" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;justify-content:center;"><div style="color:var(--dl);font-size:13px;">⏳ Carregando datas...</div></div>
+    <div id="orc-slots-horas" style="display:none;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:600;color:var(--dl);margin-bottom:10px;" id="orc-slots-data-label"></div>
+      <div id="orc-slots-horas-list" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;"></div>
+    </div>
+    <div id="orc-slots-confirmar" style="display:none;">
+      <div style="background:var(--bg2);border:1px solid var(--br);border-radius:10px;padding:14px;margin-bottom:16px;font-size:14px;font-weight:600;text-align:center;" id="orc-slot-escolhido"></div>
+      <div id="orc-slot-err" class="err"></div>
+      <button onclick="_orcConfirmarVisita()" style="width:100%;padding:13px;background:var(--a);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:15px;font-weight:700;" id="orc-slot-btn">✅ Confirmar visita</button>
+    </div>
+    <div id="orc-slots-done" style="display:none;text-align:center;padding:16px 0;">
+      <div style="font-size:36px;margin-bottom:10px;">🎉</div>
+      <div style="font-size:17px;font-weight:700;color:var(--dk);margin-bottom:6px;">Visita confirmada!</div>
+      <div style="font-size:13px;color:var(--dl);" id="orc-slot-done-txt"></div>
+    </div>
+    <div style="text-align:center;margin-top:16px;">
+      <button onclick="_orcVoltar()" style="background:none;border:none;color:var(--dl);font-size:12px;cursor:pointer;text-decoration:underline;">Não, obrigado — sair</button>
+    </div>
+  </div>`;
+  _vcSelectedSlotId = null;
+  try {
+    const hoje = localDate();
+    const [slots, ag] = await Promise.all([
+      dbGet("slots_visita","data=gte."+hoje+"&order=data.asc,hora.asc&limit=200"),
+      dbGet("visitas_comerciais","status=neq.cancelada&select=slot_id")
+    ]);
+    const bookedIds = new Set(ag.map(a=>a.slot_id));
+    // Agrupar datas com pelo menos 1 slot livre
+    const byDate = {};
+    slots.forEach(s=>{ if(!byDate[s.data]) byDate[s.data]=[]; byDate[s.data].push({...s,booked:bookedIds.has(s.id)}); });
+    const datasLivres = Object.entries(byDate).filter(([,sls])=>sls.some(s=>!s.booked));
+    const datasEl = document.getElementById("orc-slots-datas");
+    if(!datasLivres.length) {
+      datasEl.innerHTML = '<div style="color:var(--dl);font-size:13px;text-align:center;">Nenhum horário disponível no momento. Entre em contato pelo WhatsApp.</div>';
+      return;
+    }
+    datasEl.innerHTML = datasLivres.map(([data,sls])=>{
+      const fmtD = new Date(data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"});
+      return `<button class="vc-slot-day" onclick="_orcSelectData('${data}',${JSON.stringify(sls).replace(/'/g,"\\'")})">${fmtD}</button>`;
+    }).join("");
+    window._orcSlotsByDate = byDate;
+  } catch(e) {
+    document.getElementById("orc-slots-datas").innerHTML = '<div style="color:var(--dl);font-size:12px;">Erro ao carregar horários.</div>';
+  }
+}
+
+function _orcSelectData(data, slots) {
+  document.querySelectorAll(".vc-slot-day").forEach(b=>b.classList.toggle("on", b.textContent.trim()===new Date(data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"})));
+  const horasEl = document.getElementById("orc-slots-horas");
+  const listaEl = document.getElementById("orc-slots-horas-list");
+  document.getElementById("orc-slots-data-label").textContent = new Date(data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"});
+  listaEl.innerHTML = slots.map(s=>{
+    const livre = !s.booked;
+    return `<button class="vc-slot-time${livre?"":" taken"}" ${livre?`onclick="_orcSelectSlot('${s.id}','${data}','${s.hora}')"`:""} ${!livre?'disabled':''}>
+      ${s.hora.slice(0,5)}${!livre?' <span style="font-size:10px;font-weight:400;">ocupado</span>':''}
+    </button>`;
+  }).join("");
+  horasEl.style.display="";
+  document.getElementById("orc-slots-confirmar").style.display="none";
+  document.getElementById("orc-slots-done").style.display="none";
+  _vcSelectedSlotId = null;
+}
+
+function _orcSelectSlot(slotId, data, hora) {
+  document.querySelectorAll(".vc-slot-time").forEach(b=>b.classList.remove("on"));
+  event.currentTarget.classList.add("on");
+  _vcSelectedSlotId = slotId;
+  const fmtData = new Date(data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"});
+  document.getElementById("orc-slot-escolhido").textContent = "📅 "+fmtData+" às "+hora.slice(0,5);
+  document.getElementById("orc-slots-confirmar").style.display="";
+  document.getElementById("orc-slot-err").style.display="none";
+}
+
+async function _orcConfirmarVisita() {
+  if(!_vcSelectedSlotId) return;
+  const btn = document.getElementById("orc-slot-btn"); btn.disabled=true; btn.textContent="Confirmando...";
+  const err = document.getElementById("orc-slot-err"); err.style.display="none";
+  try {
+    const vid = (()=>{try{return localStorage.getItem("dmv_sid");}catch(e){return null;}})();
+    const nome = [_orc.nome_noiva,_orc.nome_noivo].filter(Boolean).join(" e ")||_orc.nome_contratante||"";
+    await sbFetch("visitas_comerciais",{
+      method:"POST",
+      body:{ slot_id:_vcSelectedSlotId, orc_id:_orc._dbId||null, visitor_id:vid, nome, whatsapp:_orc.whatsapp||null, email:_orc.email||null, status:"agendada" },
+      prefer:"return=minimal"
+    });
+    document.getElementById("orc-slots-confirmar").style.display="none";
+    document.getElementById("orc-slots-horas").style.display="none";
+    document.getElementById("orc-slots-done").style.display="";
+    document.getElementById("orc-slot-done-txt").textContent = "Confirmaremos pelo WhatsApp "+(_orc.whatsapp||"em breve")+". Até lá! 🌿";
+  } catch(e){
+    err.style.display="block"; err.textContent="Erro ao confirmar: "+e.message;
+    btn.disabled=false; btn.textContent="✅ Confirmar visita";
+  }
 }
 
 // ── Dashboard ────────────────────────────────────────────────
@@ -5522,14 +5871,18 @@ function _orcAplicarValor(){
 }
 
 function _orcStep(){
-  [1,2,3].forEach(i=>{
+  [1,2,3,4].forEach(i=>{
     const el=document.getElementById("osi-"+i);
     if(el) el.classList.toggle("on",i===_orc.step);
   });
+  const sep4=document.getElementById("osi-sep-4"), ind4=document.getElementById("osi-4");
+  if(sep4) sep4.style.display=(_orc.step>=4)?"":"none";
+  if(ind4) ind4.style.display=(_orc.step>=4)?"":"none";
   const body=document.getElementById("orc-wizard-body");
   if(_orc.step===1) body.innerHTML=_orcHTML1();
   else if(_orc.step===2) _orcLoadPacotes();
   else if(_orc.step===3){body.innerHTML=_orcHTML4();}
+  else if(_orc.step===4) _orcLoadSlots();
 }
 
 // Insere o orçamento na 1ª passagem e atualiza nas seguintes (captura de lead)
@@ -6054,12 +6407,12 @@ function _orcHTML4(){
 async function _orcSalvar(){
   const btn=document.getElementById("orc-btn-salvar");
   btn.disabled=true; btn.textContent="Gerando PDF…";
-  // Atualiza a gravação como finalizado (PDF gerado)
   _orc._stage="pendente";
   await _orcUpsertLead();
-  // Generate PDF via print window
   _orcAbrirPDF();
   btn.disabled=false; btn.textContent="Salvar orçamento em PDF";
+  // Após salvar PDF, oferecer agendamento de visita
+  _orc.step=4; _orcStep();
 }
 
 function _orcAbrirPDF(){
