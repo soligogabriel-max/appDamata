@@ -349,7 +349,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.15e</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.16a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -516,7 +516,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.15e</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.16a</div>
       </div>
     </div>
     <div class="uarea">
@@ -1657,6 +1657,16 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
 
 <script>
 // ══════════════════════════════════════════
+// Data local no formato YYYY-MM-DD (evita bug de UTC vs horário de Brasília)
+function localDate(d) {
+  const dt = d || new Date();
+  return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0');
+}
+// Converte timestamp UTC do banco (ex: "2026-07-16T01:30:00") para data local YYYY-MM-DD
+function utcToLocalDate(ts) {
+  return localDate(new Date(ts));
+}
+
 // SUPABASE CONFIG
 // ══════════════════════════════════════════
 const SB_URL = "https://wwnndsprpofmgbklqdgg.supabase.co";
@@ -3281,22 +3291,22 @@ async function renderDashboard() {
   };
 
   const hoje = new Date();
-  const mesIni = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().slice(0,10);
-  const hojStr = hoje.toISOString().slice(0,10);
+  const hojStr = localDate(hoje);
+  const mesAtualStr = hojStr.slice(0,7); // YYYY-MM
 
-  // Helpers para mês de offset (0=atual, -1=anterior, etc.)
+  // Helpers para mês de offset (0=atual, -1=anterior, etc.) — usa datas locais
   const mesRange = offset => {
     const d = new Date(hoje.getFullYear(), hoje.getMonth() + offset, 1);
     const fim = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-    return [d.toISOString().slice(0,10), fim.toISOString().slice(0,10)];
+    return [localDate(d), localDate(fim)];
   };
 
   try {
     const [agendaRows, receberRows, visitasRows, orcRows] = await Promise.all([
       dbGet("agenda", "data_evento=gte."+hojStr+"&select=cod,nome_evento,data_evento,tipo_evento,status&order=data_evento.asc&limit=200"),
       dbGet("contas_a_receber", "status=eq.NP&select=valor,vencimento"),
-      dbGet("site_visits", "visited_at=gte."+new Date(hoje.getFullYear(), hoje.getMonth()-3, 1).toISOString().slice(0,10)+"&select=visited_at,session_id&limit=10000"),
-      dbGet("orcamentos", "created_at=gte."+new Date(hoje.getFullYear(), hoje.getMonth()-3, 1).toISOString().slice(0,10)+"&select=created_at,valor_total,status,visitor_id&limit=2000")
+      dbGet("site_visits", "visited_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=visited_at,session_id&limit=10000"),
+      dbGet("orcamentos", "created_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=created_at,valor_total,status,visitor_id&limit=2000")
     ]);
 
     // — Eventos futuros
@@ -3315,10 +3325,10 @@ async function renderDashboard() {
       ? fmtR(atrasadas) + " em atraso"
       : "nenhuma em atraso";
 
-    // — Visitantes: agrupa por mês
+    // — Visitantes: agrupa por mês usando data local (não UTC)
     const uniqMes = offset => {
       const [ini, fim] = mesRange(offset);
-      return new Set(visitasRows.filter(r => r.visited_at >= ini && r.visited_at < fim).map(r=>r.session_id)).size;
+      return new Set(visitasRows.filter(r => { const d=utcToLocalDate(r.visited_at); return d>=ini && d<fim; }).map(r=>r.session_id)).size;
     };
     const visAtual = uniqMes(0);
     const visMed3 = (uniqMes(-1) + uniqMes(-2) + uniqMes(-3)) / 3;
@@ -3329,10 +3339,10 @@ async function renderDashboard() {
     document.getElementById("dc-visitas-sub").innerHTML =
       mediaDia + "/dia em média" + trend(visAtual, visMed3);
 
-    // — Orçamentos
+    // — Orçamentos: usando data local
     const orcMes = offset => {
       const [ini, fim] = mesRange(offset);
-      const rows = orcRows.filter(r => r.created_at >= ini && r.created_at < fim);
+      const rows = orcRows.filter(r => { const d=utcToLocalDate(r.created_at); return d>=ini && d<fim; });
       return { count: rows.length, total: rows.reduce((s,r)=>s+(r.valor_total||0),0), rows };
     };
     const orcAt = orcMes(0);
@@ -3380,13 +3390,13 @@ async function renderVisitas() {
     const since = new Date(); since.setDate(since.getDate() - 30); since.setHours(0,0,0,0);
     const rows = await dbGet("site_visits", "visited_at=gte."+since.toISOString()+"&select=visited_at,session_id,referrer,device&order=visited_at.desc&limit=5000");
 
-    const hoje = new Date().toISOString().slice(0,10);
-    const mesAtual = new Date().toISOString().slice(0,7);
+    const hoje = localDate();          // data local YYYY-MM-DD (não UTC)
+    const mesAtual = hoje.slice(0,7);  // YYYY-MM local
 
-    // Agrupar por dia
+    // Agrupar por dia local (converte UTC do banco para horário local)
     const byDay = {};
     rows.forEach(r => {
-      const day = r.visited_at.slice(0,10);
+      const day = utcToLocalDate(r.visited_at);
       if(!byDay[day]) byDay[day] = { total:0, uniq: new Set() };
       byDay[day].total++;
       byDay[day].uniq.add(r.session_id);
@@ -3399,7 +3409,7 @@ async function renderVisitas() {
 
     // Cards do mês
     let totalMes = 0, uniqMes = new Set();
-    rows.filter(r => r.visited_at.slice(0,7) === mesAtual).forEach(r => {
+    rows.filter(r => utcToLocalDate(r.visited_at).slice(0,7) === mesAtual).forEach(r => {
       totalMes++;
       uniqMes.add(r.session_id);
     });
