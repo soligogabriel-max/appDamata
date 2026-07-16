@@ -357,7 +357,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.16d</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.16f</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -526,7 +526,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.16d</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.16f</div>
       </div>
     </div>
     <div class="uarea">
@@ -3142,17 +3142,18 @@ async function _syncGoogleCal(evData) {
   return resp;
 }
 
-async function _syncVCGoogleCal(vcId, nome, data, hora) {
+async function _syncVCGoogleCal(vcId, nome, data, hora, whatsapp) {
   const res = await fetch(SB_URL + "/functions/v1/sync-google-calendar", {
     method: "POST",
     headers: { "apikey": SB_KEY, "Authorization": "Bearer " + _authToken, "Content-Type": "application/json" },
     body: JSON.stringify({
       action: "upsert",
-      nome_evento: "Visita Comercial — " + nome,
+      nome_evento: "Visita — " + nome + (whatsapp ? " | 📱 " + whatsapp : ""),
       data_evento: data,
       hora_inicio: hora.slice(0, 5),
       tipo_evento: "Visita Comercial",
       local_evento: "Fazenda Damata, Mogi Mirim - SP",
+      notes: whatsapp ? "📱 WhatsApp: " + whatsapp : undefined,
     }),
   });
   const resp = await res.json();
@@ -3554,7 +3555,7 @@ async function vcSalvarManual() {
       const opt = selEl.options[selEl.selectedIndex];
       const slotData = opt?.dataset?.data;
       const slotHora = opt?.dataset?.hora;
-      if(slotData && slotHora) _syncVCGoogleCal(inserted.id, nome, slotData, slotHora).catch(()=>{});
+      if(slotData && slotHora) _syncVCGoogleCal(inserted.id, nome, slotData, slotHora, wpp||null).catch(()=>{});
     }
     closeModal("m-vc-manual");
     _vcLoadAgendadas();
@@ -3663,7 +3664,7 @@ async function _orcConfirmarVisita() {
     });
     const inserted = Array.isArray(rows) ? rows[0] : rows;
     if(inserted?.id && _vcSelectedSlotData && _vcSelectedSlotHora) {
-      _syncVCGoogleCal(inserted.id, nome, _vcSelectedSlotData, _vcSelectedSlotHora).catch(()=>{});
+      _syncVCGoogleCal(inserted.id, nome, _vcSelectedSlotData, _vcSelectedSlotHora, _orc.whatsapp||null).catch(()=>{});
     }
     document.getElementById("orc-slots-confirmar").style.display="none";
     document.getElementById("orc-slots-horas").style.display="none";

@@ -128,6 +128,7 @@ Deno.serve(async (req) => {
     spaces_json?: string;
     google_cal_id?: string;
     assessoria_nome?: string;
+    notes?: string;  // texto livre adicionado ao final da descrição
   } = {};
 
   try {
@@ -136,7 +137,7 @@ Deno.serve(async (req) => {
     return json({ error: "JSON inválido." }, 400);
   }
 
-  const { action = "upsert", cod, nome_evento, data_evento, data_fim, hora_inicio, hora_fim, tipo_evento, local_evento, status, spaces_json, google_cal_id, assessoria_nome } = body;
+  const { action = "upsert", cod, nome_evento, data_evento, data_fim, hora_inicio, hora_fim, tipo_evento, local_evento, status, spaces_json, google_cal_id, assessoria_nome, notes } = body;
 
   if (!data_evento) return json({ error: "data_evento obrigatório." }, 400);
 
@@ -183,9 +184,12 @@ Deno.serve(async (req) => {
     endField   = { date: addOneDay((data_fim && data_fim >= data_evento) ? data_fim : data_evento) };
   }
 
+  const descBase = buildDescription(tipo_evento, status, spaces_json, assessoria_nome);
+  const description = [descBase, notes].filter(Boolean).join("\n") || undefined;
+
   const event = {
     summary: title,
-    description: buildDescription(tipo_evento, status, spaces_json, assessoria_nome) || undefined,
+    description,
     location: local_evento || "Fazenda Damata, Mogi Mirim - SP",
     start: startField,
     end: endField,
