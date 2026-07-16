@@ -357,7 +357,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.16m</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.16o</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -526,7 +526,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.16m</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.16o</div>
       </div>
     </div>
     <div class="uarea">
@@ -3465,13 +3465,16 @@ async function _vcLoadAgendadas() {
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.whatsapp?`<a href="https://wa.me/55${v.whatsapp.replace(/\D/g,'')}" target="_blank" style="color:var(--a);">${v.whatsapp}</a>`:"—"}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${statusLabel[v.status]||v.status}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">
-          <select onchange="vcMudarStatus('${v.id}',this.value)" style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--br);background:var(--bg2);">
+          <div style="display:flex;align-items:center;gap:6px;">
+          <select onchange="vcMudarStatus('${v.id}','${v.gcal_event_id||''}',this.value)" style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--br);background:var(--bg2);">
             <option value="">Mudar...</option>
             <option value="agendada">Agendada</option>
             <option value="realizada">Realizada</option>
             <option value="cancelada">Cancelada</option>
             <option value="nao_compareceu">Não compareceu</option>
           </select>
+          <button onclick="vcDeletarVisita('${v.id}','${v.gcal_event_id||''}')" title="Excluir visita" style="padding:4px 7px;background:none;border:1px solid #fca5a5;border-radius:6px;cursor:pointer;font-size:13px;color:#dc2626;line-height:1;">🗑️</button>
+          </div>
         </td>
       </tr>`).join("")}</tbody>
     </table>`;
@@ -3480,24 +3483,36 @@ async function _vcLoadAgendadas() {
   }
 }
 
-async function vcMudarStatus(id, status) {
+async function vcMudarStatus(id, gcalId, status) {
   if(!status) return;
   try {
-    if(status === "cancelada") {
-      const rows = await dbGet("visitas_comerciais", "id=eq."+id+"&select=gcal_event_id");
-      const gcalId = rows[0]?.gcal_event_id;
-      if(gcalId) {
-        fetch(SB_URL + "/functions/v1/sync-google-calendar", {
-          method:"POST",
-          headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken,"Content-Type":"application/json"},
-          body:JSON.stringify({ action:"delete", data_evento:"2000-01-01", google_cal_id:gcalId })
-        }).catch(()=>{});
-      }
+    if(status === "cancelada" && gcalId) {
+      await _vcDeleteGcal(gcalId);
     }
     await sbFetch("visitas_comerciais?id=eq."+id, { method:"PATCH", body:{ status }, prefer:"return=minimal" });
     _vcLoadAgendadas();
     toast("✅ Status atualizado.");
   } catch(e) { toast("Erro: "+e.message); }
+}
+
+async function vcDeletarVisita(id, gcalId) {
+  if(!confirm("Excluir esta visita permanentemente?")) return;
+  try {
+    if(gcalId) await _vcDeleteGcal(gcalId);
+    await sbFetch("visitas_comerciais?id=eq."+id, { method:"DELETE", prefer:"return=minimal" });
+    _vcLoadAgendadas();
+    toast("✅ Visita excluída.");
+  } catch(e) { toast("Erro ao excluir: "+e.message); }
+}
+
+async function _vcDeleteGcal(gcalId) {
+  const res = await fetch(SB_URL + "/functions/v1/sync-google-calendar", {
+    method:"POST",
+    headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken,"Content-Type":"application/json"},
+    body:JSON.stringify({ action:"delete", data_evento:"2000-01-01", google_cal_id:gcalId })
+  });
+  const r = await res.json().catch(()=>({}));
+  if(r.error) toast("⚠️ GCal: "+r.error);
 }
 
 function vcNovaManual() {
