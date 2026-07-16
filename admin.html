@@ -357,7 +357,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.16b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.16d</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -526,7 +526,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.16b</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.16d</div>
       </div>
     </div>
     <div class="uarea">
@@ -3142,6 +3142,27 @@ async function _syncGoogleCal(evData) {
   return resp;
 }
 
+async function _syncVCGoogleCal(vcId, nome, data, hora) {
+  const res = await fetch(SB_URL + "/functions/v1/sync-google-calendar", {
+    method: "POST",
+    headers: { "apikey": SB_KEY, "Authorization": "Bearer " + _authToken, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "upsert",
+      nome_evento: "Visita Comercial — " + nome,
+      data_evento: data,
+      hora_inicio: hora.slice(0, 5),
+      tipo_evento: "Visita Comercial",
+      local_evento: "Fazenda Damata, Mogi Mirim - SP",
+    }),
+  });
+  const resp = await res.json();
+  if (resp.error) throw new Error(resp.detail?.message || resp.error);
+  if (resp.google_cal_id) {
+    await sbFetch("visitas_comerciais?id=eq."+vcId, { method:"PATCH", body:{ gcal_event_id: resp.google_cal_id }, prefer:"return=minimal" });
+  }
+  return resp;
+}
+
 // ══════════════════════════════════════════
 // CONTRACT
 // ══════════════════════════════════════════
@@ -3461,6 +3482,17 @@ async function _vcLoadAgendadas() {
 async function vcMudarStatus(id, status) {
   if(!status) return;
   try {
+    if(status === "cancelada") {
+      const rows = await dbGet("visitas_comerciais", "id=eq."+id+"&select=gcal_event_id");
+      const gcalId = rows[0]?.gcal_event_id;
+      if(gcalId) {
+        fetch(SB_URL + "/functions/v1/sync-google-calendar", {
+          method:"POST",
+          headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken,"Content-Type":"application/json"},
+          body:JSON.stringify({ action:"delete", data_evento:"2000-01-01", google_cal_id:gcalId })
+        }).catch(()=>{});
+      }
+    }
     await sbFetch("visitas_comerciais?id=eq."+id, { method:"PATCH", body:{ status }, prefer:"return=minimal" });
     _vcLoadAgendadas();
     toast("✅ Status atualizado.");
@@ -3501,21 +3533,29 @@ function vcNovaManual() {
     if(!sel) return;
     if(!livres.length){ sel.innerHTML='<option value="">Nenhum horário disponível</option>'; return; }
     sel.innerHTML = '<option value="">Selecione um horário</option>' +
-      livres.map(s=>`<option value="${s.id}">${new Date(s.data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"})} às ${s.hora.slice(0,5)}</option>`).join("");
+      livres.map(s=>`<option value="${s.id}" data-data="${s.data}" data-hora="${s.hora}">${new Date(s.data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"})} às ${s.hora.slice(0,5)}</option>`).join("");
   })();
 }
 
 async function vcSalvarManual() {
   const nome = document.getElementById("vcm-nome").value.trim();
   const wpp  = document.getElementById("vcm-wpp").value.trim();
-  const slot = document.getElementById("vcm-slot").value;
+  const selEl = document.getElementById("vcm-slot");
+  const slot = selEl.value;
   const obs  = document.getElementById("vcm-obs").value.trim();
   const err  = document.getElementById("vcm-err");
   err.style.display="none";
   if(!nome||!slot){ err.style.display="block"; err.textContent="Nome e horário são obrigatórios."; return; }
   const btn = document.getElementById("vcm-btn"); btn.disabled=true; btn.textContent="Salvando...";
   try {
-    await sbFetch("visitas_comerciais",{ method:"POST", body:{ slot_id:slot, nome, whatsapp:wpp||null, obs:obs||null, status:"agendada" }, prefer:"return=minimal" });
+    const rows = await sbFetch("visitas_comerciais",{ method:"POST", body:{ slot_id:slot, nome, whatsapp:wpp||null, obs:obs||null, status:"agendada" } });
+    const inserted = Array.isArray(rows) ? rows[0] : rows;
+    if(inserted?.id) {
+      const opt = selEl.options[selEl.selectedIndex];
+      const slotData = opt?.dataset?.data;
+      const slotHora = opt?.dataset?.hora;
+      if(slotData && slotHora) _syncVCGoogleCal(inserted.id, nome, slotData, slotHora).catch(()=>{});
+    }
     closeModal("m-vc-manual");
     _vcLoadAgendadas();
     toast("✅ Visita agendada.");
@@ -3524,6 +3564,8 @@ async function vcSalvarManual() {
 
 // ── Wizard orçamento — step 4: escolher horário de visita ────────────────
 let _vcSelectedSlotId = null;
+let _vcSelectedSlotData = null;
+let _vcSelectedSlotHora = null;
 
 async function _orcLoadSlots() {
   const body = document.getElementById("orc-wizard-body");
@@ -3600,6 +3642,8 @@ function _orcSelectSlot(slotId, data, hora) {
   document.querySelectorAll(".vc-slot-time").forEach(b=>b.classList.remove("on"));
   event.currentTarget.classList.add("on");
   _vcSelectedSlotId = slotId;
+  _vcSelectedSlotData = data;
+  _vcSelectedSlotHora = hora;
   const fmtData = new Date(data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"});
   document.getElementById("orc-slot-escolhido").textContent = "📅 "+fmtData+" às "+hora.slice(0,5);
   document.getElementById("orc-slots-confirmar").style.display="";
@@ -3613,11 +3657,14 @@ async function _orcConfirmarVisita() {
   try {
     const vid = (()=>{try{return localStorage.getItem("dmv_sid");}catch(e){return null;}})();
     const nome = [_orc.nome_noiva,_orc.nome_noivo].filter(Boolean).join(" e ")||_orc.nome_contratante||"";
-    await sbFetch("visitas_comerciais",{
+    const rows = await sbFetch("visitas_comerciais",{
       method:"POST",
-      body:{ slot_id:_vcSelectedSlotId, orc_id:_orc._dbId||null, visitor_id:vid, nome, whatsapp:_orc.whatsapp||null, email:_orc.email||null, status:"agendada" },
-      prefer:"return=minimal"
+      body:{ slot_id:_vcSelectedSlotId, orc_id:_orc._dbId||null, visitor_id:vid, nome, whatsapp:_orc.whatsapp||null, email:_orc.email||null, status:"agendada" }
     });
+    const inserted = Array.isArray(rows) ? rows[0] : rows;
+    if(inserted?.id && _vcSelectedSlotData && _vcSelectedSlotHora) {
+      _syncVCGoogleCal(inserted.id, nome, _vcSelectedSlotData, _vcSelectedSlotHora).catch(()=>{});
+    }
     document.getElementById("orc-slots-confirmar").style.display="none";
     document.getElementById("orc-slots-horas").style.display="none";
     document.getElementById("orc-slots-done").style.display="";

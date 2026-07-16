@@ -9,17 +9,19 @@ CREATE TABLE IF NOT EXISTS slots_visita (
 
 -- Visitas agendadas (clientes ou admin)
 CREATE TABLE IF NOT EXISTS visitas_comerciais (
-  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  slot_id    uuid REFERENCES slots_visita(id) ON DELETE SET NULL,
-  orc_id     uuid,           -- FK lógica para orcamentos.id
-  visitor_id text,           -- dmv_sid do localStorage (rastreamento)
-  nome       text NOT NULL,
-  whatsapp   text,
-  email      text,
-  status     text NOT NULL DEFAULT 'agendada',  -- agendada | realizada | cancelada | nao_compareceu
-  obs        text,
-  created_at timestamptz DEFAULT now()
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  slot_id        uuid REFERENCES slots_visita(id) ON DELETE SET NULL,
+  orc_id         uuid,           -- FK lógica para orcamentos.id
+  visitor_id     text,           -- dmv_sid do localStorage (rastreamento)
+  nome           text NOT NULL,
+  whatsapp       text,
+  email          text,
+  status         text NOT NULL DEFAULT 'agendada',  -- agendada | realizada | cancelada | nao_compareceu
+  obs            text,
+  gcal_event_id  text,           -- ID do evento no Google Calendar
+  created_at     timestamptz DEFAULT now()
 );
+-- gcal_event_id adicionado via: ALTER TABLE visitas_comerciais ADD COLUMN IF NOT EXISTS gcal_event_id text;
 
 ALTER TABLE slots_visita      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE visitas_comerciais ENABLE ROW LEVEL SECURITY;

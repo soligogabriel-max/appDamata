@@ -120,6 +120,8 @@ Deno.serve(async (req) => {
     nome_evento?: string;
     data_evento?: string;
     data_fim?: string;
+    hora_inicio?: string;  // HH:MM — se presente, cria evento com horário (não dia inteiro)
+    hora_fim?: string;     // HH:MM — padrão: hora_inicio + 30min
     tipo_evento?: string;
     local_evento?: string;
     status?: string;
@@ -134,7 +136,7 @@ Deno.serve(async (req) => {
     return json({ error: "JSON inválido." }, 400);
   }
 
-  const { action = "upsert", cod, nome_evento, data_evento, data_fim, tipo_evento, local_evento, status, spaces_json, google_cal_id, assessoria_nome } = body;
+  const { action = "upsert", cod, nome_evento, data_evento, data_fim, hora_inicio, hora_fim, tipo_evento, local_evento, status, spaces_json, google_cal_id, assessoria_nome } = body;
 
   if (!data_evento) return json({ error: "data_evento obrigatório." }, 400);
 
@@ -160,12 +162,33 @@ Deno.serve(async (req) => {
     ? `${nome_evento} [${cod}]`
     : (nome_evento || cod || "Evento Fazenda Damata");
 
+  // Evento com horário (visita comercial) vs dia inteiro (agenda)
+  let startField: object, endField: object;
+  if (hora_inicio) {
+    const TZ = "America/Sao_Paulo";
+    const startDT = `${data_evento}T${hora_inicio.length === 5 ? hora_inicio + ":00" : hora_inicio}`;
+    let endDT: string;
+    if (hora_fim) {
+      endDT = `${data_evento}T${hora_fim.length === 5 ? hora_fim + ":00" : hora_fim}`;
+    } else {
+      // +30min
+      const [hh, mm] = hora_inicio.split(":").map(Number);
+      const total = hh * 60 + mm + 30;
+      endDT = `${data_evento}T${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}:00`;
+    }
+    startField = { dateTime: startDT, timeZone: TZ };
+    endField   = { dateTime: endDT,   timeZone: TZ };
+  } else {
+    startField = { date: data_evento };
+    endField   = { date: addOneDay((data_fim && data_fim >= data_evento) ? data_fim : data_evento) };
+  }
+
   const event = {
     summary: title,
     description: buildDescription(tipo_evento, status, spaces_json, assessoria_nome) || undefined,
     location: local_evento || "Fazenda Damata, Mogi Mirim - SP",
-    start: { date: data_evento },
-    end: { date: addOneDay((data_fim && data_fim >= data_evento) ? data_fim : data_evento) },
+    start: startField,
+    end: endField,
   };
 
   let gcalId = google_cal_id;
