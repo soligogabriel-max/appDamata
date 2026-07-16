@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS slots_visita (
 CREATE TABLE IF NOT EXISTS visitas_comerciais (
   id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   slot_id        uuid REFERENCES slots_visita(id) ON DELETE SET NULL,
-  orc_id         uuid,           -- FK lógica para orcamentos.id
+  orc_id         bigint,         -- FK lógica para orcamentos.id (bigint, não uuid)
   visitor_id     text,           -- dmv_sid do localStorage (rastreamento)
   nome           text NOT NULL,
   whatsapp       text,
@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS visitas_comerciais (
   created_at     timestamptz DEFAULT now()
 );
 -- gcal_event_id adicionado via: ALTER TABLE visitas_comerciais ADD COLUMN IF NOT EXISTS gcal_event_id text;
+-- orc_id corrigido de uuid para bigint: ALTER TABLE visitas_comerciais ALTER COLUMN orc_id TYPE bigint USING NULL;
 
 ALTER TABLE slots_visita      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE visitas_comerciais ENABLE ROW LEVEL SECURITY;
