@@ -357,7 +357,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.16q</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.16t</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -526,7 +526,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.16q</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.16t</div>
       </div>
     </div>
     <div class="uarea">
@@ -8766,16 +8766,27 @@ function setDespPrevConfig(cfg) {
 }
 
 async function openSettings() {
-  _allFornecedores = await dbGet("fornecedores","order=nome.asc&limit=500");
-  const natsSet = await dbGet("naturezas","select=cod,descricao&order=cod.asc&limit=500");
+  const [forns, natsSet, wppRow] = await Promise.all([
+    dbGet("fornecedores","order=nome.asc&limit=500"),
+    dbGet("naturezas","select=cod,descricao&order=cod.asc&limit=500"),
+    sbFetch("app_config?chave=eq.whatsapp_numero&select=valor"),
+  ]);
+  _allFornecedores = forns;
   _impNaturezas = natsSet||[];
   const cfg = getDespPrevConfig();
+  const wppNumero = (Array.isArray(wppRow) && wppRow[0]?.valor) ? wppRow[0].valor : "";
   const fornecOpts = `<option value="">— Sem fornecedor —</option>` +
     (_allFornecedores||[]).map(f=>`<option value="${_esc(f.codigo)}" ${cfg.fornecedor_cod===f.codigo?"selected":""}>${_esc(f.nome)}</option>`).join("");
   const natOpts = `<option value="">— Sem natureza —</option>` +
     _impNaturezas.map(n=>`<option value="${_esc(n.cod)}" ${cfg.natureza===n.cod?"selected":""}>${_esc(n.descricao)}</option>`).join("");
 
   document.getElementById("settings-body").innerHTML = `
+    <div style="margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid var(--brd);">
+      <div style="font-weight:700;font-size:14px;margin-bottom:12px;color:var(--dk);">WhatsApp de Envio</div>
+      <p style="font-size:12px;color:var(--dm);margin-bottom:14px;">Número utilizado nas funções de envio de WhatsApp do sistema.</p>
+      <label class="lbl">Número (com DDD e código do país)</label>
+      <input class="inp inp-inline" type="tel" id="cfg-wpp-numero" value="${_esc(wppNumero)}" placeholder="Ex: 5519999999999" style="margin-bottom:0;"/>
+    </div>
     <div style="margin-bottom:18px;">
       <div style="font-weight:700;font-size:14px;margin-bottom:12px;color:var(--dk);">Despesa Variável Prevista por Evento</div>
       <p style="font-size:12px;color:var(--dm);margin-bottom:14px;">Criado automaticamente em A Pagar ao salvar cada novo contrato.</p>
@@ -8797,12 +8808,23 @@ function closeSettings() {
   document.getElementById("m-settings").classList.remove("open");
 }
 
-function saveSettings() {
+async function saveSettings() {
   const ativo = document.getElementById("cfg-ativo").checked;
   const valor = parseFloat(document.getElementById("cfg-valor").value)||0;
   const fornecedor_cod = document.getElementById("cfg-fornec").value||null;
   const natureza = document.getElementById("cfg-nat").value||null;
   setDespPrevConfig({ativo, valor, fornecedor_cod, natureza});
+
+  const wppNumero = (document.getElementById("cfg-wpp-numero").value||"").trim();
+  try {
+    const existing = await sbFetch("app_config?chave=eq.whatsapp_numero&select=chave");
+    if (Array.isArray(existing) && existing.length > 0) {
+      await sbFetch("app_config?chave=eq.whatsapp_numero", {method:"PATCH", body:{valor:wppNumero}, prefer:"return=minimal"});
+    } else {
+      await sbFetch("app_config", {method:"POST", body:{chave:"whatsapp_numero", valor:wppNumero}, prefer:"return=minimal"});
+    }
+  } catch(e) { toast("⚠️ Erro ao salvar número WhatsApp: "+e.message); return; }
+
   closeSettings();
   toast("Configurações salvas");
 }
