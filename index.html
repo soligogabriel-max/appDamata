@@ -37,13 +37,14 @@
     *{box-sizing:border-box;margin:0;padding:0;}
     body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f5f0;color:#2E3C44;}
 
+    /* ── STICKY TOP (header + barra orçamento) ─── */
+    #sticky-top{position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.3);}
+
     /* ── HEADER ─────────────────────────────────── */
     #header{
       width:100%;background:#2E3C44;
       display:flex;align-items:center;justify-content:center;
       gap:16px;padding:18px 32px;
-      position:sticky;top:0;z-index:100;
-      box-shadow:0 2px 12px rgba(0,0,0,.3);
     }
     #header svg{flex-shrink:0;}
     #header-wordmark{
@@ -56,26 +57,21 @@
       font-size:10px;letter-spacing:3px;color:#E8A52A;text-transform:uppercase;margin-top:3px;
     }
 
-    /* ── BOTÕES ──────────────────────────────────── */
-    #cta-bar{
+    /* ── BARRA ORÇAMENTO ─────────────────────────── */
+    #orc-bar{
       width:100%;background:#1e2d35;
-      display:flex;align-items:center;justify-content:center;
-      flex-wrap:wrap;gap:10px;padding:14px 24px;
+      padding:14px 24px;
     }
-    .cta-btn{
-      display:inline-flex;align-items:center;gap:7px;
-      padding:9px 20px;border-radius:30px;
-      background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);
-      color:#fff;font-size:13px;font-weight:600;letter-spacing:.3px;
-      text-decoration:none;cursor:pointer;font-family:inherit;
-      transition:background .18s,border-color .18s;
-      white-space:nowrap;
+    #btn-orc{
+      display:flex;align-items:center;justify-content:center;gap:10px;
+      width:100%;padding:15px;border-radius:14px;
+      background:#E8A52A;color:#2E3C44;
+      font-size:16px;font-weight:800;letter-spacing:.3px;
+      text-decoration:none;cursor:pointer;
+      transition:background .18s,transform .15s;
+      border:none;font-family:inherit;
     }
-    .cta-btn:hover{background:rgba(232,165,42,.25);border-color:#E8A52A;color:#E8A52A;}
-    .cta-btn.orc{background:rgba(232,165,42,.18);border-color:rgba(232,165,42,.6);color:#E8A52A;font-size:14px;font-weight:700;}
-    .cta-btn.orc:hover{background:#E8A52A;color:#2E3C44;}
-    .cta-btn.portal{background:rgba(232,165,42,.1);border-color:rgba(232,165,42,.4);color:#E8A52A;}
-    .cta-btn.portal:hover{background:#E8A52A;color:#2E3C44;}
+    #btn-orc:hover{background:#f0b83a;transform:translateY(-1px);}
 
     /* ── WHATSAPP FLUTUANTE ──────────────────────── */
     #wpp-float{
@@ -139,16 +135,32 @@
     /* ── FOOTER ──────────────────────────────────── */
     #footer{
       width:100%;background:#1a252d;
-      padding:20px;text-align:center;
-      font-size:11px;color:rgba(255,255,255,.3);letter-spacing:1px;
+      padding:28px 24px 32px;
+      display:flex;flex-direction:column;align-items:center;gap:20px;
+    }
+    #footer-links{
+      display:flex;align-items:center;justify-content:center;gap:32px;
+    }
+    .ft-link{
+      display:flex;flex-direction:column;align-items:center;gap:7px;
+      text-decoration:none;color:rgba(255,255,255,.55);
+      font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;
+      transition:color .18s;
+    }
+    .ft-link:hover{color:#E8A52A;}
+    .ft-link svg{width:28px;height:28px;fill:currentColor;}
+    #footer-copy{
+      font-size:10px;color:rgba(255,255,255,.2);letter-spacing:1px;
     }
 
     /* ── RESPONSIVO ──────────────────────────────── */
     @media(max-width:640px){
       #header{padding:14px 20px;}
       #header-wordmark .name{font-size:20px;letter-spacing:4px;}
+      #orc-bar{padding:12px 16px;}
       #wpp-float{bottom:20px;right:20px;width:54px;height:54px;}
       #wpp-float svg{width:30px;height:30px;}
+      #footer-links{gap:24px;}
     }
   </style>
 </head>
@@ -166,22 +178,19 @@
   </symbol>
 </svg>
 
-<!-- ① HEADER -->
-<header id="header">
-  <svg width="52" height="50"><use href="#logo-sym-lt"/></svg>
-  <div id="header-wordmark">
-    <span class="name">DAMATA</span>
-    <span class="sub">Fazenda · Mogi Mirim · SP</span>
+<!-- ① STICKY: HEADER + BARRA ORÇAMENTO -->
+<div id="sticky-top">
+  <header id="header">
+    <svg width="52" height="50"><use href="#logo-sym-lt"/></svg>
+    <div id="header-wordmark">
+      <span class="name">DAMATA</span>
+      <span class="sub">Fazenda · Mogi Mirim · SP</span>
+    </div>
+  </header>
+  <div id="orc-bar">
+    <a id="btn-orc" href="/admin.html#orcamento">📋 Fazer Orçamento</a>
   </div>
-</header>
-
-<!-- ② BOTÕES -->
-<nav id="cta-bar">
-  <a class="cta-btn orc" href="/admin.html#orcamento">📋 Fazer Orçamento</a>
-  <a class="cta-btn" href="https://instagram.com/damatafazenda" target="_blank">📷 Instagram</a>
-  <a class="cta-btn" href="https://maps.app.goo.gl/B2KEUapfKFutrrKKA" target="_blank">📍 Como chegar</a>
-  <a class="cta-btn portal" href="/admin.html#login">🔐 Portal</a>
-</nav>
+</div>
 
 <!-- ③ CARROSSEL + VÍDEOS -->
 <section id="media-section">
@@ -204,7 +213,32 @@
   <div id="pdf-loading">Carregando informações…</div>
 </section>
 
-<footer id="footer">FAZENDA DAMATA · Mogi Mirim · SP</footer>
+<footer id="footer">
+  <div id="footer-links">
+    <!-- Instagram -->
+    <a class="ft-link" href="https://instagram.com/damatafazenda" target="_blank" aria-label="Instagram">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/>
+      </svg>
+      Instagram
+    </a>
+    <!-- Google Maps -->
+    <a class="ft-link" href="https://maps.app.goo.gl/B2KEUapfKFutrrKKA" target="_blank" aria-label="Como chegar">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 0C7.802 0 4 3.403 4 7.602 4 11.8 7.469 16.812 12 24c4.531-7.188 8-12.2 8-16.398C20 3.403 16.199 0 12 0zm0 11a3 3 0 110-6 3 3 0 010 6z"/>
+      </svg>
+      Como chegar
+    </a>
+    <!-- Portal -->
+    <a class="ft-link" href="/admin.html#login" aria-label="Portal">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 8h-1V6A5 5 0 007 6v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-6 9a2 2 0 110-4 2 2 0 010 4zm3.1-9H8.9V6a3.1 3.1 0 016.2 0v2z"/>
+      </svg>
+      Portal
+    </a>
+  </div>
+  <div id="footer-copy">FAZENDA DAMATA · Mogi Mirim · SP</div>
+</footer>
 
 <!-- ⑤ WHATSAPP FLUTUANTE -->
 <a id="wpp-float" href="https://wa.me/5519996784361" target="_blank" aria-label="WhatsApp">
