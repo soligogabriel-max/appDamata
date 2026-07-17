@@ -38,11 +38,12 @@
     body{font-family:'Segoe UI',system-ui,sans-serif;background:#f5f5f0;color:#2E3C44;}
 
     /* ── HEADER ─────────────────────────────────── */
-    #sticky-top{position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.3);}
     #header{
       width:100%;background:#2E3C44;
       display:flex;align-items:center;justify-content:center;
       gap:16px;padding:18px 32px;
+      position:sticky;top:0;z-index:100;
+      box-shadow:0 2px 12px rgba(0,0,0,.3);
     }
     #header svg{flex-shrink:0;}
     #header-wordmark{
@@ -56,56 +57,52 @@
     }
 
     /* ── BOTÕES ──────────────────────────────────── */
-    #orc-bar{
-      width:100%;background:#1e2d35;
-      padding:16px 24px 0;
-    }
-    #btn-orc{
-      display:flex;align-items:center;justify-content:center;gap:10px;
-      width:100%;padding:16px;border-radius:14px;
-      background:#E8A52A;color:#2E3C44;
-      font-size:16px;font-weight:800;letter-spacing:.3px;
-      text-decoration:none;cursor:pointer;
-      transition:background .18s,transform .15s;
-      border:none;font-family:inherit;
-    }
-    #btn-orc:hover{background:#f0b83a;transform:translateY(-1px);}
     #cta-bar{
       width:100%;background:#1e2d35;
-      display:grid;grid-template-columns:1fr 1fr;
-      gap:10px;padding:12px 24px 16px;
-      max-width:100%;
+      display:flex;align-items:center;justify-content:center;
+      flex-wrap:wrap;gap:10px;padding:14px 24px;
     }
     .cta-btn{
-      display:inline-flex;align-items:center;justify-content:center;gap:7px;
-      padding:13px 16px;border-radius:12px;
-      background:rgba(255,255,255,.08);border:1.5px solid rgba(255,255,255,.15);
-      color:#fff;font-size:14px;font-weight:600;
+      display:inline-flex;align-items:center;gap:7px;
+      padding:9px 20px;border-radius:30px;
+      background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);
+      color:#fff;font-size:13px;font-weight:600;letter-spacing:.3px;
       text-decoration:none;cursor:pointer;font-family:inherit;
       transition:background .18s,border-color .18s;
       white-space:nowrap;
     }
-    .cta-btn:hover{background:rgba(232,165,42,.2);border-color:#E8A52A;color:#E8A52A;}
+    .cta-btn:hover{background:rgba(232,165,42,.25);border-color:#E8A52A;color:#E8A52A;}
+    .cta-btn.orc{background:rgba(232,165,42,.18);border-color:rgba(232,165,42,.6);color:#E8A52A;font-size:14px;font-weight:700;}
+    .cta-btn.orc:hover{background:#E8A52A;color:#2E3C44;}
     .cta-btn.portal{background:rgba(232,165,42,.1);border-color:rgba(232,165,42,.4);color:#E8A52A;}
     .cta-btn.portal:hover{background:#E8A52A;color:#2E3C44;}
+
+    /* ── WHATSAPP FLUTUANTE ──────────────────────── */
+    #wpp-float{
+      position:fixed;bottom:24px;right:24px;z-index:999;
+      width:60px;height:60px;border-radius:50%;
+      background:#25D366;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 4px 20px rgba(37,211,102,.45),0 2px 8px rgba(0,0,0,.25);
+      text-decoration:none;
+      transition:transform .18s,box-shadow .18s;
+    }
+    #wpp-float:hover{
+      transform:scale(1.1);
+      box-shadow:0 6px 28px rgba(37,211,102,.6),0 3px 12px rgba(0,0,0,.3);
+    }
+    #wpp-float svg{width:34px;height:34px;fill:#fff;}
 
     /* ── ÁREA DE INFORMAÇÕES (PDFs em sequência) ─── */
     #info-area{
       width:100%;background:#fff;
       display:flex;flex-direction:column;align-items:center;
     }
-
-    /* container de um PDF — canvas empilhados sem gap */
     .pdf-doc{
       width:100%;max-width:900px;
       display:flex;flex-direction:column;align-items:center;
     }
-    .pdf-doc canvas{
-      width:100%;
-      display:block;
-    }
-
-    /* estado de loading/erro */
+    .pdf-doc canvas{width:100%;display:block;}
     #pdf-loading{
       width:100%;padding:48px;text-align:center;
       color:#8A9BA8;font-size:14px;
@@ -150,8 +147,8 @@
     @media(max-width:640px){
       #header{padding:14px 20px;}
       #header-wordmark .name{font-size:20px;letter-spacing:4px;}
-      #videos-ph{grid-template-columns:1fr;}
-      #carousel-ph{height:220px;}
+      #wpp-float{bottom:20px;right:20px;width:54px;height:54px;}
+      #wpp-float svg{width:30px;height:30px;}
     }
   </style>
 </head>
@@ -169,20 +166,18 @@
   </symbol>
 </svg>
 
-<!-- ① HEADER + ② BOTÃO ORÇAMENTO (sticky juntos) -->
-<div id="sticky-top">
-  <header id="header">
-    <svg width="52" height="50"><use href="#logo-sym-lt"/></svg>
-    <div id="header-wordmark">
-      <span class="name">DAMATA</span>
-    </div>
-  </header>
-  <div id="orc-bar">
-    <a id="btn-orc" href="/admin.html#orcamento">📋 Fazer Orçamento</a>
+<!-- ① HEADER -->
+<header id="header">
+  <svg width="52" height="50"><use href="#logo-sym-lt"/></svg>
+  <div id="header-wordmark">
+    <span class="name">DAMATA</span>
+    <span class="sub">Fazenda · Mogi Mirim · SP</span>
   </div>
-</div>
+</header>
+
+<!-- ② BOTÕES -->
 <nav id="cta-bar">
-  <a class="cta-btn" href="https://wa.me/5519996784361" target="_blank">💬 WhatsApp</a>
+  <a class="cta-btn orc" href="/admin.html#orcamento">📋 Fazer Orçamento</a>
   <a class="cta-btn" href="https://instagram.com/damatafazenda" target="_blank">📷 Instagram</a>
   <a class="cta-btn" href="https://maps.app.goo.gl/B2KEUapfKFutrrKKA" target="_blank">📍 Como chegar</a>
   <a class="cta-btn portal" href="/admin.html#login">🔐 Portal</a>
@@ -210,6 +205,13 @@
 </section>
 
 <footer id="footer">FAZENDA DAMATA · Mogi Mirim · SP</footer>
+
+<!-- ⑤ WHATSAPP FLUTUANTE -->
+<a id="wpp-float" href="https://wa.me/5519996784361" target="_blank" aria-label="WhatsApp">
+  <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+    <path d="M16 0C7.163 0 0 7.163 0 16c0 2.824.738 5.476 2.031 7.782L0 32l8.418-2.009A15.93 15.93 0 0016 32c8.837 0 16-7.163 16-16S24.837 0 16 0zm0 29.333a13.27 13.27 0 01-6.77-1.853l-.485-.288-5.001 1.194 1.237-4.864-.317-.5A13.267 13.267 0 012.667 16C2.667 8.636 8.636 2.667 16 2.667S29.333 8.636 29.333 16 23.364 29.333 16 29.333zM23.27 19.44c-.387-.194-2.29-1.13-2.644-1.259-.354-.129-.612-.194-.87.194-.258.387-1 1.259-1.226 1.517-.226.258-.451.29-.838.097-.387-.194-1.634-.602-3.112-1.92-1.15-1.025-1.926-2.291-2.152-2.678-.226-.387-.024-.596.17-.788.174-.173.387-.452.58-.677.194-.226.258-.387.387-.645.129-.258.065-.484-.032-.677-.097-.194-.87-2.097-1.193-2.871-.314-.753-.634-.65-.87-.662l-.742-.013c-.258 0-.677.097-.1032.484-.355.387-1.355 1.323-1.355 3.226 0 1.903 1.387 3.742 1.58 4s2.73 4.163 6.614 5.839c.924.399 1.645.637 2.207.815.927.295 1.772.253 2.44.154.744-.111 2.29-.936 2.612-1.839.322-.903.322-1.677.226-1.839-.097-.161-.355-.258-.742-.452z"/>
+  </svg>
+</a>
 
 <script>
 const SB_URL = "https://wwnndsprpofmgbklqdgg.supabase.co";
@@ -258,7 +260,6 @@ async function renderPdfNow(url, wrapper) {
 
       await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
     }
-    // Remove placeholder height after render
     wrapper.style.minHeight = "";
   } catch (e) {
     const err = document.createElement("p");
@@ -275,11 +276,9 @@ function renderPdf(pdfEntry, container) {
 
   const wrapper = document.createElement("div");
   wrapper.className = "pdf-doc";
-  // Reserve space so IntersectionObserver triggers when scrolled to
   wrapper.style.minHeight = "400px";
   container.appendChild(wrapper);
 
-  // Lazy render: only load PDF when wrapper enters viewport
   let rendered = false;
   const obs = new IntersectionObserver((entries) => {
     if (entries[0].isIntersecting && !rendered) {
@@ -373,7 +372,6 @@ async function init() {
   const infoArea = document.getElementById("info-area");
   const loading = document.getElementById("pdf-loading");
 
-  // Carrossel e vídeos carregam em paralelo
   loadLandingCarousel();
   loadLandingVideos();
 
