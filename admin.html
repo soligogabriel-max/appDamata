@@ -365,7 +365,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.17g</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.17h</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -534,7 +534,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <svg width="30" height="29"><use href="#logo-sym-lt"/></svg>
       <div>
         <div class="brand-n">DAMATA</div>
-        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.17g</div>
+        <div id="hdr-version" style="font-size:9px;color:rgba(255,255,255,.4);letter-spacing:1px;line-height:1;">v2026.07.17h</div>
       </div>
     </div>
     <div class="uarea">
@@ -591,6 +591,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
       <div class="tgrp-drop">
         <button class="tab" onclick="setTab('relatorio');closeGrps()" id="t-relatorio">📋 Faturamento</button>
         <button class="tab" onclick="setTab('relorc');closeGrps()" id="t-relorc">💬 Orçamentos</button>
+        <button class="tab" onclick="setTab('visitas');closeGrps()" id="t-visitas">📊 Visitas do Site</button>
       </div>
     </div>
 
@@ -600,7 +601,6 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <button class="tab" onclick="setTab('pend');closeGrps()" id="t-pend">🔔 Solicitações <span id="pbadge" style="color:var(--a);"></span></button>
         <button class="tab" onclick="setTab('users');closeGrps()" id="t-users">👥 Usuários</button>
         <button class="tab" onclick="setTab('fotoslanding');closeGrps()" id="t-fotoslanding">🗂 Storage</button>
-        <button class="tab" onclick="setTab('visitas');closeGrps()" id="t-visitas">📊 Visitas do Site</button>
         <button class="tab" onclick="openSettings();closeGrps()" id="t-settings">⚙ Config</button>
       </div>
     </div>
@@ -2209,8 +2209,8 @@ const TAB_GRP={
   contratos:"grp-eventos", pedidos:"grp-eventos", vt:"grp-eventos", orcamentos:"grp-eventos", vc:"grp-eventos",
   receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro", socios:"grp-financeiro",
   fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros", naturezas:"grp-cadastros", assessorias:"grp-cadastros",
-  pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin", visitas:"grp-admin",
-  relatorio:"grp-relatorios", relorc:"grp-relatorios"
+  pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin",
+  relatorio:"grp-relatorios", relorc:"grp-relatorios", visitas:"grp-relatorios"
 };
 function toggleGrp(id){
   const el=document.getElementById(id);
