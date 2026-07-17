@@ -1,0 +1,25 @@
+{
+  "name": "Portal Fazenda Damata",
+  "short_name": "Damata",
+  "description": "Portal administrativo da Fazenda Damata",
+  "start_url": "/admin.html#login",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#2E3C44",
+  "theme_color": "#2E3C44",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
