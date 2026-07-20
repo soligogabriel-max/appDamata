@@ -3190,18 +3190,18 @@ async function abrirHistoricoVisitante(visitorId, nome, whatsapp) {
       promises.push(Promise.resolve([]));
     }
 
-    // Orçamentos — por visitor_id OU whatsapp
+    // Orçamentos — por visitor_id OU whatsapp (or= usa sintaxe de ponto: col.op.val)
     const orcFilters = [];
-    if (visitorId) orcFilters.push("visitor_id=eq."+visitorId);
-    if (whatsapp)  orcFilters.push("whatsapp=eq."+encodeURIComponent(whatsapp));
-    const orcQ = orcFilters.length ? (orcFilters.length>1 ? "or=("+orcFilters.join(",")+")" : orcFilters[0]) : null;
+    if (visitorId) orcFilters.push("visitor_id.eq."+visitorId);
+    if (whatsapp)  orcFilters.push("whatsapp.eq."+encodeURIComponent(whatsapp));
+    const orcQ = orcFilters.length ? "or=("+orcFilters.join(",")+")" : null;
     promises.push(orcQ ? dbGet("orcamentos", orcQ+"&select=created_at,tipo_evento,nome_noiva,nome_noivo,nome_contratante,valor_total,status&order=created_at.desc&limit=100") : Promise.resolve([]));
 
     // Outras visitas comerciais — por visitor_id OU whatsapp
     const vcFilters = [];
-    if (visitorId) vcFilters.push("visitor_id=eq."+visitorId);
-    if (whatsapp)  vcFilters.push("whatsapp=eq."+encodeURIComponent(whatsapp));
-    const vcQ = vcFilters.length ? (vcFilters.length>1 ? "or=("+vcFilters.join(",")+")" : vcFilters[0]) : null;
+    if (visitorId) vcFilters.push("visitor_id.eq."+visitorId);
+    if (whatsapp)  vcFilters.push("whatsapp.eq."+encodeURIComponent(whatsapp));
+    const vcQ = vcFilters.length ? "or=("+vcFilters.join(",")+")" : null;
     promises.push(vcQ ? dbGet("visitas_comerciais", vcQ+"&select=created_at,status,slot_id,slots_visita(data,hora)&order=created_at.desc&limit=50") : Promise.resolve([]));
 
     const [siteVisits, orcamentos, vcVisitas] = await Promise.all(promises);
