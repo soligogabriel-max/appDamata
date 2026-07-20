@@ -3976,7 +3976,7 @@ async function renderVisitas() {
     const [rows, orcRows, vcRows] = await Promise.all([
       dbGet("site_visits", "visited_at=gte."+since.toISOString()+"&select=visited_at,session_id,referrer,device&order=visited_at.desc&limit=5000"),
       dbGet("orcamentos", "created_at=gte."+since.toISOString()+"&select=created_at,visitor_id&limit=5000"),
-      dbGet("visitas_comerciais", "status=neq.cancelada&select=slot_id,slots_visita(data)&limit=2000")
+      dbGet("visitas_comerciais", "status=neq.cancelada&select=created_at&limit=2000")
     ]);
 
     const hoje = localDate();          // data local YYYY-MM-DD (não UTC)
@@ -3998,12 +3998,11 @@ async function renderVisitas() {
       byDay[day].orcs.add(r.visitor_id || ("__idx__"+i));
     });
 
-    // Agrupar visitas comerciais pelo dia do slot
+    // Agrupar visitas comerciais pelo dia em que foram marcadas (created_at)
     vcRows.forEach(r => {
-      const slotData = r.slots_visita?.data;
-      if(!slotData) return;
-      if(!byDay[slotData]) byDay[slotData] = { total:0, uniq: new Set(), orcs: new Set(), vcs: 0 };
-      byDay[slotData].vcs = (byDay[slotData].vcs || 0) + 1;
+      const day = utcToLocalDate(r.created_at);
+      if(!byDay[day]) byDay[day] = { total:0, uniq: new Set(), orcs: new Set(), vcs: 0 };
+      byDay[day].vcs = (byDay[day].vcs || 0) + 1;
     });
 
     // Cards de hoje
