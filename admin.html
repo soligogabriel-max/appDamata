@@ -1740,6 +1740,12 @@ function utcToLocalDate(ts) {
 // ══════════════════════════════════════════
 const SB_URL = "https://wwnndsprpofmgbklqdgg.supabase.co";
 const SB_KEY = "sb_publishable__RQxBa8P-lryd0LtWgTJPw_-aSWERWK";
+// Mantém hdr-version sempre igual ao ll-version (atualizado pelo hook de commit)
+document.addEventListener("DOMContentLoaded", () => {
+  const v = document.getElementById("ll-version");
+  const h = document.getElementById("hdr-version");
+  if (v && h) h.textContent = v.textContent;
+});
 const _sb = supabase.createClient(SB_URL, SB_KEY);
 let _authToken = SB_KEY;
 _sb.auth.onAuthStateChange((event, session) => {
