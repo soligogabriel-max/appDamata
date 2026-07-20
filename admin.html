@@ -4023,24 +4023,23 @@ async function renderVisitas() {
     const days = Object.keys(byDay).sort((a,b)=>b.localeCompare(a));
     if(!days.length) { tabela.innerHTML = '<div class="empty"><div class="eicon">📊</div>Nenhuma visita registrada ainda.</div>'; return; }
 
-    const fmtDate = d => { const [y,m,dd] = d.split("-"); return dd+"/"+m+"/"+y; };
-    tabela.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    const fmtDate = d => { const [,m,dd] = d.split("-"); return dd+"/"+m; };
+    const th = t => `<th style="text-align:center;padding:6px 4px;border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;">${t}</th>`;
+    const td = (v,color) => `<td style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--br);font-weight:600;font-size:12px;color:${color||"var(--dk)"};">${v}</td>`;
+    tabela.innerHTML = `<table style="width:100%;border-collapse:collapse;">
       <thead><tr style="background:var(--bg2);color:var(--dl);">
-        <th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--br);">Data</th>
-        <th style="text-align:center;padding:8px 10px;border-bottom:1px solid var(--br);">Visitantes únicos</th>
-        <th style="text-align:center;padding:8px 10px;border-bottom:1px solid var(--br);">Total de visitas</th>
-        <th style="text-align:center;padding:8px 10px;border-bottom:1px solid var(--br);">Orçamentos</th>
-        <th style="text-align:center;padding:8px 10px;border-bottom:1px solid var(--br);">Visitas</th>
+        <th style="text-align:left;padding:6px 6px;border-bottom:1px solid var(--br);font-size:11px;">Data</th>
+        ${th("Únicos")}${th("Visitas")}${th("Orç.")}${th("Marcadas")}
       </tr></thead>
       <tbody>${days.map((d,i) => {
         const orcCount = byDay[d].orcs ? byDay[d].orcs.size : 0;
         const vcCount  = byDay[d].vcs  || 0;
         return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
-        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${fmtDate(d)}${d===hoje?' <span style="background:var(--a);color:#fff;font-size:10px;border-radius:4px;padding:1px 5px;margin-left:4px;">hoje</span>':''}</td>
-        <td style="text-align:center;padding:7px 10px;border-bottom:1px solid var(--br);font-weight:600;color:var(--a);">${byDay[d].uniq.size}</td>
-        <td style="text-align:center;padding:7px 10px;border-bottom:1px solid var(--br);">${byDay[d].total}</td>
-        <td style="text-align:center;padding:7px 10px;border-bottom:1px solid var(--br);font-weight:600;color:${orcCount>0?"#2E7D52":"var(--dl)"};">${orcCount||"—"}</td>
-        <td style="text-align:center;padding:7px 10px;border-bottom:1px solid var(--br);font-weight:600;color:${vcCount>0?"#1565C0":"var(--dl)"};">${vcCount||"—"}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;white-space:nowrap;">${fmtDate(d)}${d===hoje?' <span style="background:var(--a);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px;margin-left:3px;">hoje</span>':''}</td>
+        ${td(byDay[d].uniq.size,"var(--a)")}
+        ${td(byDay[d].total)}
+        ${td(orcCount||"—", orcCount>0?"#2E7D52":"var(--dl)")}
+        ${td(vcCount||"—",  vcCount>0?"#1565C0":"var(--dl)")}
       </tr>`;}).join("")}</tbody>
     </table>`;
   } catch(e) {
