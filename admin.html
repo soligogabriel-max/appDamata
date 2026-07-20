@@ -3150,6 +3150,23 @@ async function _syncGoogleCal(evData) {
   return resp;
 }
 
+async function vcSyncGCal(vcId, btn) {
+  btn.disabled = true; btn.textContent = "⏳";
+  try {
+    const vcRows = await dbGet("visitas_comerciais", "id=eq."+vcId+"&select=nome,whatsapp,slot_id");
+    const v = vcRows[0]; if (!v) throw new Error("Visita não encontrada");
+    const slotRows = await dbGet("slots_visita", "id=eq."+v.slot_id+"&select=data,hora");
+    const s = slotRows[0]; if (!s) throw new Error("Slot não encontrado");
+    await _syncVCGoogleCal(vcId, v.nome||"", s.data, s.hora, v.whatsapp||null);
+    toast("✅ Sincronizado com Google Calendar!");
+    btn.textContent = "✅";
+    btn.style.borderColor = "#86efac"; btn.style.color = "#15803d";
+  } catch(e) {
+    toast("⚠️ Erro: "+e.message, 4000);
+    btn.disabled = false; btn.textContent = "📅 Sync";
+  }
+}
+
 async function _syncVCGoogleCal(vcId, nome, data, hora, whatsapp) {
   const res = await fetch(SB_URL + "/functions/v1/sync-google-calendar", {
     method: "POST",
@@ -3481,6 +3498,7 @@ async function _vcLoadAgendadas() {
             <option value="cancelada">Cancelada</option>
             <option value="nao_compareceu">Não compareceu</option>
           </select>
+          ${!v.gcal_event_id ? `<button onclick="vcSyncGCal('${v.id}',this)" title="Sincronizar com Google Calendar" style="padding:4px 7px;background:none;border:1px solid #b0c4de;border-radius:6px;cursor:pointer;font-size:12px;color:#1e3a5f;line-height:1;white-space:nowrap;">📅 Sync</button>` : ''}
           <button onclick="vcDeletarVisita('${v.id}','${v.gcal_event_id||''}')" title="Excluir visita" style="padding:4px 7px;background:none;border:1px solid #fca5a5;border-radius:6px;cursor:pointer;font-size:13px;color:#dc2626;line-height:1;">🗑️</button>
           </div>
         </td>
