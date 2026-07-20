@@ -140,6 +140,47 @@
       font-size:10px;color:rgba(255,255,255,.2);letter-spacing:1px;
     }
 
+    /* ── MODAL VISITA COMERCIAL ─────────────────── */
+    #visita-overlay{
+      position:fixed;inset:0;z-index:2000;
+      background:rgba(0,0,0,.55);backdrop-filter:blur(3px);
+      display:flex;align-items:flex-end;justify-content:center;
+      opacity:0;pointer-events:none;transition:opacity .25s;
+    }
+    #visita-overlay.open{opacity:1;pointer-events:all;}
+    #visita-card{
+      width:100%;max-width:480px;
+      background:#fff;border-radius:20px 20px 0 0;
+      padding:28px 24px 40px;
+      transform:translateY(100%);
+      transition:transform .32s cubic-bezier(.22,1,.36,1);
+      max-height:92vh;overflow-y:auto;
+    }
+    #visita-overlay.open #visita-card{transform:translateY(0);}
+    .v-lbl{display:block;font-size:11px;font-weight:700;color:#8A9E95;
+      letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px;}
+    .v-inp{width:100%;padding:13px 14px;border-radius:10px;
+      border:1.5px solid #ddd;font-size:15px;font-family:inherit;
+      outline:none;background:#fafaf8;transition:border-color .18s;}
+    .v-inp:focus{border-color:#E8A52A;}
+    .v-slot-day{padding:9px 16px;border-radius:9px;background:#f2f1ed;
+      border:2px solid transparent;cursor:pointer;
+      font-size:13px;font-weight:600;color:#2E3C44;
+      transition:all .15s;white-space:nowrap;font-family:inherit;}
+    .v-slot-day:hover,.v-slot-day.on{border-color:#E8A52A;background:#E8A52A;color:#fff;}
+    .v-slot-time{padding:10px 20px;border-radius:9px;background:#f2f1ed;
+      border:2px solid transparent;cursor:pointer;
+      font-size:15px;font-weight:700;color:#2E3C44;
+      transition:all .15s;font-family:inherit;}
+    .v-slot-time:hover,.v-slot-time.on{border-color:#E8A52A;background:#E8A52A;color:#fff;}
+    .v-slot-time.taken{opacity:.35;cursor:not-allowed;border-style:dashed;}
+    #v-btn-confirm{width:100%;padding:15px;border-radius:12px;
+      background:#2E3C44;color:#E8A52A;border:none;
+      font-size:16px;font-weight:800;cursor:pointer;
+      font-family:inherit;transition:background .18s;}
+    #v-btn-confirm:hover{background:#3a4d5a;}
+    #v-btn-confirm:disabled{opacity:.5;cursor:not-allowed;}
+
     /* ── RESPONSIVO ──────────────────────────────── */
     @media(max-width:640px){
       #header{padding:14px 20px;}
@@ -219,6 +260,50 @@
   </div>
   <div id="footer-copy">FAZENDA DAMATA · Mogi Mirim · SP</div>
 </footer>
+
+<!-- MODAL: AGENDAR VISITA COMERCIAL -->
+<div id="visita-overlay" onclick="if(event.target===this)fecharVisita()" role="dialog" aria-modal="true">
+  <div id="visita-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <div style="font-size:18px;font-weight:800;color:#2E3C44;">📅 Agendar Visita Comercial</div>
+      <button onclick="fecharVisita()" style="background:none;border:none;cursor:pointer;font-size:22px;color:#bbb;line-height:1;padding:2px 6px;" aria-label="Fechar">✕</button>
+    </div>
+    <p style="font-size:13px;color:#7A8E88;margin-bottom:20px;line-height:1.55;">
+      Conheça pessoalmente os nossos espaços! Escolha um horário e confirme sua visita — nossa equipe estará te esperando. 🌿
+    </p>
+
+    <div id="v-form" style="display:flex;flex-direction:column;gap:16px;">
+      <div>
+        <label class="v-lbl" for="v-nome">Seu nome</label>
+        <input id="v-nome" class="v-inp" type="text" placeholder="Nome completo" autocomplete="name"/>
+      </div>
+      <div>
+        <label class="v-lbl" for="v-wpp">WhatsApp</label>
+        <input id="v-wpp" class="v-inp" type="tel" placeholder="(19) 99999-9999" autocomplete="tel"/>
+      </div>
+      <div>
+        <label class="v-lbl">Escolha uma data</label>
+        <div id="v-slots-datas" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <div style="font-size:13px;color:#aaa;">Carregando horários…</div>
+        </div>
+      </div>
+      <div id="v-horas-wrap" style="display:none;">
+        <label class="v-lbl" id="v-horas-label">Horários disponíveis</label>
+        <div id="v-slots-horas" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;"></div>
+      </div>
+      <div id="v-escolhido" style="display:none;background:#f6f3eb;border-radius:10px;padding:11px 14px;font-size:14px;font-weight:700;color:#2E3C44;"></div>
+      <div id="v-err" style="display:none;color:#c0392b;font-size:13px;"></div>
+      <button id="v-btn-confirm" onclick="confirmarVisitaPublica()" style="display:none;">✅ Confirmar visita</button>
+    </div>
+
+    <div id="v-done" style="display:none;text-align:center;padding:24px 0 8px;">
+      <div style="font-size:52px;margin-bottom:14px;">🌿</div>
+      <div style="font-size:18px;font-weight:800;color:#2E3C44;margin-bottom:10px;">Visita confirmada!</div>
+      <div id="v-done-txt" style="font-size:14px;color:#6A7D75;line-height:1.6;"></div>
+      <button onclick="fecharVisita()" style="margin-top:22px;padding:13px 30px;border-radius:10px;background:#E8A52A;color:#2E3C44;border:none;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">Fechar</button>
+    </div>
+  </div>
+</div>
 
 <!-- ⑤ WHATSAPP FLUTUANTE -->
 <a id="wpp-float" href="https://wa.me/5519996784361" target="_blank" aria-label="WhatsApp">
@@ -382,6 +467,126 @@ async function loadLandingVideos() {
   }
 }
 
+// ── Modal: Agendar Visita Comercial ─────────────────────────────
+let _vSlotsByDate = {}, _vSelSlotId = null, _vSelData = null, _vSelHora = null;
+
+async function abrirVisita() {
+  const ov = document.getElementById("visita-overlay");
+  ov.classList.add("open");
+  document.body.style.overflow = "hidden";
+  document.getElementById("v-nome").value = "";
+  document.getElementById("v-wpp").value = "";
+  document.getElementById("v-horas-wrap").style.display = "none";
+  document.getElementById("v-escolhido").style.display = "none";
+  document.getElementById("v-btn-confirm").style.display = "none";
+  document.getElementById("v-err").style.display = "none";
+  document.getElementById("v-form").style.display = "flex";
+  document.getElementById("v-done").style.display = "none";
+  _vSelSlotId = null;
+  await _vLoadSlots();
+}
+
+function fecharVisita() {
+  document.getElementById("visita-overlay").classList.remove("open");
+  document.body.style.overflow = "";
+  if (location.hash === "#visita") history.replaceState(null, "", location.pathname);
+}
+
+async function _vLoadSlots() {
+  const el = document.getElementById("v-slots-datas");
+  el.innerHTML = '<div style="font-size:13px;color:#aaa;">Carregando horários…</div>';
+  try {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const [r1, r2] = await Promise.all([
+      fetch(SB_URL+"/rest/v1/slots_visita?data=gte."+hoje+"&order=data.asc,hora.asc&limit=200",
+        { headers:{ apikey:SB_KEY, Authorization:"Bearer "+SB_KEY } }),
+      fetch(SB_URL+"/rest/v1/visitas_comerciais?status=neq.cancelada&select=slot_id",
+        { headers:{ apikey:SB_KEY, Authorization:"Bearer "+SB_KEY } })
+    ]);
+    const slots = await r1.json(), ag = await r2.json();
+    const booked = new Set((ag||[]).map(a => a.slot_id));
+    _vSlotsByDate = {};
+    (slots||[]).forEach(s => {
+      if (!_vSlotsByDate[s.data]) _vSlotsByDate[s.data] = [];
+      _vSlotsByDate[s.data].push({ ...s, booked: booked.has(s.id) });
+    });
+    const livres = Object.entries(_vSlotsByDate).filter(([,sl]) => sl.some(s => !s.booked));
+    if (!livres.length) {
+      el.innerHTML = '<div style="font-size:13px;color:#aaa;">Nenhum horário disponível no momento.<br>Entre em contato pelo WhatsApp. 😊</div>';
+      return;
+    }
+    el.innerHTML = livres.map(([data]) => {
+      const fmt = new Date(data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"});
+      return `<button class="v-slot-day" onclick="_vSelectData('${data}')">${fmt}</button>`;
+    }).join("");
+  } catch(e) {
+    document.getElementById("v-slots-datas").innerHTML = '<div style="font-size:13px;color:#c0392b;">Erro ao carregar horários. Tente novamente.</div>';
+  }
+}
+
+function _vSelectData(data) {
+  const fmt = d => new Date(d+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"});
+  document.querySelectorAll(".v-slot-day").forEach(b => b.classList.toggle("on", b.textContent.trim()===fmt(data)));
+  const slots = _vSlotsByDate[data] || [];
+  document.getElementById("v-horas-label").textContent =
+    new Date(data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"});
+  document.getElementById("v-slots-horas").innerHTML = slots.map(s => {
+    const livre = !s.booked;
+    return `<button class="v-slot-time${livre?"":" taken"}" ${livre?`onclick="_vSelectSlot('${s.id}','${data}','${s.hora}')"`:""} ${!livre?"disabled":""}>
+      ${s.hora.slice(0,5)}${!livre?' <span style="font-size:10px;font-weight:400;">ocupado</span>':""}
+    </button>`;
+  }).join("");
+  document.getElementById("v-horas-wrap").style.display = "";
+  document.getElementById("v-escolhido").style.display = "none";
+  document.getElementById("v-btn-confirm").style.display = "none";
+  document.getElementById("v-err").style.display = "none";
+  _vSelSlotId = null;
+}
+
+function _vSelectSlot(slotId, data, hora) {
+  document.querySelectorAll(".v-slot-time").forEach(b => b.classList.remove("on"));
+  event.currentTarget.classList.add("on");
+  _vSelSlotId = slotId; _vSelData = data; _vSelHora = hora;
+  const fmtData = new Date(data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"});
+  const el = document.getElementById("v-escolhido");
+  el.textContent = "📅 "+fmtData+" às "+hora.slice(0,5);
+  el.style.display = "";
+  document.getElementById("v-btn-confirm").style.display = "";
+  document.getElementById("v-err").style.display = "none";
+}
+
+async function confirmarVisitaPublica() {
+  const nome = (document.getElementById("v-nome").value||"").trim();
+  const wpp  = (document.getElementById("v-wpp").value||"").trim();
+  const err  = document.getElementById("v-err");
+  if (!nome) { err.textContent = "Por favor, informe seu nome."; err.style.display = ""; return; }
+  if (!_vSelSlotId) { err.textContent = "Por favor, escolha uma data e horário."; err.style.display = ""; return; }
+  const btn = document.getElementById("v-btn-confirm");
+  btn.disabled = true; btn.textContent = "Confirmando…";
+  err.style.display = "none";
+  try {
+    const vid = (()=>{ try { return localStorage.getItem("dmv_sid"); } catch(e) { return null; } })();
+    const res = await fetch(SB_URL+"/rest/v1/visitas_comerciais", {
+      method: "POST",
+      headers: { apikey:SB_KEY, Authorization:"Bearer "+SB_KEY, "Content-Type":"application/json", Prefer:"return=minimal" },
+      body: JSON.stringify({ slot_id:_vSelSlotId, nome, whatsapp:wpp||null, visitor_id:vid, status:"agendada" })
+    });
+    if (!res.ok) throw new Error(res.status);
+    const fmtData = new Date(_vSelData+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
+    document.getElementById("v-form").style.display = "none";
+    document.getElementById("v-done").style.display = "";
+    document.getElementById("v-done-txt").innerHTML =
+      `Até ${fmtData} às ${_vSelHora.slice(0,5)}! 🌿<br><br>Nossa equipe pode entrar em contato pelo WhatsApp para confirmar. Qualquer dúvida, é só chamar.`;
+  } catch(e) {
+    err.textContent = "Erro ao confirmar. Tente novamente ou entre em contato pelo WhatsApp.";
+    err.style.display = "";
+    btn.disabled = false; btn.textContent = "✅ Confirmar visita";
+  }
+}
+
+function _checkVisitaHash() { if (location.hash === "#visita") abrirVisita(); }
+window.addEventListener("hashchange", _checkVisitaHash);
+
 async function init() {
   const infoArea = document.getElementById("info-area");
   const loading = document.getElementById("pdf-loading");
@@ -411,7 +616,7 @@ async function init() {
   }
 }
 
-init();
+init().then(() => _checkVisitaHash());
 </script>
 </body>
 </html>
