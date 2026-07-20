@@ -568,10 +568,34 @@ async function confirmarVisitaPublica() {
     const vid = (()=>{ try { return localStorage.getItem("dmv_sid"); } catch(e) { return null; } })();
     const res = await fetch(SB_URL+"/rest/v1/visitas_comerciais", {
       method: "POST",
-      headers: { apikey:SB_KEY, Authorization:"Bearer "+SB_KEY, "Content-Type":"application/json", Prefer:"return=minimal" },
+      headers: { apikey:SB_KEY, Authorization:"Bearer "+SB_KEY, "Content-Type":"application/json", Prefer:"return=representation" },
       body: JSON.stringify({ slot_id:_vSelSlotId, nome, whatsapp:wpp||null, visitor_id:vid, status:"agendada" })
     });
     if (!res.ok) throw new Error(res.status);
+    const insertedRows = await res.json().catch(()=>[]);
+    const insertedId = Array.isArray(insertedRows) ? insertedRows[0]?.id : insertedRows?.id;
+    // Sync Google Calendar (fire-and-forget, usa anon key)
+    fetch(SB_URL+"/functions/v1/sync-google-calendar", {
+      method: "POST",
+      headers: { apikey:SB_KEY, Authorization:"Bearer "+SB_KEY, "Content-Type":"application/json" },
+      body: JSON.stringify({
+        action: "upsert",
+        nome_evento: "Visita — "+nome+(wpp?" | 📱 "+wpp:""),
+        data_evento: _vSelData,
+        hora_inicio: _vSelHora.slice(0,5),
+        tipo_evento: "Visita Comercial",
+        local_evento: "Fazenda Damata, Mogi Mirim - SP",
+        notes: wpp ? "📱 WhatsApp: "+wpp : undefined,
+      })
+    }).then(r=>r.json()).then(resp=>{
+      if (resp?.google_cal_id && insertedId) {
+        fetch(SB_URL+"/rest/v1/visitas_comerciais?id=eq."+insertedId, {
+          method: "PATCH",
+          headers: { apikey:SB_KEY, Authorization:"Bearer "+SB_KEY, "Content-Type":"application/json", Prefer:"return=minimal" },
+          body: JSON.stringify({ gcal_event_id: resp.google_cal_id })
+        });
+      }
+    }).catch(()=>{});
     const fmtData = new Date(_vSelData+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
     document.getElementById("v-form").style.display = "none";
     document.getElementById("v-done").style.display = "";
