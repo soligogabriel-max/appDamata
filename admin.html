@@ -1709,6 +1709,19 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
   </div>
 </div>
 
+<!-- MODAL: Histórico do Visitante -->
+<div class="moverlay" id="m-hist-visitante" onclick="if(event.target===this)fecharHistoricoVisitante()" style="align-items:flex-end;justify-content:flex-end;">
+  <div style="background:var(--bg);width:100%;max-width:480px;height:100%;overflow-y:auto;padding:24px 20px 36px;display:flex;flex-direction:column;gap:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+      <div style="font-size:17px;font-weight:800;color:var(--dk);" id="hist-titulo">Histórico do Visitante</div>
+      <button onclick="fecharHistoricoVisitante()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--dl);padding:4px;">✕</button>
+    </div>
+    <div id="hist-body" style="display:flex;flex-direction:column;gap:18px;">
+      <div class="empty"><div class="eicon">⏳</div>Carregando...</div>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -3150,6 +3163,132 @@ async function _syncGoogleCal(evData) {
   return resp;
 }
 
+function fecharHistoricoVisitante() {
+  document.getElementById("m-hist-visitante").classList.remove("open");
+}
+
+async function abrirHistoricoVisitante(visitorId, nome, whatsapp) {
+  const modal = document.getElementById("m-hist-visitante");
+  const body  = document.getElementById("hist-body");
+  const titulo = document.getElementById("hist-titulo");
+  titulo.textContent = nome || "Visitante";
+  body.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  modal.classList.add("open");
+
+  try {
+    const fmtDt = ts => { if(!ts) return "—"; const d=new Date(ts); return d.toLocaleDateString("pt-BR",{day:"2-digit",month:"short",year:"numeric"})+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); };
+    const fmtD  = s  => { if(!s) return "—"; const [y,m,dd]=s.split("-"); return `${dd}/${m}/${y}`; };
+    const fmtR  = v  => v!=null ? "R$ "+parseFloat(v).toLocaleString("pt-BR",{minimumFractionDigits:2}) : "—";
+
+    // Busca paralela: visitas ao site, orçamentos e visitas comerciais
+    const promises = [];
+
+    // Site visits — só se tiver visitor_id
+    if (visitorId) {
+      promises.push(dbGet("site_visits", "session_id=eq."+visitorId+"&select=visited_at,device,referrer&order=visited_at.asc&limit=500"));
+    } else {
+      promises.push(Promise.resolve([]));
+    }
+
+    // Orçamentos — por visitor_id OU whatsapp
+    const orcFilters = [];
+    if (visitorId) orcFilters.push("visitor_id=eq."+visitorId);
+    if (whatsapp)  orcFilters.push("whatsapp=eq."+encodeURIComponent(whatsapp));
+    const orcQ = orcFilters.length ? (orcFilters.length>1 ? "or=("+orcFilters.join(",")+")" : orcFilters[0]) : null;
+    promises.push(orcQ ? dbGet("orcamentos", orcQ+"&select=created_at,tipo_evento,nome_noiva,nome_noivo,nome_contratante,valor_total,status&order=created_at.desc&limit=100") : Promise.resolve([]));
+
+    // Outras visitas comerciais — por visitor_id OU whatsapp
+    const vcFilters = [];
+    if (visitorId) vcFilters.push("visitor_id=eq."+visitorId);
+    if (whatsapp)  vcFilters.push("whatsapp=eq."+encodeURIComponent(whatsapp));
+    const vcQ = vcFilters.length ? (vcFilters.length>1 ? "or=("+vcFilters.join(",")+")" : vcFilters[0]) : null;
+    promises.push(vcQ ? dbGet("visitas_comerciais", vcQ+"&select=created_at,status,slot_id,slots_visita(data,hora)&order=created_at.desc&limit=50") : Promise.resolve([]));
+
+    const [siteVisits, orcamentos, vcVisitas] = await Promise.all(promises);
+
+    // ── Seção: Dados do visitante ──
+    const wppLink = whatsapp
+      ? `<a href="https://wa.me/55${whatsapp.replace(/\D/g,'')}" target="_blank" style="color:var(--a);font-weight:600;">${whatsapp}</a>`
+      : '<span style="color:var(--dl);">Não informado</span>';
+
+    // ── Seção: Visitas ao site ──
+    let siteHtml = '<div style="color:var(--dl);font-size:13px;">Sem rastreamento de sessão.</div>';
+    if (siteVisits.length) {
+      const first = siteVisits[0], last = siteVisits[siteVisits.length-1];
+      const devices = [...new Set(siteVisits.map(r=>r.device||"?"))].join(", ");
+      siteHtml = `
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+          <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+            <div style="font-size:20px;font-weight:800;color:var(--a);">${siteVisits.length}</div>
+            <div style="font-size:11px;color:var(--dl);">visitas ao site</div>
+          </div>
+          <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;">
+            <div style="font-size:12px;font-weight:700;color:var(--dk);">${devices}</div>
+            <div style="font-size:11px;color:var(--dl);">dispositivo(s)</div>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--dl);">Primeira visita: <b>${fmtDt(first.visited_at)}</b></div>
+        <div style="font-size:12px;color:var(--dl);">Última visita: <b>${fmtDt(last.visited_at)}</b></div>`;
+    }
+
+    // ── Seção: Orçamentos ──
+    const statusOrcLabel = { lead:"🔵 Lead", enviado:"📩 Enviado", convertido:"✅ Convertido", descartado:"❌ Descartado" };
+    let orcHtml = '<div style="color:var(--dl);font-size:13px;">Nenhum orçamento encontrado.</div>';
+    if (orcamentos.length) {
+      orcHtml = orcamentos.map(o => {
+        const nomeOrc = [o.nome_noiva, o.nome_noivo, o.nome_contratante].filter(Boolean).join(" / ") || "—";
+        return `<div style="background:var(--bg2);border-radius:8px;padding:10px 12px;font-size:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:4px;">
+            <div style="font-weight:700;color:var(--dk);">${o.tipo_evento||"Evento"} · ${nomeOrc}</div>
+            <div style="white-space:nowrap;color:var(--dl);">${fmtDt(o.created_at).slice(0,9)}</div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <span>${statusOrcLabel[o.status]||o.status||"—"}</span>
+            <span style="color:var(--a);font-weight:700;">${fmtR(o.valor_total)}</span>
+          </div>
+        </div>`;
+      }).join("");
+    }
+
+    // ── Seção: Visitas comerciais ──
+    const statusVcLabel = { agendada:"🟡 Agendada", realizada:"✅ Realizada", cancelada:"❌ Cancelada", nao_compareceu:"⚠️ Não compareceu" };
+    let vcHtml = '<div style="color:var(--dl);font-size:13px;">Nenhuma visita encontrada.</div>';
+    if (vcVisitas.length) {
+      vcHtml = vcVisitas.map(v => {
+        const slotStr = v.slots_visita ? fmtD(v.slots_visita.data)+" às "+(v.slots_visita.hora||"").slice(0,5) : "—";
+        return `<div style="background:var(--bg2);border-radius:8px;padding:10px 12px;font-size:12px;display:flex;justify-content:space-between;align-items:center;">
+          <div style="font-weight:700;color:var(--dk);">📅 ${slotStr}</div>
+          <div>${statusVcLabel[v.status]||v.status}</div>
+        </div>`;
+      }).join("");
+    }
+
+    body.innerHTML = `
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;">Contato</div>
+        <div style="font-size:14px;">WhatsApp: ${wppLink}</div>
+        ${visitorId ? `<div style="font-size:11px;color:var(--dl);margin-top:4px;">ID rastreado: <code style="font-size:10px;">${visitorId.slice(0,8)}…</code></div>` : ''}
+      </div>
+      <hr style="border:none;border-top:1px solid var(--br);">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px;">Visitas ao Site</div>
+        ${siteHtml}
+      </div>
+      <hr style="border:none;border-top:1px solid var(--br);">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px;">Orçamentos (${orcamentos.length})</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">${orcHtml}</div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--br);">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px;">Visitas Comerciais (${vcVisitas.length})</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">${vcHtml}</div>
+      </div>`;
+  } catch(e) {
+    body.innerHTML = `<div class="empty"><div class="eicon">⚠️</div>Erro: ${e.message}</div>`;
+  }
+}
+
 async function vcSyncGCal(vcId, btn) {
   btn.disabled = true; btn.textContent = "⏳";
   try {
@@ -3486,7 +3625,7 @@ async function _vcLoadAgendadas() {
       </tr></thead>
       <tbody>${visitas.map((v,i)=>`<tr style="background:${i%2?"var(--bg2)":"transparent"}">
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);font-weight:600;">${fmtSlot(v.slot_id)}</td>
-        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.nome||"—"}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.nome ? `<button onclick='abrirHistoricoVisitante(${JSON.stringify(v.visitor_id||null)},${JSON.stringify(v.nome||"")},${JSON.stringify(v.whatsapp||null)})' style='background:none;border:none;cursor:pointer;color:var(--a);font-weight:600;font-size:13px;text-decoration:underline;text-underline-offset:2px;padding:0;'>${v.nome}</button>` : "—"}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.whatsapp?`<a href="https://wa.me/55${v.whatsapp.replace(/\D/g,'')}" target="_blank" style="color:var(--a);">${v.whatsapp}</a>`:"—"}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${statusLabel[v.status]||v.status}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">
