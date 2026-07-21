@@ -9276,7 +9276,7 @@ async function sendWppLembretes() {
     const res = await fetch(SB_URL + "/functions/v1/enviar-lembretes-wpp", {
       method: "POST",
       headers: { "apikey": SB_KEY, "Authorization": "Bearer " + _authToken, "Content-Type": "application/json" },
-      body: JSON.stringify({ vencimento_de: de, vencimento_ate: ate }),
+      body: JSON.stringify({ vencimento_de: de, vencimento_ate: ate, ...((_wppModo === "atrasados") ? { modo: "atrasados" } : {}) }),
     });
     const resp = await res.json();
     let html = "";
