@@ -5,6 +5,11 @@
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "apikey, authorization, content-type",
+};
+
 function fmt(v: number) {
   return "R$ " + Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
 }
@@ -57,10 +62,12 @@ td{padding:8px 0;border-bottom:1px solid #f0f0f0;font-size:13px}
 ${body}
 </div>
 </body>
-</html>`, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+</html>`, { headers: { "Content-Type": "text/html; charset=utf-8", ...CORS } });
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+
   const url = new URL(req.url);
   const id = url.searchParams.get("id") ?? "";
 
