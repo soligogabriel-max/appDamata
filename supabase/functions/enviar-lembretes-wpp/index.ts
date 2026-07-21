@@ -1,17 +1,15 @@
 // Supabase Edge Function: enviar-lembretes-wpp
-// Envia lembretes de vencimento de parcelas via WhatsApp (Meta Cloud API).
+// Envia lembretes de vencimento/atraso de parcelas via WhatsApp (Meta Cloud API).
 //
-// Secrets necessários (Project Settings -> Edge Functions -> Secrets):
-//   META_WPP_TOKEN    = Bearer token permanente do Meta Cloud API
-//   META_WPP_PHONE_ID = Phone Number ID do WhatsApp Business
-//   META_WPP_TEMPLATE = Nome do template aprovado (padrão: lembrete_vencimento)
+// Secrets necessários:
+//   META_WPP_TOKEN          = Bearer token permanente do Meta Cloud API
+//   META_WPP_PHONE_ID       = Phone Number ID do WhatsApp Business
+//   META_WPP_TEMPLATE       = Template para parcelas vencendo (padrão: parcela_vencimento_damata)
+//   META_WPP_TEMPLATE_ATRASO = Template para parcelas atrasadas (padrão: cobranca_atraso_damata)
 //
-// Template sugerido para criar no Meta Business Manager (categoria UTILITY, pt_BR):
-//   Corpo: "Olá {{1}}! Passando para lembrar que a parcela {{2}}/{{3}} no valor
-//   de R$ {{4}} referente ao seu evento na Fazenda Damata vence em {{5}}.
-//   Qualquer dúvida estamos à disposição. 🌿"
-//
-// Supabase injeta automaticamente: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// Payload POST:
+//   { vencimento_de, vencimento_ate }          → modo vencimento (uma msg por parcela)
+//   { vencimento_de, vencimento_ate, modo: "atrasados" } → modo atraso (uma msg por evento com lista)
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -40,7 +38,32 @@ function fmtDate(dateStr: string): string {
 }
 
 function fmtVal(val: number): string {
-  return Number(val).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+  return "R$ " + Number(val).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
+}
+
+async function sendTemplate(
+  metaUrl: string, token: string,
+  phone: string, templateName: string,
+  params: string[]
+) {
+  const res = await fetch(metaUrl, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: phone,
+      type: "template",
+      template: {
+        name: templateName,
+        language: { code: "pt_BR" },
+        components: [{
+          type: "body",
+          parameters: params.map((text) => ({ type: "text", text })),
+        }],
+      },
+    }),
+  });
+  return res.json();
 }
 
 Deno.serve(async (req) => {
@@ -49,39 +72,32 @@ Deno.serve(async (req) => {
 
   const token = Deno.env.get("META_WPP_TOKEN");
   const phoneId = Deno.env.get("META_WPP_PHONE_ID");
-  const templateName = Deno.env.get("META_WPP_TEMPLATE") || "lembrete_vencimento";
+  const templateVencimento = Deno.env.get("META_WPP_TEMPLATE") || "parcela_vencimento_damata";
+  const templateAtraso = Deno.env.get("META_WPP_TEMPLATE_ATRASO") || "cobranca_atraso_damata";
 
   if (!token || !phoneId) {
-    return json({ error: "Configure META_WPP_TOKEN e META_WPP_PHONE_ID nos secrets da Edge Function." }, 500);
+    return json({ error: "Configure META_WPP_TOKEN e META_WPP_PHONE_ID nos secrets." }, 500);
   }
 
-  let payload: { dias?: number; vencimento_de?: string; vencimento_ate?: string } = {};
-  try {
-    payload = await req.json();
-  } catch {
-    return json({ error: "JSON inválido." }, 400);
-  }
+  let payload: { dias?: number; vencimento_de?: string; vencimento_ate?: string; modo?: string } = {};
+  try { payload = await req.json(); } catch { return json({ error: "JSON inválido." }, 400); }
 
-  // Período padrão: hoje até hoje + N dias
-  const dias = payload.dias ?? 3;
   const hoje = new Date();
   const inicio = payload.vencimento_de ?? hoje.toISOString().slice(0, 10);
   const fimDate = new Date(hoje);
-  fimDate.setDate(fimDate.getDate() + dias);
+  fimDate.setDate(fimDate.getDate() + (payload.dias ?? 3));
   const fim = payload.vencimento_ate ?? fimDate.toISOString().slice(0, 10);
+  const modoAtraso = payload.modo === "atrasados";
 
   const SB_URL = Deno.env.get("SUPABASE_URL")!;
   const SB_SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sbH = {
-    apikey: SB_SR,
-    Authorization: "Bearer " + SB_SR,
-    "Content-Type": "application/json",
-  };
+  const sbH = { apikey: SB_SR, Authorization: "Bearer " + SB_SR, "Content-Type": "application/json" };
+  const META_URL = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
 
   // 1. Busca parcelas pendentes no período
   const recRes = await fetch(
     `${SB_URL}/rest/v1/contas_a_receber?status=eq.NP&vencimento=gte.${inicio}&vencimento=lte.${fim}&deleted_at=is.null` +
-    `&select=id,cod_evento,parcela,num_parcela,valor,vencimento&order=vencimento.asc&limit=500`,
+    `&select=id,cod_evento,parcela,num_parcela,valor,vencimento&order=cod_evento.asc,vencimento.asc&limit=500`,
     { headers: sbH },
   );
   const parcelas: Array<{ id: string; cod_evento: string; parcela: string; num_parcela: string; valor: number; vencimento: string }> =
@@ -91,95 +107,121 @@ Deno.serve(async (req) => {
     return json({ ok: true, enviados: 0, msg: "Nenhuma parcela pendente no período.", periodo: { de: inicio, ate: fim } });
   }
 
-  // 2. Busca telefone do cliente via ficha_do_evento
+  // 2. Busca dados do evento e ficha do cliente
   const codEventos = [...new Set(parcelas.map((p) => p.cod_evento).filter(Boolean))];
-  const fichaRes = await fetch(
-    `${SB_URL}/rest/v1/ficha_do_evento?cod=in.(${codEventos.map(encodeURIComponent).join(",")})` +
-    `&select=cod,nome_contratante,celular&limit=500`,
-    { headers: sbH },
-  );
+
+  const [fichaRes, agendaRes] = await Promise.all([
+    fetch(`${SB_URL}/rest/v1/ficha_do_evento?cod=in.(${codEventos.map(encodeURIComponent).join(",")})&select=cod,nome_contratante,celular&limit=500`, { headers: sbH }),
+    fetch(`${SB_URL}/rest/v1/agenda?cod=in.(${codEventos.map(encodeURIComponent).join(",")})&select=cod,nome_evento&limit=500`, { headers: sbH }),
+  ]);
   const fichas: Array<{ cod: string; nome_contratante: string; celular: string }> = await fichaRes.json();
+  const eventos: Array<{ cod: string; nome_evento: string }> = await agendaRes.json();
+
   const fichaMap: Record<string, { nome_contratante: string; celular: string }> = {};
   fichas.forEach((f) => { fichaMap[f.cod] = f; });
+  const eventoMap: Record<string, string> = {};
+  eventos.forEach((e) => { eventoMap[e.cod] = e.nome_evento; });
 
-  // 3. Envia mensagens via Meta Cloud API
   const enviados: string[] = [];
   const erros: Array<{ cod_evento: string; parcela: string; erro: string }> = [];
-  const META_URL = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
 
-  for (const p of parcelas) {
-    const ficha = fichaMap[p.cod_evento];
-    if (!ficha?.celular) {
-      erros.push({ cod_evento: p.cod_evento, parcela: p.parcela ?? "?", erro: "Sem telefone cadastrado em ficha_do_evento" });
-      continue;
+  if (modoAtraso) {
+    // ── Modo atrasados: uma mensagem por evento com lista completa ──
+    // Agrupa parcelas por cod_evento
+    const porEvento: Record<string, typeof parcelas> = {};
+    for (const p of parcelas) {
+      if (!porEvento[p.cod_evento]) porEvento[p.cod_evento] = [];
+      porEvento[p.cod_evento].push(p);
     }
 
-    const phone = normalizePhone(ficha.celular);
-    if (!phone || phone.length < 13) {
-      erros.push({ cod_evento: p.cod_evento, parcela: p.parcela ?? "?", erro: `Telefone inválido: ${ficha.celular}` });
-      continue;
-    }
-
-    const primeiroNome = (ficha.nome_contratante || "Cliente").split(" ")[0];
-
-    const body = {
-      messaging_product: "whatsapp",
-      to: phone,
-      type: "template",
-      template: {
-        name: templateName,
-        language: { code: "pt_BR" },
-        components: [
-          {
-            type: "body",
-            parameters: [
-              { type: "text", text: primeiroNome },
-              { type: "text", text: String(p.parcela ?? "?") },
-              { type: "text", text: String(p.num_parcela ?? "?") },
-              { type: "text", text: fmtVal(p.valor ?? 0) },
-              { type: "text", text: fmtDate(p.vencimento) },
-            ],
-          },
-        ],
-      },
-    };
-
-    try {
-      const res = await fetch(META_URL, {
-        method: "POST",
-        headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (data.error) {
-        erros.push({ cod_evento: p.cod_evento, parcela: p.parcela ?? "?", erro: data.error.message });
-      } else {
-        enviados.push(`${p.cod_evento} parc.${p.parcela ?? "?"}/${p.num_parcela ?? "?"} → ${phone}`);
-        // Salva no histórico WhatsApp
-        await fetch(`${SB_URL}/rest/v1/wpp_mensagens`, {
-          method: "POST",
-          headers: { ...sbH, Prefer: "return=minimal" },
-          body: JSON.stringify({
-            telefone: phone,
-            mensagem: `[Cobrança] Parcela ${p.parcela ?? "?"}/${p.num_parcela ?? "?"} — R$ ${fmtVal(p.valor ?? 0)} — vence ${fmtDate(p.vencimento)}`,
-            direcao: "enviada",
-            nome: ficha.nome_contratante || null,
-            tipo: "template",
-            wamid: data.messages?.[0]?.id || null,
-          }),
-        });
+    for (const [cod, itens] of Object.entries(porEvento)) {
+      const ficha = fichaMap[cod];
+      if (!ficha?.celular) {
+        erros.push({ cod_evento: cod, parcela: "—", erro: "Sem telefone em ficha_do_evento" });
+        continue;
       }
-    } catch (e) {
-      erros.push({ cod_evento: p.cod_evento, parcela: p.parcela ?? "?", erro: String(e) });
+      const phone = normalizePhone(ficha.celular);
+      if (!phone || phone.length < 13) {
+        erros.push({ cod_evento: cod, parcela: "—", erro: `Telefone inválido: ${ficha.celular}` });
+        continue;
+      }
+
+      const nome = (ficha.nome_contratante || "Cliente").split(" ")[0];
+      const nomeEvento = eventoMap[cod] || cod;
+
+      // Monta lista de parcelas
+      const lista = itens
+        .map((p) => `Parcela ${p.parcela ?? "?"}/${p.num_parcela ?? "?"} - venceu ${fmtDate(p.vencimento)} - ${fmtVal(p.valor ?? 0)}`)
+        .join("\n");
+
+      try {
+        const data = await sendTemplate(META_URL, token, phone, templateAtraso, [nome, nomeEvento, lista]);
+        if (data.error) {
+          erros.push({ cod_evento: cod, parcela: "—", erro: data.error.message });
+        } else {
+          enviados.push(`${cod} (${itens.length} parcela(s)) → ${phone}`);
+          await fetch(`${SB_URL}/rest/v1/wpp_mensagens`, {
+            method: "POST",
+            headers: { ...sbH, Prefer: "return=minimal" },
+            body: JSON.stringify({
+              telefone: phone,
+              mensagem: `[Atraso] ${nomeEvento} — ${itens.length} parcela(s) em atraso:\n${lista}`,
+              direcao: "enviada",
+              nome: ficha.nome_contratante || null,
+              tipo: "template",
+              wamid: data.messages?.[0]?.id || null,
+            }),
+          });
+        }
+      } catch (e) {
+        erros.push({ cod_evento: cod, parcela: "—", erro: String(e) });
+      }
+    }
+  } else {
+    // ── Modo vencimento: uma mensagem por parcela ──
+    for (const p of parcelas) {
+      const ficha = fichaMap[p.cod_evento];
+      if (!ficha?.celular) {
+        erros.push({ cod_evento: p.cod_evento, parcela: p.parcela ?? "?", erro: "Sem telefone em ficha_do_evento" });
+        continue;
+      }
+      const phone = normalizePhone(ficha.celular);
+      if (!phone || phone.length < 13) {
+        erros.push({ cod_evento: p.cod_evento, parcela: p.parcela ?? "?", erro: `Telefone inválido: ${ficha.celular}` });
+        continue;
+      }
+
+      const nome = (ficha.nome_contratante || "Cliente").split(" ")[0];
+
+      try {
+        const data = await sendTemplate(META_URL, token, phone, templateVencimento, [
+          nome,
+          `${p.parcela ?? "?"}/${p.num_parcela ?? "?"}`,
+          fmtVal(p.valor ?? 0),
+          fmtDate(p.vencimento),
+        ]);
+        if (data.error) {
+          erros.push({ cod_evento: p.cod_evento, parcela: p.parcela ?? "?", erro: data.error.message });
+        } else {
+          enviados.push(`${p.cod_evento} parc.${p.parcela ?? "?"}/${p.num_parcela ?? "?"} → ${phone}`);
+          await fetch(`${SB_URL}/rest/v1/wpp_mensagens`, {
+            method: "POST",
+            headers: { ...sbH, Prefer: "return=minimal" },
+            body: JSON.stringify({
+              telefone: phone,
+              mensagem: `[Cobrança] Parcela ${p.parcela ?? "?"}/${p.num_parcela ?? "?"} — ${fmtVal(p.valor ?? 0)} — vence ${fmtDate(p.vencimento)}`,
+              direcao: "enviada",
+              nome: ficha.nome_contratante || null,
+              tipo: "template",
+              wamid: data.messages?.[0]?.id || null,
+            }),
+          });
+        }
+      } catch (e) {
+        erros.push({ cod_evento: p.cod_evento, parcela: p.parcela ?? "?", erro: String(e) });
+      }
     }
   }
 
-  return json({
-    ok: true,
-    enviados: enviados.length,
-    erros,
-    lista: enviados,
-    periodo: { de: inicio, ate: fim },
-    total_parcelas: parcelas.length,
-  });
+  return json({ ok: true, enviados: enviados.length, erros, lista: enviados, periodo: { de: inicio, ate: fim }, total_parcelas: parcelas.length });
 });
