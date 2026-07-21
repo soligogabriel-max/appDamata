@@ -155,6 +155,19 @@ Deno.serve(async (req) => {
         erros.push({ cod_evento: p.cod_evento, parcela: p.parcela ?? "?", erro: data.error.message });
       } else {
         enviados.push(`${p.cod_evento} parc.${p.parcela ?? "?"}/${p.num_parcela ?? "?"} → ${phone}`);
+        // Salva no histórico WhatsApp
+        await fetch(`${SB_URL}/rest/v1/wpp_mensagens`, {
+          method: "POST",
+          headers: { ...sbH, Prefer: "return=minimal" },
+          body: JSON.stringify({
+            telefone: phone,
+            mensagem: `[Cobrança] Parcela ${p.parcela ?? "?"}/${p.num_parcela ?? "?"} — R$ ${fmtVal(p.valor ?? 0)} — vence ${fmtDate(p.vencimento)}`,
+            direcao: "enviada",
+            nome: ficha.nome_contratante || null,
+            tipo: "template",
+            wamid: data.messages?.[0]?.id || null,
+          }),
+        });
       }
     } catch (e) {
       erros.push({ cod_evento: p.cod_evento, parcela: p.parcela ?? "?", erro: String(e) });
