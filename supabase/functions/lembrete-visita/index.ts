@@ -94,6 +94,14 @@ Deno.serve(async (req) => {
       const nome  = (v.nome || "").split(" ")[0];
 
       const r = await sendTemplate(phone, nome, dataFmt, hora, link);
+      if (r.messages) {
+        // Salva mensagem enviada no histórico
+        await fetch(`${SB_URL}/rest/v1/wpp_mensagens`, {
+          method: "POST",
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+          body: JSON.stringify({ telefone: phone, mensagem: `[Lembrete de visita] ${dataFmt} às ${hora} — ${link}`, direcao: "enviada", nome: v.nome || null, tipo: "template", wamid: r.messages[0]?.id || null }),
+        });
+      }
       results.push({ id: v.id, phone, status: r.messages ? "enviado" : "erro", detail: r });
     }
 

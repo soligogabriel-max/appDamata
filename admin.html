@@ -82,6 +82,10 @@ button{cursor:pointer;}
 .dc-sub{font-size:11px;color:var(--dl);min-height:14px;}
 .dc-up{color:#16a34a;font-weight:700;}
 .dc-dn{color:#dc2626;font-weight:700;}
+.wpp-contact-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--br);transition:background .1s;}
+.wpp-contact-item:hover{background:var(--bg);}
+.wpp-contact-item.wpp-selected{background:var(--a);color:#fff;}
+.wpp-contact-item.wpp-selected span{color:#fff!important;}
 .acard{background:#fff;border-radius:24px;padding:32px 26px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(46,60,68,.22);}
 .logo-w{display:flex;flex-direction:column;align-items:center;margin-bottom:20px;}
 .logo-n{font-size:18px;font-weight:700;color:var(--dk);letter-spacing:4px;margin-top:9px;}
@@ -365,7 +369,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.20a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -592,6 +596,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         <button class="tab" onclick="setTab('relatorio');closeGrps()" id="t-relatorio">📋 Faturamento</button>
         <button class="tab" onclick="setTab('relorc');closeGrps()" id="t-relorc">💬 Orçamentos</button>
         <button class="tab" onclick="setTab('visitas');closeGrps()" id="t-visitas">📊 Visitas do Site</button>
+        <button class="tab" onclick="setTab('whatsapp');closeGrps()" id="t-whatsapp">💬 WhatsApp</button>
       </div>
     </div>
 
@@ -1111,6 +1116,31 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
         <div class="sec-t" style="font-size:14px;margin-bottom:10px;">Últimos 30 dias</div>
         <div id="vis-tabela" style="overflow-x:auto;"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
+      </div>
+    </div>
+    <div id="p-whatsapp" class="panel">
+      <div class="uwrap" style="max-width:960px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;">
+          <div class="sec-t" style="margin-bottom:0">💬 WhatsApp — Histórico</div>
+          <button onclick="renderWhatsApp()" style="margin-left:auto;padding:6px 14px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dl);">↻ Atualizar</button>
+        </div>
+        <div style="display:flex;gap:0;height:560px;border:1px solid var(--br);border-radius:12px;overflow:hidden;background:var(--bg);">
+          <!-- Coluna: lista de contatos -->
+          <div id="wpp-contacts" style="width:260px;min-width:180px;border-right:1px solid var(--br);overflow-y:auto;background:var(--bg2);">
+            <div style="padding:12px 14px;font-size:12px;font-weight:700;color:var(--dl);border-bottom:1px solid var(--br);letter-spacing:.4px;">CONTATOS</div>
+            <div id="wpp-contact-list"><div style="padding:20px;text-align:center;font-size:13px;color:var(--dl);">⏳ Carregando…</div></div>
+          </div>
+          <!-- Coluna: mensagens -->
+          <div style="flex:1;display:flex;flex-direction:column;min-width:0;">
+            <div id="wpp-chat-header" style="padding:12px 16px;border-bottom:1px solid var(--br);font-size:14px;font-weight:700;color:var(--dt);background:var(--bg2);">
+              Selecione um contato
+            </div>
+            <div id="wpp-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px;">
+              <div style="text-align:center;font-size:13px;color:var(--dl);margin-top:60px;">← Selecione um contato para ver o histórico</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:12px;font-size:11px;color:var(--dl);">Mensagens recebidas via WhatsApp Cloud API. Outbound via templates (lembretes automáticos).</div>
       </div>
     </div>
     <div id="p-fotoslanding" class="panel">
@@ -2210,7 +2240,7 @@ const TAB_GRP={
   receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro", socios:"grp-financeiro",
   fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros", naturezas:"grp-cadastros", assessorias:"grp-cadastros",
   pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin",
-  relatorio:"grp-relatorios", relorc:"grp-relatorios", visitas:"grp-relatorios"
+  relatorio:"grp-relatorios", relorc:"grp-relatorios", visitas:"grp-relatorios", whatsapp:"grp-relatorios"
 };
 function toggleGrp(id){
   const el=document.getElementById(id);
@@ -2237,7 +2267,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",vc:"p-vc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas"};
+  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",vc:"p-vc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas",whatsapp:"p-whatsapp"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(cfilter);
   if(t==="receber") renderReceber();
@@ -2261,6 +2291,7 @@ function setTab(t) {
   if(t==="naturezas") renderNaturezas();
   if(t==="socios") renderContaSocios();
   if(t==="visitas") renderVisitas();
+  if(t==="whatsapp") renderWhatsApp();
   if(t==="dashboard") renderDashboard();
   if(t==="vc") renderVC();
 }
@@ -3886,6 +3917,93 @@ async function renderVisitas() {
     ["vis-total-hoje","vis-uniq-hoje","vis-total-mes","vis-uniq-mes"].forEach(id => document.getElementById(id).textContent = "—");
   }
 }
+
+/* ── WhatsApp Histórico ───────────────────────────────────────── */
+let _wppTel = null; // telefone selecionado
+
+async function renderWhatsApp() {
+  const list = document.getElementById("wpp-contact-list");
+  list.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;color:var(--dl);">⏳ Carregando…</div>';
+  document.getElementById("wpp-messages").innerHTML = '<div style="text-align:center;font-size:13px;color:var(--dl);margin-top:60px;">← Selecione um contato</div>';
+  document.getElementById("wpp-chat-header").textContent = "Selecione um contato";
+  try {
+    // Busca últimas mensagens agrupadas por telefone
+    const rows = await dbGet("wpp_mensagens", "select=telefone,nome,mensagem,direcao,created_at&order=created_at.desc&limit=2000");
+
+    // Agrupa por telefone, pega a última mensagem e nome de cada
+    const byTel = {};
+    rows.forEach(r => {
+      if (!byTel[r.telefone]) {
+        byTel[r.telefone] = { tel: r.telefone, nome: r.nome, ultima: r.mensagem, dir: r.direcao, at: r.created_at, count: 0 };
+      }
+      byTel[r.telefone].count++;
+    });
+
+    const contatos = Object.values(byTel).sort((a,b) => b.at.localeCompare(a.at));
+    if (!contatos.length) {
+      list.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;color:var(--dl);">Nenhuma mensagem ainda.</div>';
+      return;
+    }
+
+    list.innerHTML = contatos.map(c => {
+      const fmtDate = d => {
+        const dt = new Date(d);
+        const hoje = new Date();
+        if (dt.toDateString() === hoje.toDateString()) return dt.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+        return dt.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"});
+      };
+      const telFmt = t => t.replace(/^55(\d{2})(\d{4,5})(\d{4})$/, "($1) $2-$3");
+      const label = c.nome || telFmt(c.tel);
+      const preview = (c.ultima||"").slice(0,40) + (c.ultima?.length>40?"…":"");
+      return `<div class="wpp-contact-item" data-tel="${c.tel}" onclick="wppSelectContact('${c.tel}','${(c.nome||"").replace(/'/g,"\\'")}')">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:4px;">
+          <span style="font-weight:700;font-size:13px;color:var(--dt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${label}</span>
+          <span style="font-size:10px;color:var(--dl);white-space:nowrap;">${fmtDate(c.at)}</span>
+        </div>
+        <div style="font-size:11px;color:var(--dl);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.dir==="recebida"?"↩ ":"↪ "}${preview}</div>
+      </div>`;
+    }).join("");
+
+    // Reseleciona contato anterior se ainda existir
+    if (_wppTel && byTel[_wppTel]) wppSelectContact(_wppTel, byTel[_wppTel].nome || "");
+
+  } catch(e) {
+    list.innerHTML = `<div style="padding:16px;font-size:12px;color:var(--er);">Erro: ${e.message}</div>`;
+  }
+}
+
+async function wppSelectContact(tel, nome) {
+  _wppTel = tel;
+  // Marca selecionado
+  document.querySelectorAll(".wpp-contact-item").forEach(el => el.classList.toggle("wpp-selected", el.dataset.tel===tel));
+
+  const telFmt = t => t.replace(/^55(\d{2})(\d{4,5})(\d{4})$/, "($1) $2-$3");
+  const label = nome || telFmt(tel);
+  document.getElementById("wpp-chat-header").innerHTML = `<span>${label}</span> <span style="font-size:11px;font-weight:400;color:var(--dl);">${telFmt(tel)}</span>`;
+
+  const box = document.getElementById("wpp-messages");
+  box.innerHTML = '<div style="text-align:center;font-size:13px;color:var(--dl);">⏳ Carregando…</div>';
+
+  try {
+    const rows = await dbGet("wpp_mensagens", `telefone=eq.${tel}&select=mensagem,direcao,created_at,tipo,wamid&order=created_at.asc&limit=500`);
+    if (!rows.length) { box.innerHTML = '<div style="text-align:center;font-size:13px;color:var(--dl);margin-top:40px;">Nenhuma mensagem com este contato.</div>'; return; }
+
+    const fmtDt = d => new Date(d).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+    box.innerHTML = rows.map(r => {
+      const out = r.direcao === "enviada";
+      return `<div style="display:flex;justify-content:${out?"flex-end":"flex-start"};">
+        <div style="max-width:70%;background:${out?"var(--a)":"var(--bg2)"};color:${out?"#fff":"var(--dt)"};border-radius:${out?"12px 12px 2px 12px":"12px 12px 12px 2px"};padding:8px 12px;font-size:13px;line-height:1.5;">
+          <div style="word-break:break-word;">${(r.mensagem||"").replace(/\n/g,"<br>")}</div>
+          <div style="font-size:10px;opacity:.7;margin-top:4px;text-align:right;">${fmtDt(r.created_at)}${r.tipo==="template"?" · template":""}</div>
+        </div>
+      </div>`;
+    }).join("");
+    box.scrollTop = box.scrollHeight;
+  } catch(e) {
+    box.innerHTML = `<div style="text-align:center;font-size:12px;color:var(--er);">Erro: ${e.message}</div>`;
+  }
+}
+
 
 // ── Gerar Contrato a partir de usuário ──
 let _gcUser = null;
