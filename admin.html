@@ -369,7 +369,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21e</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21f</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -4417,7 +4417,7 @@ function statusBadgeVenc(s,venc){
   return '<span class="stbadge pend">Pendente</span>';
 }
 
-let _recFiltrado=[], _recAgendaMap={}, _recConcilMap={};
+let _recFiltrado=[], _recAgendaMap={}, _recConcilMap={}, _recConcilTituloMap={};
 
 async function renderReceber(){
   const wr=document.getElementById("rec-list"); wr.innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
@@ -4455,14 +4455,18 @@ async function renderReceber(){
       <div class="tot-card"><div class="tot-lbl">Títulos</div><div class="tot-val">${filtrado.length}</div></div>`;
     // Carrega extrato SEM filtro de mês para pegar conciliações de qualquer data
     const agendaMap = agendaMapRec;
-    const extratoRows = await dbGet("extrato_bancario","select=id_extrato_c6,titulo_a_receber,entrada&titulo_a_receber=not.is.null&limit=2000");
+    const extratoRows = await dbGet("extrato_bancario","select=id_extrato_c6,titulo_a_receber,entrada,titulo&titulo_a_receber=not.is.null&limit=2000");
     // Deduplica extrato por id_extrato_c6 antes de montar mapa
     const seenExt=new Set();
     const extratoDedup=extratoRows.filter(e=>{ if(seenExt.has(e.id_extrato_c6)){return false;} seenExt.add(e.id_extrato_c6); return true; });
-    const concilMap = {};
-    extratoDedup.forEach(e=>{ const k=String(e.titulo_a_receber); concilMap[k]=(concilMap[k]||0)+(e.entrada||0); });
+    const concilMap = {}; const concilTituloMap = {};
+    extratoDedup.forEach(e=>{
+      const k=String(e.titulo_a_receber);
+      concilMap[k]=(concilMap[k]||0)+(e.entrada||0);
+      if(e.titulo){ concilTituloMap[k]=concilTituloMap[k]?concilTituloMap[k]+", "+e.titulo:e.titulo; }
+    });
 
-    _recFiltrado=filtrado; _recAgendaMap=agendaMap; _recConcilMap=concilMap;
+    _recFiltrado=filtrado; _recAgendaMap=agendaMap; _recConcilMap=concilMap; _recConcilTituloMap=concilTituloMap;
     if(!filtrado.length){ wr.innerHTML='<div class="empty"><div class="eicon">💰</div>Nenhum título encontrado.</div>'; return; }
     wr.innerHTML=`
     <div id="rec-bulk-bar" style="display:none;align-items:center;gap:10px;padding:8px 12px;background:var(--al);border:1.5px solid var(--am);border-radius:10px;margin-bottom:8px;">
@@ -4471,7 +4475,7 @@ async function renderReceber(){
       <button class="btn-cancel" style="padding:5px 14px;font-size:12px;" onclick="_recClearSel()">Limpar seleção</button>
     </div>
     <div class="table-wrap"><table class="fin-table">
-      <thead><tr><th style="width:32px;"><input type="checkbox" id="rec-chk-all" onchange="_recToggleAll(this)" style="cursor:pointer;"/></th><th>Vencimento</th><th>Cód.</th><th>Evento</th><th>Natureza</th><th>Parcela</th><th>Valor</th><th>Conciliado</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th style="width:32px;"><input type="checkbox" id="rec-chk-all" onchange="_recToggleAll(this)" style="cursor:pointer;"/></th><th>Vencimento</th><th>Cód.</th><th>Evento</th><th>Natureza</th><th>Parcela</th><th>Valor</th><th>Conciliado</th><th>Título Extrato</th><th>Status</th><th></th></tr></thead>
       <tbody>${filtrado.map(r=>{
         const nomeEv=agendaMap[r.cod_evento]||"";
         const concil=concilMap[String(r.id)]||0;
@@ -4479,6 +4483,7 @@ async function renderReceber(){
         const isAtras=!isPago&&r.vencimento&&new Date(r.vencimento)<hoje;
         const badge=isPago?'<span class="stbadge pago">Pago</span>':(isAtras?'<span class="stbadge atras">Atrasado</span>':'<span class="stbadge pend">Pendente</span>');
         const rj=_esc(JSON.stringify(r));
+        const tituloExt=(_recConcilTituloMap||{})[String(r.id)]||"";
         return`<tr>
           <td><input type="checkbox" class="rec-chk" data-id="${r.id}" onchange="_recChkChange()" style="cursor:pointer;"/></td>
           <td>${fmtDate(r.vencimento)}</td>
@@ -4488,6 +4493,7 @@ async function renderReceber(){
           <td style="color:var(--dm);">${r.parcela||r.num_parcela||"—"}</td>
           <td style="font-weight:700;color:#1A4A7C;">${fmt(r.valor)}</td>
           <td style="font-weight:600;color:${concil>0?"#2A6644":"var(--dl)"};">${concil>0?fmt(concil):"—"}</td>
+          <td style="font-size:11px;color:var(--dl);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(tituloExt)}">${tituloExt||"—"}</td>
           <td>${badge}</td>
           <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openCrud("contas_a_receber",JSON.parse(this.dataset.r),renderReceber)' data-r="${rj}">✏️</button></div></td>
         </tr>`;
