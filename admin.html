@@ -369,7 +369,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21d</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21e</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -7272,6 +7272,57 @@ function _renderContratosTabela(rows) {
     </tbody></table>`;
 }
 
+function _showAssinaturaModal(cod, data) {
+  const sigs = data.signatures || [];
+  const total = data.total || sigs.length;
+  const assinados = data.assinados || sigs.filter(s=>s.signed).length;
+  const todos = data.todosAssinaram || assinados === total;
+  const pct = total > 0 ? Math.round(assinados / total * 100) : 0;
+  const barColor = todos ? "#16a34a" : assinados > 0 ? "#d97706" : "#dc2626";
+  const rows = sigs.map(s => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--br);">
+      <div>
+        <div style="font-weight:600;font-size:13px;">${_esc(s.name||"—")}</div>
+        ${s.email?`<div style="font-size:11px;color:var(--dl);">${_esc(s.email)}</div>`:""}
+      </div>
+      <div style="font-size:13px;font-weight:700;color:${s.signed?"#16a34a":"#9ca3af"};white-space:nowrap;margin-left:12px;">
+        ${s.signed ? "✅ Assinou" : "⏳ Pendente"}
+      </div>
+    </div>`).join("");
+  const html = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--dk);">Status de Assinaturas</div>
+        <div style="font-size:12px;color:var(--dl);margin-top:2px;">Contrato ${_esc(cod)}</div>
+      </div>
+      <button onclick="document.getElementById('m-autentique').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--dl);">✕</button>
+    </div>
+    <div style="background:var(--bg);border-radius:10px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;gap:14px;">
+      <div style="font-size:28px;font-weight:800;color:${barColor};">${assinados}/${total}</div>
+      <div style="flex:1;">
+        <div style="font-size:12px;font-weight:600;color:var(--dl);margin-bottom:4px;">${todos?"Todos assinaram":"Aguardando assinaturas"}</div>
+        <div style="background:#e5e7eb;border-radius:99px;height:8px;overflow:hidden;">
+          <div style="height:8px;border-radius:99px;background:${barColor};width:${pct}%;transition:width .4s;"></div>
+        </div>
+      </div>
+    </div>
+    <div style="border:1px solid var(--br);border-radius:10px;overflow:hidden;margin-bottom:16px;">
+      ${rows || '<div style="padding:14px;color:var(--dl);font-size:13px;">Nenhum signatário encontrado.</div>'}
+    </div>
+    ${todos?`<div style="text-align:center;font-size:13px;color:#16a34a;font-weight:600;">✅ Contrato totalmente assinado!</div>`:""}
+  `;
+  let m = document.getElementById("m-autentique");
+  if (!m) {
+    m = document.createElement("div");
+    m.id = "m-autentique";
+    m.style.cssText = "display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;";
+    m.onclick = function(e){ if(e.target===m) m.style.display="none"; };
+    document.body.appendChild(m);
+  }
+  m.innerHTML = `<div style="background:var(--card);border-radius:16px;padding:22px;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,.18);">${html}</div>`;
+  m.style.display = "flex";
+}
+
 async function _verificarAutentique(cod, btn) {
   const orig = btn.textContent;
   btn.disabled = true; btn.textContent = "⏳";
@@ -7286,14 +7337,9 @@ async function _verificarAutentique(cod, btn) {
     });
     const data = await res.json();
     if (data.error) { toast("❌ " + data.error); btn.disabled=false; btn.textContent=orig; return; }
-    if (data.todosAssinaram) {
-      toast("✅ Contrato " + cod + " assinado por todos! Status atualizado.");
-      renderContratos();
-    } else {
-      const detalhes = (data.signatures||[]).map(s => s.name + (s.signed ? " ✅" : " ⏳")).join(", ");
-      toast("🔄 " + data.assinados + "/" + data.total + " assinaturas: " + detalhes);
-      btn.disabled=false; btn.textContent=orig;
-    }
+    if (data.todosAssinaram) renderContratos();
+    else { btn.disabled=false; btn.textContent=orig; }
+    _showAssinaturaModal(cod, data);
   } catch(e) { toast("❌ Erro: " + e.message); btn.disabled=false; btn.textContent=orig; }
 }
 
