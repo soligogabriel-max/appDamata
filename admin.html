@@ -369,7 +369,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21g</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21h</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -6400,7 +6400,7 @@ function _orcHTML1(){
   const tipos=ORC_TIPOS.map(t=>`<option value="${t}" ${curTipo===t?"selected":""}>${t}</option>`).join("");
   return `<div class="orc-card" style="background:#f0f7f0;border:1.5px solid #c8e6c9;margin-bottom:12px;">
     <div style="font-size:14px;font-weight:700;color:#2A6644;margin-bottom:8px;">🔍 Já fez um orçamento conosco?</div>
-    <div style="font-size:13px;color:#555;margin-bottom:12px;">Coloque o WhatsApp cadastrado e vejo seus arquivos.</div>
+    <div style="font-size:13px;color:#555;margin-bottom:12px;">Coloque seu WhatsApp cadastrado e veja seus orçamentos.</div>
     <div style="display:flex;gap:8px;align-items:flex-start;">
       <input type="tel" id="orc-busca-wpp" class="inp" placeholder="+55 (11) 99999-9999" style="margin-bottom:0;flex:1;" onkeydown="if(event.key==='Enter')_orcBuscarExistentes()"/>
       <button onclick="_orcBuscarExistentes()" style="padding:10px 16px;background:#2A6644;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">Buscar</button>
