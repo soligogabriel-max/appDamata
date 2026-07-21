@@ -369,7 +369,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21f</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21g</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -6334,10 +6334,81 @@ function _orcRenderNames(){
   const tipo=document.getElementById('orc-tipo').value;
   document.getElementById('orc-name-fields').innerHTML=_orcNameFieldsHTML(tipo);
 }
+async function _orcBuscarExistentes(){
+  const raw=(document.getElementById("orc-busca-wpp")||{}).value||"";
+  const wpp=raw.replace(/\D/g,"");
+  const res=document.getElementById("orc-busca-res");
+  if(!res) return;
+  if(wpp.length<10){res.innerHTML='<div style="color:#b45309;font-size:13px;">Informe um WhatsApp válido.</div>';return;}
+  res.innerHTML='<div style="color:var(--dl);font-size:13px;">Buscando…</div>';
+  try{
+    const q=encodeURIComponent(raw.startsWith("+")?raw:("+55"+wpp.replace(/^55/,"")));
+    // tenta com + na frente e sem
+    const [r1,r2]=await Promise.all([
+      sbFetch("orcamentos?whatsapp=eq."+q+"&select=id,created_at,tipo_evento,data_evento,nome_contratante,valor_total,status&order=created_at.desc&limit=10"),
+      sbFetch("orcamentos?whatsapp=eq."+encodeURIComponent(wpp.replace(/^55/,""))+"&select=id,created_at,tipo_evento,data_evento,nome_contratante,valor_total,status&order=created_at.desc&limit=10"),
+    ]);
+    const seen=new Set(); const rows=[...r1,...r2].filter(r=>{if(seen.has(r.id))return false;seen.add(r.id);return true;});
+    if(!rows.length){res.innerHTML='<div style="color:var(--dl);font-size:13px;padding:8px 0;">Nenhum orçamento encontrado para este número.</div>';return;}
+    res.innerHTML='<div style="font-size:12px;font-weight:700;color:var(--dk);margin-bottom:8px;">'+rows.length+' orçamento(s) encontrado(s):</div>'+rows.map(r=>{
+      const d=r.data_evento?r.data_evento.split("-").reverse().join("/"):"—";
+      const v=r.valor_total?("R$ "+Number(r.valor_total).toLocaleString("pt-BR",{minimumFractionDigits:2})):"—";
+      const st=r.status||"lead";
+      const stColor=st==="pendente"?"#2563eb":st==="aprovado"?"#16a34a":"#9ca3af";
+      return`<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+          <div>
+            <div style="font-weight:700;font-size:13px;color:var(--dk);">${_esc(r.tipo_evento||"Evento")} · ${d}</div>
+            <div style="font-size:12px;color:var(--dl);margin-top:2px;">${_esc(r.nome_contratante||"")} · <span style="color:${stColor};font-weight:600;">${st}</span></div>
+          </div>
+          <div style="font-weight:800;font-size:14px;color:#1A4A7C;white-space:nowrap;">${v}</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <a href="${SB_URL}/functions/v1/orcamento-publico?id=${r.id}" target="_blank" style="flex:1;padding:7px 0;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:8px;color:#0369a1;font-size:12px;font-weight:700;text-align:center;text-decoration:none;">📄 Ver PDF</a>
+          <button onclick="_orcCarregarExistente(${r.id})" style="flex:1;padding:7px 0;background:var(--a);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✏️ Editar</button>
+        </div>
+      </div>`;
+    }).join("");
+  }catch(e){res.innerHTML='<div style="color:var(--er);font-size:13px;">Erro: '+e.message+'</div>';}
+}
+
+async function _orcCarregarExistente(id){
+  const res=document.getElementById("orc-busca-res");
+  if(res) res.innerHTML='<div style="color:var(--dl);font-size:13px;">Carregando…</div>';
+  try{
+    const rows=await sbFetch("orcamentos?id=eq."+id+"&select=*&limit=1");
+    const o=rows&&rows[0];
+    if(!o){alert("Orçamento não encontrado.");return;}
+    // Restaura _orc com os dados salvos
+    _orc.tipo_evento=o.tipo_evento||""; _orc.data_evento=o.data_evento||"";
+    _orc.num_convidados=o.num_convidados||""; _orc.salao=o.salao||"";
+    _orc.nome_contratante=o.nome_contratante||""; _orc.nome_noiva=o.nome_noiva||""; _orc.nome_noivo=o.nome_noivo||"";
+    _orc.whatsapp=o.whatsapp||""; _orc.email=o.email||"";
+    _orc.pacote_cod=o.pacote_cod||null; _orc._dbId=o.id; _orc._stage=o.status||"pendente";
+    const itens=Array.isArray(o.itens)?o.itens:(typeof o.itens==="string"?JSON.parse(o.itens||"[]"):[]);
+    _orc._selectedItems=itens.map(i=>({cod_item:i.cod,descricao:i.descricao,qty:i.qty||1,valor_unitario:i.valor_unitario||0,subtotal:i.subtotal||0}));
+    _orc._subtotal=_orc._selectedItems.reduce((a,i)=>a+(i.subtotal||0),0);
+    _orc.valor_total=o.valor_total||_orc._subtotal;
+    _orc._discount=Math.max(0,_orc._subtotal-_orc.valor_total);
+    _orc._discountPkg=o.pacote_cod||null; _orc._saved=true;
+    _orc.step=1; _orcStep();
+  }catch(e){if(res) res.innerHTML='<div style="color:var(--er);font-size:13px;">Erro: '+e.message+'</div>';}
+}
+
 function _orcHTML1(){
   const curTipo=_orc.tipo_evento||ORC_TIPOS[0];
   const tipos=ORC_TIPOS.map(t=>`<option value="${t}" ${curTipo===t?"selected":""}>${t}</option>`).join("");
-  return `<div class="orc-card">
+  return `<div class="orc-card" style="background:#f0f7f0;border:1.5px solid #c8e6c9;margin-bottom:12px;">
+    <div style="font-size:14px;font-weight:700;color:#2A6644;margin-bottom:8px;">🔍 Já fez um orçamento conosco?</div>
+    <div style="font-size:13px;color:#555;margin-bottom:12px;">Coloque o WhatsApp cadastrado e vejo seus arquivos.</div>
+    <div style="display:flex;gap:8px;align-items:flex-start;">
+      <input type="tel" id="orc-busca-wpp" class="inp" placeholder="+55 (11) 99999-9999" style="margin-bottom:0;flex:1;" onkeydown="if(event.key==='Enter')_orcBuscarExistentes()"/>
+      <button onclick="_orcBuscarExistentes()" style="padding:10px 16px;background:#2A6644;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">Buscar</button>
+    </div>
+    <div id="orc-busca-res" style="margin-top:10px;"></div>
+  </div>
+  <div style="text-align:center;color:var(--dl);font-size:12px;font-weight:600;letter-spacing:.5px;margin:4px 0 12px;">— ou faça um novo orçamento —</div>
+  <div class="orc-card">
     <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:20px;">Conte-nos sobre o seu evento</div>
     <label class="lbl">Tipo de evento *</label>
     <select id="orc-tipo" class="inp" onchange="_orcRenderNames()">${tipos}</select>
