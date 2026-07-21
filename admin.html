@@ -369,7 +369,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21b</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -6790,6 +6790,16 @@ async function _orcSalvar(){
   await _orcUpsertLead();
   _orcAbrirPDF();
   btn.disabled=false; btn.textContent="Salvar orçamento em PDF";
+  // Envia orçamento via WhatsApp em background (silencioso)
+  if(_orc._dbId && _orc.whatsapp){
+    fetch(SB_URL+"/functions/v1/enviar-orcamento-wpp",{
+      method:"POST",
+      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken,"Content-Type":"application/json"},
+      body:JSON.stringify({id:_orc._dbId})
+    }).then(r=>r.json()).then(d=>{
+      if(d.ok) toast("📱 Orçamento enviado por WhatsApp!");
+    }).catch(()=>{});
+  }
   // Após salvar PDF, oferecer agendamento de visita
   _orc.step=4; _orcStep();
 }
