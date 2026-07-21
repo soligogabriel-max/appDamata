@@ -355,7 +355,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21h</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21i</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -6336,12 +6336,29 @@ async function _orcBuscarExistentes(){
           <div style="font-weight:800;font-size:14px;color:#1A4A7C;white-space:nowrap;">${v}</div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px;">
-          <a href="${SB_URL}/functions/v1/orcamento-publico?id=${r.id}" target="_blank" style="flex:1;padding:7px 0;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:8px;color:#0369a1;font-size:12px;font-weight:700;text-align:center;text-decoration:none;">📄 Ver PDF</a>
+          <button onclick="_orcVerPdf('${r.id}')" style="flex:1;padding:7px 0;background:#f0f9ff;border:1.5px solid #bae6fd;border-radius:8px;color:#0369a1;font-size:12px;font-weight:700;cursor:pointer;">📄 Ver PDF</button>
           <button onclick="_orcCarregarExistente(${r.id})" style="flex:1;padding:7px 0;background:var(--a);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">✏️ Editar</button>
         </div>
       </div>`;
     }).join("");
   }catch(e){res.innerHTML='<div style="color:var(--er);font-size:13px;">Erro: '+e.message+'</div>';}
+}
+
+async function _orcVerPdf(id){
+  const w=window.open("","_blank");
+  if(!w){alert("Permita pop-ups para visualizar o PDF.");return;}
+  w.document.write('<html><body style="font-family:sans-serif;text-align:center;padding:40px;color:#666">Carregando…</body></html>');
+  try{
+    const resp=await fetch(SB_URL+"/functions/v1/orcamento-publico?id="+encodeURIComponent(id),{headers:{apikey:SB_KEY}});
+    const html=await resp.text();
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }catch(e){
+    w.document.open();
+    w.document.write('<html><body style="font-family:sans-serif;padding:40px;color:#c00">Erro ao carregar orçamento: '+e.message+'</body></html>');
+    w.document.close();
+  }
 }
 
 async function _orcCarregarExistente(id){
