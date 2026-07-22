@@ -126,12 +126,13 @@ Deno.serve(async (req) => {
 
     const nome = (ficha?.nome_contratante || "Cliente").split(" ")[0];
 
-    // Usa template de vencimento individual (parcela_vencimento_damata)
+    // parcela_vencimento_damata: {{1}}=nome {{2}}=parcela {{3}}=valor {{4}}=data {{5}}=contrato
     const data = await sendTemplate(META_URL, token, phone, templateVencimento, [
       nome,
       `${p.parcela ?? "?"}/${p.num_parcela ?? "?"}`,
       fmtVal(p.valor ?? 0),
       fmtDate(p.vencimento),
+      cod,
     ]);
 
     if (data.error) return json({ ok: false, enviados: 0, erro: data.error.message, template: templateVencimento });
@@ -220,7 +221,8 @@ Deno.serve(async (req) => {
         .join("\n");
 
       try {
-        const data = await sendTemplate(META_URL, token, phone, templateAtraso, [nome, nomeEvento, lista]);
+        // cobranca_atraso_damata: {{1}}=nome {{2}}=nomeEvento {{3}}=lista {{4}}=contrato
+        const data = await sendTemplate(META_URL, token, phone, templateAtraso, [nome, nomeEvento, lista, cod]);
         if (data.error) {
           erros.push({ cod_evento: cod, parcela: "—", erro: data.error.message });
         } else {
@@ -259,11 +261,13 @@ Deno.serve(async (req) => {
       const nome = (ficha.nome_contratante || "Cliente").split(" ")[0];
 
       try {
+        // parcela_vencimento_damata: {{1}}=nome {{2}}=parcela {{3}}=valor {{4}}=data {{5}}=contrato
         const data = await sendTemplate(META_URL, token, phone, templateVencimento, [
           nome,
           `${p.parcela ?? "?"}/${p.num_parcela ?? "?"}`,
           fmtVal(p.valor ?? 0),
           fmtDate(p.vencimento),
+          p.cod_evento,
         ]);
         if (data.error) {
           erros.push({ cod_evento: p.cod_evento, parcela: p.parcela ?? "?", erro: data.error.message });
