@@ -4,8 +4,8 @@
 // Secrets necessários:
 //   META_WPP_TOKEN          = Bearer token permanente do Meta Cloud API
 //   META_WPP_PHONE_ID       = Phone Number ID do WhatsApp Business
-//   META_WPP_TEMPLATE       = Template para parcelas (padrão: parcela_vencimento_damata)
-//   META_WPP_TEMPLATE_ATRASO = Template para modo atrasados em lote (padrão: cobranca_atraso_damata)
+//   META_WPP_TEMPLATE       = Template para parcelas (padrão: parcela_lembrete_fd)
+//   META_WPP_TEMPLATE_ATRASO = Template para modo atrasados em lote (padrão: cobranca_atraso_fd)
 //
 // Payload POST:
 //   { parcela_id, celular_override? }             → modo individual (botão inline)
@@ -73,8 +73,8 @@ Deno.serve(async (req) => {
 
   const token = Deno.env.get("META_WPP_TOKEN");
   const phoneId = Deno.env.get("META_WPP_PHONE_ID");
-  const templateVencimento = Deno.env.get("META_WPP_TEMPLATE") || "parcela_vencimento_damata";
-  const templateAtraso = Deno.env.get("META_WPP_TEMPLATE_ATRASO") || "cobranca_atraso_damata";
+  const templateVencimento = Deno.env.get("META_WPP_TEMPLATE") || "parcela_lembrete_fd";
+  const templateAtraso = Deno.env.get("META_WPP_TEMPLATE_ATRASO") || "cobranca_atraso_fd";
 
   if (!token || !phoneId) {
     return json({ error: "Configure META_WPP_TOKEN e META_WPP_PHONE_ID nos secrets." }, 500);
