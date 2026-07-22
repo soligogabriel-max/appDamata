@@ -4,12 +4,13 @@
 // Secrets necessários:
 //   META_WPP_TOKEN          = Bearer token permanente do Meta Cloud API
 //   META_WPP_PHONE_ID       = Phone Number ID do WhatsApp Business
-//   META_WPP_TEMPLATE       = Template para parcelas vencendo (padrão: parcela_vencimento_damata)
-//   META_WPP_TEMPLATE_ATRASO = Template para parcelas atrasadas (padrão: cobranca_atraso_damata)
+//   META_WPP_TEMPLATE       = Template para parcelas (padrão: parcela_vencimento_damata)
+//   META_WPP_TEMPLATE_ATRASO = Template para modo atrasados em lote (padrão: cobranca_atraso_damata)
 //
 // Payload POST:
-//   { vencimento_de, vencimento_ate }          → modo vencimento (uma msg por parcela)
-//   { vencimento_de, vencimento_ate, modo: "atrasados" } → modo atraso (uma msg por evento com lista)
+//   { parcela_id, celular_override? }             → modo individual (botão inline)
+//   { vencimento_de, vencimento_ate }             → modo vencimento em lote
+//   { vencimento_de, vencimento_ate, modo: "atrasados" } → modo atraso em lote
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -79,7 +80,10 @@ Deno.serve(async (req) => {
     return json({ error: "Configure META_WPP_TOKEN e META_WPP_PHONE_ID nos secrets." }, 500);
   }
 
-  let payload: { dias?: number; vencimento_de?: string; vencimento_ate?: string; modo?: string; parcela_id?: string; celular_override?: string } = {};
+  let payload: {
+    dias?: number; vencimento_de?: string; vencimento_ate?: string; modo?: string;
+    parcela_id?: string; celular_override?: string;
+  } = {};
   try { payload = await req.json(); } catch { return json({ error: "JSON inválido." }, 400); }
 
   const SB_URL = Deno.env.get("SUPABASE_URL")!;
@@ -87,7 +91,7 @@ Deno.serve(async (req) => {
   const sbH = { apikey: SB_SR, Authorization: "Bearer " + SB_SR, "Content-Type": "application/json" };
   const META_URL = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
 
-  // ── Modo parcela_id: envia lembrete para uma parcela específica ──
+  // ── Modo individual: botão inline por título ──
   if (payload.parcela_id) {
     const pRes = await fetch(
       `${SB_URL}/rest/v1/contas_a_receber?id=eq.${payload.parcela_id}&select=id,cod_evento,parcela,num_parcela,valor,vencimento&limit=1`,
@@ -121,12 +125,18 @@ Deno.serve(async (req) => {
     if (!phone || phone.length < 13) return json({ ok: false, enviados: 0, erro: `Telefone inválido: ${celular}` });
 
     const nome = (ficha?.nome_contratante || "Cliente").split(" ")[0];
+
+    // Usa template de vencimento individual (parcela_vencimento_damata)
+    const data = await sendTemplate(META_URL, token, phone, templateVencimento, [
+      nome,
+      `${p.parcela ?? "?"}/${p.num_parcela ?? "?"}`,
+      fmtVal(p.valor ?? 0),
+      fmtDate(p.vencimento),
+    ]);
+
+    if (data.error) return json({ ok: false, enviados: 0, erro: data.error.message, template: templateVencimento });
+
     const nomeEvento = evento?.nome_evento || cod;
-    const lista = `Parcela ${p.parcela ?? "?"}/${p.num_parcela ?? "?"} - venceu ${fmtDate(p.vencimento)} - ${fmtVal(p.valor ?? 0)}`;
-
-    const data = await sendTemplate(META_URL, token, phone, templateAtraso, [nome, nomeEvento, lista]);
-    if (data.error) return json({ ok: false, enviados: 0, erro: data.error.message });
-
     await fetch(`${SB_URL}/rest/v1/wpp_mensagens`, {
       method: "POST",
       headers: { ...sbH, Prefer: "return=minimal" },
@@ -143,6 +153,7 @@ Deno.serve(async (req) => {
     return json({ ok: true, enviados: 1, phone, lista: [`${cod} parc.${p.parcela}/${p.num_parcela} → ${phone}`] });
   }
 
+  // ── Modos em lote (vencimento / atrasados) ──
   const hoje = new Date();
   const inicio = payload.vencimento_de ?? hoje.toISOString().slice(0, 10);
   const fimDate = new Date(hoje);
@@ -183,7 +194,6 @@ Deno.serve(async (req) => {
 
   if (modoAtraso) {
     // ── Modo atrasados: uma mensagem por evento com lista completa ──
-    // Agrupa parcelas por cod_evento
     const porEvento: Record<string, typeof parcelas> = {};
     for (const p of parcelas) {
       if (!porEvento[p.cod_evento]) porEvento[p.cod_evento] = [];
@@ -205,7 +215,6 @@ Deno.serve(async (req) => {
       const nome = (ficha.nome_contratante || "Cliente").split(" ")[0];
       const nomeEvento = eventoMap[cod] || cod;
 
-      // Monta lista de parcelas
       const lista = itens
         .map((p) => `Parcela ${p.parcela ?? "?"}/${p.num_parcela ?? "?"} - venceu ${fmtDate(p.vencimento)} - ${fmtVal(p.valor ?? 0)}`)
         .join("\n");
