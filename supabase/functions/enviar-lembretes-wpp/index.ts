@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
       headers: { ...sbH, Prefer: "return=minimal" },
       body: JSON.stringify({
         telefone: phone,
-        mensagem: `[Atraso] ${nomeEvento} — Parcela ${p.parcela}/${p.num_parcela} — ${fmtVal(p.valor)} — venceu ${fmtDate(p.vencimento)}`,
+        mensagem: `[Fazenda Damata] Ctr. ${cod} — ${nomeEvento} — Parcela ${p.parcela}/${p.num_parcela} — ${fmtVal(p.valor)} — venceu ${fmtDate(p.vencimento)}`,
         direcao: "enviada",
         nome: ficha?.nome_contratante || null,
         tipo: "template",
@@ -230,7 +230,7 @@ Deno.serve(async (req) => {
             headers: { ...sbH, Prefer: "return=minimal" },
             body: JSON.stringify({
               telefone: phone,
-              mensagem: `[Atraso] ${nomeEvento} — ${itens.length} parcela(s) em atraso:\n${lista}`,
+              mensagem: `[Fazenda Damata] Ctr. ${cod} — ${nomeEvento} — ${itens.length} parcela(s) em atraso:\n${lista}`,
               direcao: "enviada",
               nome: ficha.nome_contratante || null,
               tipo: "template",
@@ -274,7 +274,7 @@ Deno.serve(async (req) => {
             headers: { ...sbH, Prefer: "return=minimal" },
             body: JSON.stringify({
               telefone: phone,
-              mensagem: `[Cobrança] Parcela ${p.parcela ?? "?"}/${p.num_parcela ?? "?"} — ${fmtVal(p.valor ?? 0)} — vence ${fmtDate(p.vencimento)}`,
+              mensagem: `[Fazenda Damata] Ctr. ${p.cod_evento} — Parcela ${p.parcela ?? "?"}/${p.num_parcela ?? "?"} — ${fmtVal(p.valor ?? 0)} — vence ${fmtDate(p.vencimento)}`,
               direcao: "enviada",
               nome: ficha.nome_contratante || null,
               tipo: "template",
