@@ -355,7 +355,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.22d</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.22e</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -4432,7 +4432,7 @@ async function renderReceber(){
     const hoje=new Date(); hoje.setHours(0,0,0,0);
     let filtrado=rows.filter(r=>{
       if(_userEventIds != null && !_userEventIds.includes(r.cod_evento)) return false;
-      if(st==="Atrasado") return r.vencimento&&new Date(r.vencimento)<hoje;
+      if(st==="Atrasado") return (r.valor||0)>0&&r.vencimento&&new Date(r.vencimento)<hoje;
       if(st==="Pendente") return !r.vencimento||new Date(r.vencimento)>=hoje;
       return true;
     });
