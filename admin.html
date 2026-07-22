@@ -355,7 +355,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.22c</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.22d</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -4145,7 +4145,7 @@ async function wppSelectContact(tel, nome) {
   box.innerHTML = '<div style="text-align:center;font-size:13px;color:var(--dl);">⏳ Carregando…</div>';
 
   try {
-    const rows = await dbGet("wpp_mensagens", `telefone=eq.${tel}&select=mensagem,direcao,created_at,tipo,wamid&order=created_at.asc&limit=500`);
+    const rows = await dbGet("wpp_mensagens", `telefone=eq.${encodeURIComponent(tel)}&select=mensagem,direcao,created_at,tipo,wamid&order=created_at.asc&limit=500`);
     if (!rows.length) { box.innerHTML = '<div style="text-align:center;font-size:13px;color:var(--dl);margin-top:40px;">Nenhuma mensagem com este contato.</div>'; return; }
 
     const fmtDt = d => new Date(d).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
