@@ -79,8 +79,69 @@ Deno.serve(async (req) => {
     return json({ error: "Configure META_WPP_TOKEN e META_WPP_PHONE_ID nos secrets." }, 500);
   }
 
-  let payload: { dias?: number; vencimento_de?: string; vencimento_ate?: string; modo?: string } = {};
+  let payload: { dias?: number; vencimento_de?: string; vencimento_ate?: string; modo?: string; parcela_id?: string; celular_override?: string } = {};
   try { payload = await req.json(); } catch { return json({ error: "JSON inválido." }, 400); }
+
+  const SB_URL = Deno.env.get("SUPABASE_URL")!;
+  const SB_SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const sbH = { apikey: SB_SR, Authorization: "Bearer " + SB_SR, "Content-Type": "application/json" };
+  const META_URL = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
+
+  // ── Modo parcela_id: envia lembrete para uma parcela específica ──
+  if (payload.parcela_id) {
+    const pRes = await fetch(
+      `${SB_URL}/rest/v1/contas_a_receber?id=eq.${payload.parcela_id}&select=id,cod_evento,parcela,num_parcela,valor,vencimento&limit=1`,
+      { headers: sbH },
+    );
+    const [p] = await pRes.json();
+    if (!p) return json({ error: "Parcela não encontrada." }, 404);
+
+    const cod = p.cod_evento;
+
+    // Salva celular_override na ficha, se fornecido
+    if (payload.celular_override) {
+      await fetch(`${SB_URL}/rest/v1/ficha_do_evento?cod=eq.${encodeURIComponent(cod)}`, {
+        method: "PATCH",
+        headers: { ...sbH, Prefer: "return=minimal" },
+        body: JSON.stringify({ celular: payload.celular_override }),
+      });
+    }
+
+    const [fichaR, agR] = await Promise.all([
+      fetch(`${SB_URL}/rest/v1/ficha_do_evento?cod=eq.${encodeURIComponent(cod)}&select=nome_contratante,celular&limit=1`, { headers: sbH }),
+      fetch(`${SB_URL}/rest/v1/agenda?cod=eq.${encodeURIComponent(cod)}&select=nome_evento&limit=1`, { headers: sbH }),
+    ]);
+    const [ficha] = await fichaR.json();
+    const [evento] = await agR.json();
+
+    const celular = payload.celular_override || ficha?.celular;
+    if (!celular) return json({ ok: false, enviados: 0, msg: "Sem telefone cadastrado." });
+
+    const phone = normalizePhone(celular);
+    if (!phone || phone.length < 13) return json({ ok: false, enviados: 0, erro: `Telefone inválido: ${celular}` });
+
+    const nome = (ficha?.nome_contratante || "Cliente").split(" ")[0];
+    const nomeEvento = evento?.nome_evento || cod;
+    const lista = `Parcela ${p.parcela ?? "?"}/${p.num_parcela ?? "?"} - venceu ${fmtDate(p.vencimento)} - ${fmtVal(p.valor ?? 0)}`;
+
+    const data = await sendTemplate(META_URL, token, phone, templateAtraso, [nome, nomeEvento, lista]);
+    if (data.error) return json({ ok: false, enviados: 0, erro: data.error.message });
+
+    await fetch(`${SB_URL}/rest/v1/wpp_mensagens`, {
+      method: "POST",
+      headers: { ...sbH, Prefer: "return=minimal" },
+      body: JSON.stringify({
+        telefone: phone,
+        mensagem: `[Atraso] ${nomeEvento} — Parcela ${p.parcela}/${p.num_parcela} — ${fmtVal(p.valor)} — venceu ${fmtDate(p.vencimento)}`,
+        direcao: "enviada",
+        nome: ficha?.nome_contratante || null,
+        tipo: "template",
+        wamid: data.messages?.[0]?.id || null,
+      }),
+    });
+
+    return json({ ok: true, enviados: 1, phone, lista: [`${cod} parc.${p.parcela}/${p.num_parcela} → ${phone}`] });
+  }
 
   const hoje = new Date();
   const inicio = payload.vencimento_de ?? hoje.toISOString().slice(0, 10);
@@ -88,11 +149,6 @@ Deno.serve(async (req) => {
   fimDate.setDate(fimDate.getDate() + (payload.dias ?? 3));
   const fim = payload.vencimento_ate ?? fimDate.toISOString().slice(0, 10);
   const modoAtraso = payload.modo === "atrasados";
-
-  const SB_URL = Deno.env.get("SUPABASE_URL")!;
-  const SB_SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sbH = { apikey: SB_SR, Authorization: "Bearer " + SB_SR, "Content-Type": "application/json" };
-  const META_URL = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
 
   // 1. Busca parcelas pendentes no período
   const recRes = await fetch(
