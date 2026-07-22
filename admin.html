@@ -355,7 +355,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.21i</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.22a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -731,7 +731,6 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <div style="display:flex;align-items:center;gap:10px;">
             <div class="sec-t" style="margin-bottom:0;">Contas a Receber</div>
             <button class="btn-a" style="font-size:12px;" onclick="openCrud('contas_a_receber',null,renderReceber)">+ Novo</button>
-            <button id="btn-wpp-lembretes" class="btn-a" style="font-size:12px;background:#25D366;display:none;" onclick="openWppLembretes()">📱 Lembretes WPP</button>
             <button class="btn-cancel" style="font-size:12px;padding:5px 12px;" onclick="openDuplicados('receber')">🔍 Duplicados</button>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -1382,6 +1381,22 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
     <div class="macts">
       <button class="btn-cancel" onclick="closeEditUser()">Cancelar</button>
       <button class="btn-confirm" id="eu-btn-save" onclick="saveEditUser()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: WPP TEL FALTANDO -->
+<div class="moverlay" id="m-rec-wpp-tel" onclick="if(event.target===this)document.getElementById('m-rec-wpp-tel').classList.remove('open')">
+  <div class="mbox" style="max-width:360px;">
+    <div class="mtitle">📱 WhatsApp não cadastrado</div>
+    <div style="font-size:13px;color:var(--dl);margin-bottom:14px;">
+      <b id="m-rec-wpp-nome"></b> não tem WhatsApp cadastrado.<br>Informe para enviar o lembrete e salvar na ficha.
+    </div>
+    <label class="lbl">WhatsApp</label>
+    <input class="inp" id="m-rec-wpp-input" type="tel" placeholder="(19) 99999-9999"/>
+    <div class="macts">
+      <button class="btn-cancel" onclick="document.getElementById('m-rec-wpp-tel').classList.remove('open')">Cancelar</button>
+      <button class="btn-confirm" style="background:#25D366;" onclick="_recWppSalvarEnviar()">💾 Salvar e Enviar</button>
     </div>
   </div>
 </div>
@@ -4394,7 +4409,6 @@ let _recFiltrado=[], _recAgendaMap={}, _recConcilMap={}, _recConcilTituloMap={};
 async function renderReceber(){
   const wr=document.getElementById("rec-list"); wr.innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   const totWr=document.getElementById("rec-totais"); totWr.innerHTML="";
-  const wppBtn=document.getElementById("btn-wpp-lembretes"); if(wppBtn) wppBtn.style.display=effIsAdmin()?"":"none";
   try {
     const mesEl=document.getElementById("rec-fil-mes");
     const mes=mesEl.value;
@@ -4467,7 +4481,7 @@ async function renderReceber(){
           <td style="font-weight:600;color:${concil>0?"#2A6644":"var(--dl)"};">${concil>0?fmt(concil):"—"}</td>
           <td style="font-size:11px;color:var(--dl);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(tituloExt)}">${tituloExt||"—"}</td>
           <td>${badge}</td>
-          <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openCrud("contas_a_receber",JSON.parse(this.dataset.r),renderReceber)' data-r="${rj}">✏️</button></div></td>
+          <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openCrud("contas_a_receber",JSON.parse(this.dataset.r),renderReceber)' data-r="${rj}">✏️</button>${isAtras?`<button class="act-btn" title="Lembrete WhatsApp" style="color:#25D366;" data-id="${r.id}" data-cod="${r.cod_evento||''}" onclick="_recEnviarLembrete(this)">📱</button>`:''}</div></td>
         </tr>`;
       }).join("")}</tbody>
     </table></div>`;
@@ -9323,6 +9337,44 @@ function setWppModo(modo) {
   document.getElementById("wpp-result").style.display = "none";
   document.getElementById("wpp-btn-send").style.display = "none";
   _wppParcelas = [];
+}
+
+let _recWppCtx=null;
+async function _recEnviarLembrete(btn){
+  const id=btn.dataset.id, cod=btn.dataset.cod;
+  const fichas=await sbFetch("ficha_do_evento?cod=eq."+encodeURIComponent(cod)+"&select=celular,nome_contratante&limit=1").catch(()=>[]);
+  const f=fichas&&fichas[0];
+  if(f&&f.celular){
+    if(!confirm("Enviar lembrete WhatsApp para "+(f.nome_contratante||cod)+" ("+f.celular+")?"))return;
+    await _recWppEnviar(id,null);
+  }else{
+    _recWppCtx={id,cod};
+    document.getElementById("m-rec-wpp-nome").textContent=f?.nome_contratante||cod||"Este contratante";
+    document.getElementById("m-rec-wpp-input").value="";
+    document.getElementById("m-rec-wpp-tel").classList.add("open");
+  }
+}
+async function _recWppSalvarEnviar(){
+  const tel=document.getElementById("m-rec-wpp-input").value.trim();
+  if(!tel){toast("Informe o WhatsApp.");return;}
+  const {id,cod}=_recWppCtx||{};
+  if(!id)return;
+  document.getElementById("m-rec-wpp-tel").classList.remove("open");
+  await _recWppEnviar(id,tel);
+}
+async function _recWppEnviar(parcelaId,celularOverride){
+  const payload={parcela_id:parcelaId};
+  if(celularOverride)payload.celular_override=celularOverride;
+  try{
+    const res=await fetch(SB_URL+"/functions/v1/enviar-lembretes-wpp",{
+      method:"POST",
+      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken,"Content-Type":"application/json"},
+      body:JSON.stringify(payload),
+    });
+    const resp=await res.json();
+    if(resp.enviados>0)toast("✅ Lembrete enviado!");
+    else toast("⚠️ "+(resp.erro||resp.msg||"Erro ao enviar."), true);
+  }catch(e){toast("Erro: "+e.message,true);}
 }
 
 function openWppLembretes() {
