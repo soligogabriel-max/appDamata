@@ -649,8 +649,23 @@ async function generateFile(){
     fuBal:preset.fuBal,fuMesas:preset.fuMesas,fuCad:preset.fuCad,fuBan:preset.fuBan,
     exHoras:preset.exHoras,exMont:preset.exMont,exDesm:preset.exDesm,
   };
+  // Se estiver dentro do admin, envia para salvar e aguarda o código real confirmado
   if(window.parent&&window.parent!==window){
-    window.parent.postMessage({type:"damata_salvar_contrato",preset:savePreset},"*");
+    var codConfirmado=await new Promise(function(resolve){
+      var timer=setTimeout(function(){resolve(savePreset.code);},15000);
+      function handler(evt){
+        if(evt.data&&evt.data.type==="damata_cod_resultado"){
+          clearTimeout(timer);
+          window.removeEventListener("message",handler);
+          resolve(evt.data.cod||savePreset.code);
+        }
+      }
+      window.addEventListener("message",handler);
+      window.parent.postMessage({type:"damata_salvar_contrato",preset:savePreset},"*");
+    });
+    // Atualiza campo e preset com o código real (pode ter sido corrigido por colisão)
+    g("o-code").value=codConfirmado;
+    preset.code=codConfirmado;
   }
   var pJson=JSON.stringify(preset);
   var tmpl=b64ToUtf8(isH?HOSPEDAGEM_B64:CLIENT_B64);
