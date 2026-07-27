@@ -364,7 +364,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.27a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.27b</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -7310,6 +7310,7 @@ async function salvarContrato(preset) {
 
     alert(`✅ Contrato ${cod} salvo!\n${nomeEvento}`);
     setTab("contratos");
+    return { cod };
   } catch(e) {
     // Rollback: remove registros criados antes do ponto de falha
     try {
@@ -7327,7 +7328,10 @@ async function salvarContrato(preset) {
 // Recebe mensagem do iframe do gerador
 window.addEventListener("message", e => {
   if(e.data && e.data.type === "damata_salvar_contrato") {
-    salvarContrato(e.data.preset);
+    const src = e.source;
+    salvarContrato(e.data.preset)
+      .then(r => { if(src) src.postMessage({type:"damata_cod_resultado", cod: r?.cod || e.data.preset.code}, "*"); })
+      .catch(() => { if(src) src.postMessage({type:"damata_cod_resultado", cod: e.data.preset.code}, "*"); });
   }
 });
 
