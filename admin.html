@@ -364,7 +364,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.22g</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.27a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -7127,7 +7127,7 @@ async function salvarContrato(preset) {
       return `${dt.getDate()}${MESES[dt.getMonth()]}${String(dt.getFullYear()).slice(2)}`;
     };
     const dStr = d2 && d2!==d1 ? `${fmtNome(d1)} a ${fmtNome(d2)}` : fmtNome(d1);
-    const nomes = [preset.nomeNoivo, preset.nomeNoiva].filter(Boolean).join(" e ") || preset.obs || "Evento";
+    const nomes = [preset.nomeNoiva, preset.nomeNoivo].filter(Boolean).join(" e ") || preset.obs || "Evento";
 
     // Build payments_json and spaces_json so downloadContract works
     const paymentsJson = JSON.stringify(preset.payments||[]);
@@ -7176,9 +7176,14 @@ async function salvarContrato(preset) {
         payments_json: paymentsJson, spaces_json: spacesJson,
       };
       if(agExist.length && !agExist[0].deleted_at) {
-        // Registro ativo já existe — atualiza (edição de contrato)
-        await sbFetch(`agenda?cod=eq.${encodeURIComponent(cod)}`, {method:"PATCH", body: eventoBody, prefer:"return=minimal"});
-        isEdit = true;
+        // Colisão: código já pertence a evento ativo — gera novo código sequencial
+        const ano = new Date().getFullYear();
+        const allExist = await dbGet("agenda", `select=cod&cod=like.${ano}%25&order=cod.desc&limit=200`);
+        const seqs = allExist.map(e=>parseInt((e.cod||"").slice(4))).filter(n=>!isNaN(n)&&n>0);
+        const nextSeq = seqs.length ? Math.max(...seqs)+1 : 1;
+        cod = String(ano)+String(nextSeq).padStart(2,"0");
+        nomeEvento = `${nomes} - ${dStr}`;
+        await sbFetch("agenda", {method:"POST", body:{cod, ...eventoBody, nome_evento: nomeEvento}, prefer:"return=minimal"});
       } else if(agExist.length && agExist[0].deleted_at) {
         // Registro soft-deleted — ressuscita com novos dados
         await sbFetch(`agenda?cod=eq.${encodeURIComponent(cod)}`, {method:"PATCH",
