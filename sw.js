@@ -1,4 +1,4 @@
-const CACHE = "damata-v1";
+const CACHE = "damata-v2";
 const PRECACHE = ["/admin.html", "/index.html", "/manifest.json", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", e => {
