@@ -389,7 +389,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.28b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.28c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -638,7 +638,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <div class="dash-card" id="dc-receber">
             <div class="dc-icon">💰</div>
             <div class="dc-val" id="dc-receber-val">—</div>
-            <div class="dc-label">Falta receber · eventos futuros</div>
+            <div class="dc-label">A receber (contratos ativos)</div>
             <div class="dc-sub" id="dc-receber-sub"></div>
             <div id="dc-receber-bar" style="margin-top:8px;height:4px;border-radius:2px;background:var(--br);overflow:hidden;display:none;">
               <div id="dc-receber-bar-fill" style="height:100%;background:var(--a);border-radius:2px;transition:width .5s;"></div>
@@ -4136,7 +4136,7 @@ async function renderDashboard() {
   try {
     const [agendaRows, receberRows, visitasRows, orcRows] = await Promise.all([
       dbGet("agenda", "data_evento=gte."+hojStr+"&select=cod,nome_evento,data_evento,tipo_evento,status&order=data_evento.asc&limit=200"),
-      dbGet("contas_a_receber", "select=valor,vencimento,status,cod_evento&limit=5000"),
+      dbGetAll("contas_a_receber", "select=valor,vencimento,status&order=vencimento.asc"),
       dbGet("site_visits", "visited_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=visited_at,session_id&limit=10000"),
       dbGet("orcamentos", "created_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=created_at,valor_total,status,visitor_id&limit=2000")
     ]);
@@ -4150,14 +4150,12 @@ async function renderDashboard() {
       ? "próximo: " + (prox.nome_evento||prox.cod) + " em " + new Date(prox.data_evento+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})
       : "nenhum agendado";
 
-    // — A receber: filtrado por eventos futuros
-    const futureCods = new Set(agendaValidos.map(r => r.cod).filter(Boolean));
-    const recFuturos = receberRows.filter(r => futureCods.has(r.cod_evento));
-    const totalFuturo = recFuturos.reduce((s,r)=>s+(r.valor||0), 0);
-    const faltaFuturo = recFuturos.filter(r=>r.status==="NP").reduce((s,r)=>s+(r.valor||0), 0);
+    // — A receber: usa todos os registros ativos (deleted_at=is.null já aplicado pelo dbGet)
+    const totalFuturo = receberRows.reduce((s,r)=>s+(r.valor||0), 0);
+    const faltaFuturo = receberRows.filter(r=>r.status==="NP").reduce((s,r)=>s+(r.valor||0), 0);
     const pctFalta = totalFuturo > 0 ? Math.round(faltaFuturo / totalFuturo * 100) : 0;
     document.getElementById("dc-receber-val").textContent = fmtR(faltaFuturo);
-    const atrasadas = recFuturos.filter(r => r.status==="NP" && r.vencimento && r.vencimento < hojStr).reduce((s,r)=>s+(r.valor||0),0);
+    const atrasadas = receberRows.filter(r => r.status==="NP" && r.vencimento && r.vencimento < hojStr).reduce((s,r)=>s+(r.valor||0),0);
     document.getElementById("dc-receber-sub").textContent = atrasadas > 0
       ? fmtR(atrasadas) + " em atraso"
       : "nenhuma em atraso";
