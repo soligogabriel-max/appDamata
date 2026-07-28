@@ -364,7 +364,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.27b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.27c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1095,7 +1095,13 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
             <div style="font-size:12px;color:var(--dl);margin-top:4px;">Visitantes únicos este mês</div>
           </div>
         </div>
-        <div class="sec-t" style="font-size:14px;margin-bottom:10px;">Últimos 30 dias</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <div class="sec-t" style="font-size:14px;margin:0;" id="vis-periodo-label">Últimos 30 dias</div>
+          <div style="margin-left:auto;display:flex;background:var(--bg2);border:1px solid var(--br);border-radius:8px;overflow:hidden;">
+            <button id="vis-btn-dia" onclick="setVisAgrup('dia')" style="padding:4px 12px;border:none;cursor:pointer;font-size:12px;background:var(--a);color:#fff;font-weight:600;">Dia a dia</button>
+            <button id="vis-btn-mes" onclick="setVisAgrup('mes')" style="padding:4px 12px;border:none;cursor:pointer;font-size:12px;background:transparent;color:var(--dl);">Mês a mês</button>
+          </div>
+        </div>
         <div id="vis-tabela" style="overflow-x:auto;"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
       </div>
     </div>
@@ -4007,86 +4013,127 @@ async function renderDashboard() {
 }
 
 // ── Visitas ao Site ──────────────────────────────────────────
+let _visAgrup = "dia";
+function setVisAgrup(mode) {
+  _visAgrup = mode;
+  const btnDia = document.getElementById("vis-btn-dia");
+  const btnMes = document.getElementById("vis-btn-mes");
+  if(btnDia) { btnDia.style.background=mode==="dia"?"var(--a)":"transparent"; btnDia.style.color=mode==="dia"?"#fff":"var(--dl)"; btnDia.style.fontWeight=mode==="dia"?"600":"400"; }
+  if(btnMes) { btnMes.style.background=mode==="mes"?"var(--a)":"transparent"; btnMes.style.color=mode==="mes"?"#fff":"var(--dl)"; btnMes.style.fontWeight=mode==="mes"?"600":"400"; }
+  const lbl = document.getElementById("vis-periodo-label");
+  if(lbl) lbl.textContent = mode==="dia" ? "Últimos 30 dias" : "Últimos 12 meses";
+  renderVisitas();
+}
+
 async function renderVisitas() {
   const tabela = document.getElementById("vis-tabela");
   tabela.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   ["vis-total-hoje","vis-uniq-hoje","vis-total-mes","vis-uniq-mes"].forEach(id => document.getElementById(id).textContent = "—");
   try {
-    const since = new Date(); since.setDate(since.getDate() - 30); since.setHours(0,0,0,0);
+    const isMes = _visAgrup === "mes";
+    const since = new Date(); since.setDate(since.getDate() - (isMes ? 365 : 30)); since.setHours(0,0,0,0);
     const [rows, orcRows, vcRows] = await Promise.all([
       dbGet("site_visits", "visited_at=gte."+since.toISOString()+"&select=visited_at,session_id,referrer,device&order=visited_at.desc&limit=5000"),
       dbGet("orcamentos", "created_at=gte."+since.toISOString()+"&select=created_at,visitor_id&limit=5000"),
       dbGet("visitas_comerciais", "status=neq.cancelada&select=created_at&limit=2000")
     ]);
 
-    const hoje = localDate();          // data local YYYY-MM-DD (não UTC)
-    const mesAtual = hoje.slice(0,7);  // YYYY-MM local
+    const hoje = localDate();
+    const mesAtual = hoje.slice(0,7);
 
-    // Agrupar visitas por dia local
-    const byDay = {};
-    rows.forEach(r => {
-      const day = utcToLocalDate(r.visited_at);
-      if(!byDay[day]) byDay[day] = { total:0, uniq: new Set(), orcs: new Set() };
-      byDay[day].total++;
-      byDay[day].uniq.add(r.session_id);
-    });
-
-    // Agrupar orçamentos por dia local (visitor_id único; fallback para índice se não tiver)
-    orcRows.forEach((r, i) => {
-      const day = utcToLocalDate(r.created_at);
-      if(!byDay[day]) byDay[day] = { total:0, uniq: new Set(), orcs: new Set(), vcs: 0 };
-      byDay[day].orcs.add(r.visitor_id || ("__idx__"+i));
-    });
-
-    // Agrupar visitas comerciais pelo dia em que foram marcadas (created_at)
-    vcRows.forEach(r => {
-      const day = utcToLocalDate(r.created_at);
-      if(!byDay[day]) byDay[day] = { total:0, uniq: new Set(), orcs: new Set(), vcs: 0 };
-      byDay[day].vcs = (byDay[day].vcs || 0) + 1;
-    });
-
-    // Cards de hoje
-    const dh = byDay[hoje];
-    document.getElementById("vis-total-hoje").textContent = dh ? dh.total : "0";
-    document.getElementById("vis-uniq-hoje").textContent = dh ? dh.uniq.size : "0";
-
-    // Cards do mês
-    let totalMes = 0, uniqMes = new Set();
-    rows.filter(r => utcToLocalDate(r.visited_at).slice(0,7) === mesAtual).forEach(r => {
-      totalMes++;
-      uniqMes.add(r.session_id);
-    });
+    // Cards de hoje e do mês (sempre em modo diário para precisão)
+    const todayRows = rows.filter(r => utcToLocalDate(r.visited_at) === hoje);
+    document.getElementById("vis-total-hoje").textContent = todayRows.length;
+    document.getElementById("vis-uniq-hoje").textContent = new Set(todayRows.map(r=>r.session_id)).size;
+    let totalMes=0, uniqMes=new Set();
+    rows.filter(r=>utcToLocalDate(r.visited_at).slice(0,7)===mesAtual).forEach(r=>{totalMes++;uniqMes.add(r.session_id);});
     document.getElementById("vis-total-mes").textContent = totalMes;
     document.getElementById("vis-uniq-mes").textContent = uniqMes.size;
 
-    // Tabela últimos 30 dias (mais recente primeiro)
-    const days = Object.keys(byDay).sort((a,b)=>b.localeCompare(a));
-    if(!days.length) { tabela.innerHTML = '<div class="empty"><div class="eicon">📊</div>Nenhuma visita registrada ainda.</div>'; return; }
+    const th = t=>`<th style="text-align:center;padding:6px 4px;border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;">${t}</th>`;
+    const td = (v,color)=>`<td style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--br);font-weight:600;font-size:12px;color:${color||"var(--dk)"};">${v}</td>`;
 
-    const fmtDate = d => { const [,m,dd] = d.split("-"); return dd+"/"+m; };
-    const th = t => `<th style="text-align:center;padding:6px 4px;border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;">${t}</th>`;
-    const td = (v,color) => `<td style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--br);font-weight:600;font-size:12px;color:${color||"var(--dk)"};">${v}</td>`;
-    tabela.innerHTML = `<table style="width:100%;border-collapse:collapse;">
-      <thead><tr style="background:var(--bg2);color:var(--dl);">
-        <th style="text-align:left;padding:6px 6px;border-bottom:1px solid var(--br);font-size:11px;">Data</th>
-        ${th("Únicos")}${th("Visitas")}${th("Orç.")}${th("Marcadas")}
-      </tr></thead>
-      <tbody>${days.map((d,i) => {
-        const orcCount = byDay[d].orcs ? byDay[d].orcs.size : 0;
-        const vcCount  = byDay[d].vcs  || 0;
-        return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
-        <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;white-space:nowrap;">${fmtDate(d)}${d===hoje?' <span style="background:var(--a);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px;margin-left:3px;">hoje</span>':''}</td>
-        ${td(byDay[d].uniq.size,"var(--a)")}
-        ${td(byDay[d].total)}
-        ${td(orcCount||"—", orcCount>0?"#2E7D52":"var(--dl)")}
-        ${td(vcCount||"—",  vcCount>0?"#1565C0":"var(--dl)")}
-      </tr>`;}).join("")}</tbody>
-    </table>`;
+    if(isMes) {
+      // ── Agrupamento mensal ──
+      const byMonth = {};
+      rows.forEach(r=>{
+        const m=utcToLocalDate(r.visited_at).slice(0,7);
+        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        byMonth[m].total++; byMonth[m].uniq.add(r.session_id);
+      });
+      orcRows.forEach((r,i)=>{
+        const m=utcToLocalDate(r.created_at).slice(0,7);
+        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        byMonth[m].orcs.add(r.visitor_id||("__idx__"+i));
+      });
+      vcRows.forEach(r=>{
+        const m=utcToLocalDate(r.created_at).slice(0,7);
+        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        byMonth[m].vcs=(byMonth[m].vcs||0)+1;
+      });
+      const MESES=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+      const fmtMes=m=>{const[y,mo]=m.split("-");return MESES[parseInt(mo)-1]+"/"+y.slice(2);};
+      const months=Object.keys(byMonth).sort((a,b)=>b.localeCompare(a));
+      if(!months.length){tabela.innerHTML='<div class="empty"><div class="eicon">📊</div>Nenhuma visita registrada ainda.</div>';return;}
+      tabela.innerHTML=`<table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:var(--bg2);color:var(--dl);">
+          <th style="text-align:left;padding:6px 6px;border-bottom:1px solid var(--br);font-size:11px;">Mês</th>
+          ${th("Únicos")}${th("Visitas")}${th("Orç.")}${th("Marcadas")}
+        </tr></thead>
+        <tbody>${months.map((m,i)=>{
+          const orcCount=byMonth[m].orcs?byMonth[m].orcs.size:0;
+          const vcCount=byMonth[m].vcs||0;
+          return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
+            <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;white-space:nowrap;">${fmtMes(m)}${m===mesAtual?' <span style="background:var(--a);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px;margin-left:3px;">atual</span>':''}</td>
+            ${td(byMonth[m].uniq.size,"var(--a)")}
+            ${td(byMonth[m].total)}
+            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)")}
+            ${td(vcCount||"—",vcCount>0?"#1565C0":"var(--dl)")}
+          </tr>`;}).join("")}</tbody>
+      </table>`;
+    } else {
+      // ── Agrupamento diário (comportamento original) ──
+      const byDay={};
+      rows.forEach(r=>{
+        const day=utcToLocalDate(r.visited_at);
+        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:new Set()};
+        byDay[day].total++; byDay[day].uniq.add(r.session_id);
+      });
+      orcRows.forEach((r,i)=>{
+        const day=utcToLocalDate(r.created_at);
+        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        byDay[day].orcs.add(r.visitor_id||("__idx__"+i));
+      });
+      vcRows.forEach(r=>{
+        const day=utcToLocalDate(r.created_at);
+        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        byDay[day].vcs=(byDay[day].vcs||0)+1;
+      });
+      const days=Object.keys(byDay).sort((a,b)=>b.localeCompare(a));
+      if(!days.length){tabela.innerHTML='<div class="empty"><div class="eicon">📊</div>Nenhuma visita registrada ainda.</div>';return;}
+      const fmtDate=d=>{const[,m,dd]=d.split("-");return dd+"/"+m;};
+      tabela.innerHTML=`<table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:var(--bg2);color:var(--dl);">
+          <th style="text-align:left;padding:6px 6px;border-bottom:1px solid var(--br);font-size:11px;">Data</th>
+          ${th("Únicos")}${th("Visitas")}${th("Orç.")}${th("Marcadas")}
+        </tr></thead>
+        <tbody>${days.map((d,i)=>{
+          const orcCount=byDay[d].orcs?byDay[d].orcs.size:0;
+          const vcCount=byDay[d].vcs||0;
+          return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
+            <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;white-space:nowrap;">${fmtDate(d)}${d===hoje?' <span style="background:var(--a);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px;margin-left:3px;">hoje</span>':''}</td>
+            ${td(byDay[d].uniq.size,"var(--a)")}
+            ${td(byDay[d].total)}
+            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)")}
+            ${td(vcCount||"—",vcCount>0?"#1565C0":"var(--dl)")}
+          </tr>`;}).join("")}</tbody>
+      </table>`;
+    }
   } catch(e) {
     tabela.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar visitas: '+e.message+'</div>';
     ["vis-total-hoje","vis-uniq-hoje","vis-total-mes","vis-uniq-mes"].forEach(id => document.getElementById(id).textContent = "—");
   }
-}
+}}
 
 let _wppTel = null; // telefone selecionado
 
