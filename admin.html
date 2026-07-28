@@ -81,6 +81,31 @@ button{cursor:pointer;}
 .dc-label{font-size:11px;color:var(--dl);font-weight:600;letter-spacing:.3px;text-transform:uppercase;margin-bottom:4px;}
 .dc-sub{font-size:11px;color:var(--dl);min-height:14px;}
 .dc-up{color:#16a34a;font-weight:700;}
+/* EVENT DETAIL MODAL */
+#modal-ev-det{display:none;position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.55);overflow-y:auto;padding:20px 12px;}
+#modal-ev-det.open{display:flex;align-items:flex-start;justify-content:center;}
+#modal-ev-box{background:var(--card);border-radius:16px;width:100%;max-width:720px;box-shadow:0 12px 48px rgba(0,0,0,.22);overflow:hidden;}
+.mev-header{background:var(--a);padding:18px 20px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.mev-title{color:#fff;font-size:17px;font-weight:700;line-height:1.3;flex:1;}
+.mev-close{background:rgba(255,255,255,.22);border:none;color:#fff;border-radius:50%;width:30px;height:30px;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.mev-body{padding:18px 20px 24px;}
+.mev-sec{margin-bottom:18px;}
+.mev-sec-title{font-size:11px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--br);}
+.mev-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;}
+.mev-field{font-size:12px;color:var(--dl);}
+.mev-field span{display:block;font-size:13px;font-weight:600;color:var(--dk);margin-top:1px;}
+.mev-badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:12px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+.mev-chips{display:flex;flex-wrap:wrap;gap:5px;}
+.mev-chip{background:var(--al);color:var(--wa);border:1px solid var(--am);border-radius:8px;padding:3px 9px;font-size:11px;font-weight:600;}
+.mev-table{width:100%;border-collapse:collapse;font-size:12px;}
+.mev-table th{text-align:left;padding:5px 7px;background:var(--bg2);color:var(--dl);font-weight:600;font-size:10px;text-transform:uppercase;border-bottom:1px solid var(--br);}
+.mev-table td{padding:6px 7px;border-bottom:1px solid var(--br);}
+.mev-np{color:#dc2626;font-weight:700;}
+.mev-pg{color:#16a34a;font-weight:700;}
+.mev-at{color:#f59e0b;font-weight:700;}
+.mev-prog{height:6px;border-radius:3px;background:var(--br);overflow:hidden;margin:6px 0 2px;}
+.mev-prog-fill{height:100%;border-radius:3px;background:var(--a);}
+.mev-sumrow{font-weight:700;background:var(--bg2);}
 .dc-dn{color:#dc2626;font-weight:700;}
 .wpp-contact-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--br);transition:background .1s;}
 .wpp-contact-item:hover{background:var(--bg);}
@@ -364,7 +389,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.27c</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.28b</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -613,8 +638,12 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           <div class="dash-card" id="dc-receber">
             <div class="dc-icon">💰</div>
             <div class="dc-val" id="dc-receber-val">—</div>
-            <div class="dc-label">Total a receber</div>
-            <div class="dc-sub" id="dc-receber-sub">parcelas não pagas</div>
+            <div class="dc-label">Falta receber · eventos futuros</div>
+            <div class="dc-sub" id="dc-receber-sub"></div>
+            <div id="dc-receber-bar" style="margin-top:8px;height:4px;border-radius:2px;background:var(--br);overflow:hidden;display:none;">
+              <div id="dc-receber-bar-fill" style="height:100%;background:var(--a);border-radius:2px;transition:width .5s;"></div>
+            </div>
+            <div id="dc-receber-total" style="font-size:10px;color:var(--dl);margin-top:4px;display:none;"></div>
           </div>
           <div class="dash-card" id="dc-visitas">
             <div class="dc-icon">👁</div>
@@ -3910,6 +3939,179 @@ async function _orcConfirmarVisita() {
 }
 
 // ── Dashboard ────────────────────────────────────────────────
+// ── Detalhe do Evento ─────────────────────────────────────────────
+function closeEventoDetalhe() {
+  document.getElementById("modal-ev-det").classList.remove("open");
+}
+
+async function openEventoDetalhe(cod) {
+  const modal = document.getElementById("modal-ev-det");
+  const body  = document.getElementById("mev-body");
+  const title = document.getElementById("mev-title");
+  title.textContent = "Carregando…";
+  body.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  modal.classList.add("open");
+
+  const fmtR = v => "R$ " + (v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const fmtD = d => d ? new Date(d+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"}) : "—";
+  const hoje = localDate();
+
+  const SPACE_LABELS = {
+    spTumb:"Salão Tumbérgia", spPeroba:"Peroba Rosa", spBrom:"Salão Bromélias",
+    acLoft:"Loft Flamboyant", acCasa:"Casa Flamboyant",
+    acSf1:"Suíte Flamb. 1", acSf2:"Suíte Flamb. 2", acSf3:"Suíte Flamb. 3", acSf4:"Suíte Flamb. 4", acSf5:"Suíte Flamb. 5",
+    acSb1:"Suíte Brom. 1", acSb2:"Suíte Brom. 2", acSb3:"Suíte Brom. 3",
+    acSuiteAss:"Suíte Assessoria", fuBal:"Balcão Hexagonal"
+  };
+  const COUNTER_LABELS = {day:"Piscina Day Use",mesas:"Mesas de Madeira",cad:"Cadeiras Tiffany",ban:"Bancos de Madeira",horas:"Horas extras recepção",mont:"Diárias montagem",desm:"Diárias desmontagem"};
+  const STATUS_COLORS = {confirmado:"#16a34a",proposta:"#f59e0b",cancelado:"#dc2626",realizado:"#2563eb"};
+
+  try {
+    const [evRows, recRows, pagRows, vtRows, fornecMap, natMap] = await Promise.all([
+      dbGet("agenda", "cod=eq."+encodeURIComponent(cod)+"&select=*"),
+      dbGet("contas_a_receber", "cod_evento=eq."+encodeURIComponent(cod)+"&select=*&order=vencimento.asc"),
+      dbGet("contas_a_pagar", "cod_evento=eq."+encodeURIComponent(cod)+"&select=*&order=vencimento_real.asc"),
+      dbGet("visitas_tecnicas", "cod_evento=eq."+encodeURIComponent(cod)+"&select=*&order=data_vt.asc"),
+      getFornecMap(),
+      getNaturezaMap()
+    ]);
+
+    const ev = evRows && evRows[0];
+    if(!ev) { body.innerHTML='<div class="empty"><div class="eicon">⚠️</div>Evento não encontrado.</div>'; return; }
+
+    title.textContent = ev.nome_evento || cod;
+
+    const statusColor = STATUS_COLORS[ev.status] || "var(--dl)";
+    const extras = ev.spaces_json ? JSON.parse(ev.spaces_json) : {};
+
+    // ── Espaços e itens ──
+    const chips = Object.entries(SPACE_LABELS)
+      .filter(([k]) => extras[k])
+      .map(([,label]) => `<span class="mev-chip">${label}</span>`);
+    Object.entries(COUNTER_LABELS).forEach(([k,label]) => {
+      if(extras[k] && extras[k] > 0) chips.push(`<span class="mev-chip">${label}: ${extras[k]}</span>`);
+    });
+
+    // ── A receber ──
+    const recTotal = recRows.reduce((s,r)=>s+(r.valor||0),0);
+    const recPago  = recRows.filter(r=>r.status!=="NP").reduce((s,r)=>s+(r.valor||0),0);
+    const recNP    = recTotal - recPago;
+    const recPct   = recTotal>0 ? Math.round(recPago/recTotal*100) : 0;
+    const recRowsHtml = recRows.map(r=>{
+      const atras = r.vencimento && r.vencimento < hoje && r.status==="NP";
+      const cls = r.status!=="NP" ? "mev-pg" : atras ? "mev-at" : "mev-np";
+      const stLbl = r.status!=="NP" ? "✓ Pago" : atras ? "Atrasado" : "A receber";
+      return `<tr>
+        <td>${fmtD(r.vencimento)}</td>
+        <td><strong>${fmtR(r.valor)}</strong></td>
+        <td class="${cls}">${stLbl}</td>
+        <td style="color:var(--dl);font-size:11px;">${r.obs||r.descricao||""}</td>
+      </tr>`;
+    }).join("");
+
+    // ── A pagar ──
+    const pagTotal = pagRows.reduce((s,r)=>s+(r.valor||0),0);
+    const pagNP    = pagRows.filter(r=>r.status==="NP").reduce((s,r)=>s+(r.valor||0),0);
+    const pagRowsHtml = pagRows.map(r=>{
+      const atras = r.vencimento_real && r.vencimento_real < hoje && r.status==="NP";
+      const cls = r.status!=="NP" ? "mev-pg" : atras ? "mev-at" : "mev-np";
+      const stLbl = r.status!=="NP" ? "✓ Pago" : atras ? "Atrasado" : "A pagar";
+      return `<tr>
+        <td>${fmtD(r.vencimento_real)}</td>
+        <td><strong>${fmtR(r.valor)}</strong></td>
+        <td style="color:var(--dl);font-size:11px;">${natMap[r.natureza]||r.natureza||"—"}</td>
+        <td style="color:var(--dl);font-size:11px;">${fornecMap[r.fornecedor_cod]?.nome||r.fornecedor_cod||"—"}</td>
+        <td class="${cls}">${stLbl}</td>
+      </tr>`;
+    }).join("");
+
+    // ── Visita técnica ──
+    let vtHtml = "";
+    if(vtRows && vtRows.length) {
+      vtHtml = vtRows.map(vt=>`
+        <div style="background:var(--bg2);border-radius:8px;padding:10px 12px;margin-bottom:6px;">
+          <div style="font-weight:600;font-size:12px;">📋 VT em ${fmtD(vt.data_vt)}</div>
+          ${vt.obs ? `<div style="font-size:11px;color:var(--dl);margin-top:4px;">${vt.obs}</div>` : ""}
+          ${vt.status ? `<div style="font-size:11px;margin-top:4px;">Status: <strong>${vt.status}</strong></div>` : ""}
+        </div>`).join("");
+    }
+
+    // ── Resultado financeiro ──
+    const saldo = recTotal - pagTotal;
+
+    body.innerHTML = `
+      <!-- Info geral -->
+      <div class="mev-sec">
+        <div class="mev-grid">
+          <div class="mev-field">Código <span>${ev.cod}</span></div>
+          <div class="mev-field">Status <span><span class="mev-badge" style="background:${statusColor}22;color:${statusColor};">${ev.status||"—"}</span></span></div>
+          <div class="mev-field">Tipo <span>${ev.tipo_evento||"—"}</span></div>
+          <div class="mev-field">Valor contrato <span>${ev.valor_locacao ? fmtR(ev.valor_locacao) : "—"}</span></div>
+          <div class="mev-field">Data do evento <span>${fmtD(ev.data_evento)}</span></div>
+          ${ev.data_fim ? `<div class="mev-field">Término <span>${fmtD(ev.data_fim)}</span></div>` : ""}
+          ${ev.cin  ? `<div class="mev-field">Check-in <span>${fmtD(ev.cin)}</span></div>` : ""}
+          ${ev.cout ? `<div class="mev-field">Check-out <span>${fmtD(ev.cout)}</span></div>` : ""}
+        </div>
+        ${ev.obs ? `<div style="margin-top:10px;font-size:12px;color:var(--dl);"><em>${ev.obs}</em></div>` : ""}
+      </div>
+
+      ${chips.length ? `
+      <!-- Espaços / itens inclusos -->
+      <div class="mev-sec">
+        <div class="mev-sec-title">🏛️ Espaços e Itens Inclusos</div>
+        <div class="mev-chips">${chips.join("")}</div>
+      </div>` : ""}
+
+      <!-- A receber -->
+      <div class="mev-sec">
+        <div class="mev-sec-title">💰 Contas a Receber</div>
+        ${recRows.length ? `
+          <div class="mev-prog"><div class="mev-prog-fill" style="width:${recPct}%;"></div></div>
+          <div style="font-size:10px;color:var(--dl);margin-bottom:6px;">${recPct}% recebido · falta ${fmtR(recNP)} de ${fmtR(recTotal)}</div>
+          <table class="mev-table">
+            <thead><tr><th>Vencimento</th><th>Valor</th><th>Status</th><th>Obs</th></tr></thead>
+            <tbody>${recRowsHtml}
+              <tr class="mev-sumrow"><td colspan="2">${fmtR(recTotal)}</td><td colspan="2">Falta: <span class="mev-np">${fmtR(recNP)}</span></td></tr>
+            </tbody>
+          </table>` : `<div style="font-size:12px;color:var(--dl);">Nenhuma parcela cadastrada.</div>`}
+      </div>
+
+      <!-- A pagar -->
+      <div class="mev-sec">
+        <div class="mev-sec-title">💸 Contas a Pagar</div>
+        ${pagRows.length ? `
+          <table class="mev-table">
+            <thead><tr><th>Vencimento</th><th>Valor</th><th>Natureza</th><th>Fornecedor</th><th>Status</th></tr></thead>
+            <tbody>${pagRowsHtml}
+              <tr class="mev-sumrow"><td colspan="2">${fmtR(pagTotal)}</td><td colspan="2">Pendente: <span class="mev-np">${fmtR(pagNP)}</span></td><td></td></tr>
+            </tbody>
+          </table>` : `<div style="font-size:12px;color:var(--dl);">Nenhuma despesa cadastrada.</div>`}
+      </div>
+
+      <!-- Resultado -->
+      ${(recRows.length || pagRows.length) ? `
+      <div class="mev-sec">
+        <div class="mev-sec-title">📊 Resultado Previsto</div>
+        <div class="mev-grid">
+          <div class="mev-field">Total a receber <span>${fmtR(recTotal)}</span></div>
+          <div class="mev-field">Total despesas <span>${fmtR(pagTotal)}</span></div>
+          <div class="mev-field">Saldo previsto <span style="color:${saldo>=0?"#16a34a":"#dc2626"};font-size:15px;">${fmtR(saldo)}</span></div>
+        </div>
+      </div>` : ""}
+
+      ${vtHtml ? `
+      <!-- Visita técnica -->
+      <div class="mev-sec">
+        <div class="mev-sec-title">🔍 Visita Técnica</div>
+        ${vtHtml}
+      </div>` : ""}
+    `;
+  } catch(e) {
+    body.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro: '+e.message+'</div>';
+    console.error("openEventoDetalhe:", e);
+  }
+}
+
 async function renderDashboard() {
   const fmtR = v => "R$ " + (v||0).toLocaleString("pt-BR",{minimumFractionDigits:0,maximumFractionDigits:0});
   const pct = (cur, prev) => prev === 0 ? null : Math.round((cur - prev) / prev * 100);
@@ -3934,7 +4136,7 @@ async function renderDashboard() {
   try {
     const [agendaRows, receberRows, visitasRows, orcRows] = await Promise.all([
       dbGet("agenda", "data_evento=gte."+hojStr+"&select=cod,nome_evento,data_evento,tipo_evento,status&order=data_evento.asc&limit=200"),
-      dbGet("contas_a_receber", "status=eq.NP&select=valor,vencimento"),
+      dbGet("contas_a_receber", "select=valor,vencimento,status,cod_evento&limit=5000"),
       dbGet("site_visits", "visited_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=visited_at,session_id&limit=10000"),
       dbGet("orcamentos", "created_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=created_at,valor_total,status,visitor_id&limit=2000")
     ]);
@@ -3948,13 +4150,26 @@ async function renderDashboard() {
       ? "próximo: " + (prox.nome_evento||prox.cod) + " em " + new Date(prox.data_evento+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"})
       : "nenhum agendado";
 
-    // — A receber
-    const totalRec = receberRows.reduce((s,r)=>s+(r.valor||0), 0);
-    document.getElementById("dc-receber-val").textContent = fmtR(totalRec);
-    const atrasadas = receberRows.filter(r => r.vencimento && r.vencimento < hojStr).reduce((s,r)=>s+(r.valor||0),0);
+    // — A receber: filtrado por eventos futuros
+    const futureCods = new Set(agendaValidos.map(r => r.cod).filter(Boolean));
+    const recFuturos = receberRows.filter(r => futureCods.has(r.cod_evento));
+    const totalFuturo = recFuturos.reduce((s,r)=>s+(r.valor||0), 0);
+    const faltaFuturo = recFuturos.filter(r=>r.status==="NP").reduce((s,r)=>s+(r.valor||0), 0);
+    const pctFalta = totalFuturo > 0 ? Math.round(faltaFuturo / totalFuturo * 100) : 0;
+    document.getElementById("dc-receber-val").textContent = fmtR(faltaFuturo);
+    const atrasadas = recFuturos.filter(r => r.status==="NP" && r.vencimento && r.vencimento < hojStr).reduce((s,r)=>s+(r.valor||0),0);
     document.getElementById("dc-receber-sub").textContent = atrasadas > 0
       ? fmtR(atrasadas) + " em atraso"
       : "nenhuma em atraso";
+    const barEl = document.getElementById("dc-receber-bar");
+    const barFill = document.getElementById("dc-receber-bar-fill");
+    const totalEl = document.getElementById("dc-receber-total");
+    if(totalFuturo > 0) {
+      barEl.style.display = "block";
+      barFill.style.width = pctFalta + "%";
+      totalEl.style.display = "block";
+      totalEl.textContent = pctFalta + "% de " + fmtR(totalFuturo) + " total contratado";
+    }
 
     // — Visitantes: agrupa por mês usando data local (não UTC)
     const uniqMes = offset => {
@@ -3997,12 +4212,14 @@ async function renderDashboard() {
           <th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--br);">Data</th>
           <th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--br);">Tipo</th>
           <th style="text-align:left;padding:8px 10px;border-bottom:1px solid var(--br);">Status</th>
+          <th style="padding:8px 10px;border-bottom:1px solid var(--br);"></th>
         </tr></thead>
         <tbody>${agendaRows.slice(0,10).map((r,i)=>`<tr style="background:${i%2?"var(--bg2)":"transparent"}">
           <td style="padding:7px 10px;border-bottom:1px solid var(--br);font-weight:600;">${r.nome_evento||r.cod}</td>
           <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${fmt(r.data_evento)}</td>
           <td style="padding:7px 10px;border-bottom:1px solid var(--br);color:var(--dl);">${r.tipo_evento||"—"}</td>
           <td style="padding:7px 10px;border-bottom:1px solid var(--br);color:var(--dl);">${r.status||"—"}</td>
+          <td style="padding:5px 8px;border-bottom:1px solid var(--br);text-align:center;"><button onclick="openEventoDetalhe('${r.cod}')" title="Ver detalhes do evento" style="background:transparent;border:1px solid var(--br);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--dl);cursor:pointer;">👁 Ver</button></td>
         </tr>`).join("")}</tbody>
       </table>${agendaRows.length>10?`<div style="font-size:12px;color:var(--dl);padding:8px 10px;">+${agendaRows.length-10} eventos • <a href="#" onclick="setTab('agenda');return false;" style="color:var(--a);">ver todos na agenda</a></div>`:""}`;
     }
@@ -9767,6 +9984,19 @@ async function bulkDeletePagar(){
     <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
       <button onclick="hideBioModal()" style="background:white;border:1.5px solid #e2e8f0;color:#64748b;padding:10px 20px;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit">Agora não</button>
       <button id="btn-bio-reg" onclick="registerBiometric()" style="background:#1e3a5f;color:white;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Habilitar</button>
+    </div>
+  </div>
+</div>
+
+<!-- EVENT DETAIL MODAL -->
+<div id="modal-ev-det">
+  <div id="modal-ev-box">
+    <div class="mev-header">
+      <div class="mev-title" id="mev-title">—</div>
+      <button class="mev-close" onclick="closeEventoDetalhe()">✕</button>
+    </div>
+    <div class="mev-body" id="mev-body">
+      <div class="empty"><div class="eicon">⏳</div>Carregando...</div>
     </div>
   </div>
 </div>
