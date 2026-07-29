@@ -1132,6 +1132,17 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
           </div>
         </div>
         <div id="vis-tabela" style="overflow-x:auto;"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
+        <div style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="sec-t" style="font-size:15px;margin:0;">🌐 Origem dos Acessos</div>
+            <select id="vis-origem-mes" onchange="renderOrigemChart()" style="margin-left:auto;padding:5px 10px;border:1px solid var(--br);border-radius:8px;background:var(--bg2);color:var(--dk);font-size:13px;cursor:pointer;"></select>
+          </div>
+          <div id="vis-origem-vazio" style="display:none;text-align:center;padding:20px;font-size:13px;color:var(--dl);">Nenhum dado de origem ainda. Use links com UTM para rastrear.</div>
+          <div id="vis-origem-wrap" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;justify-content:center;">
+            <div style="max-width:260px;width:100%;"><canvas id="vis-origem-chart"></canvas></div>
+            <div id="vis-origem-legenda" style="display:flex;flex-direction:column;gap:8px;"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div id="p-whatsapp" class="panel">
@@ -4251,7 +4262,7 @@ async function renderVisitas() {
     const isMes = _visAgrup === "mes";
     const since = new Date(); since.setDate(since.getDate() - (isMes ? 365 : 30)); since.setHours(0,0,0,0);
     const [rows, orcRows, vcRows] = await Promise.all([
-      dbGet("site_visits", "visited_at=gte."+since.toISOString()+"&select=visited_at,session_id,referrer,device&order=visited_at.desc&limit=5000"),
+      dbGet("site_visits", "visited_at=gte."+since.toISOString()+"&select=visited_at,session_id,referrer,device,utm_source&order=visited_at.desc&limit=5000"),
       dbGet("orcamentos", "created_at=gte."+since.toISOString()+"&select=created_at,visitor_id&limit=5000"),
       dbGet("visitas_comerciais", "status=neq.cancelada&select=created_at&limit=2000")
     ]);
@@ -4347,10 +4358,66 @@ async function renderVisitas() {
           </tr>`;}).join("")}</tbody>
       </table>`;
     }
+    // Gráfico de origem
+    _origemRows = rows;
+    const mesesDisp = [...new Set(rows.map(r=>utcToLocalDate(r.visited_at).slice(0,7)))].sort((a,b)=>b.localeCompare(a));
+    const selMes = document.getElementById("vis-origem-mes");
+    if(selMes) {
+      const MESES=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+      const fmtMes=m=>{const[y,mo]=m.split("-");return MESES[parseInt(mo)-1]+"/"+y.slice(2);};
+      const prevVal = selMes.value;
+      selMes.innerHTML = mesesDisp.map(m=>`<option value="${m}"${m===prevVal?' selected':''}>${fmtMes(m)}</option>`).join('');
+    }
+    renderOrigemChart();
   } catch(e) {
     tabela.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar visitas: '+e.message+'</div>';
     ["vis-total-hoje","vis-uniq-hoje","vis-total-mes","vis-uniq-mes"].forEach(id => document.getElementById(id).textContent = "—");
   }
+}
+
+
+function renderOrigemChart() {
+  const sel = document.getElementById("vis-origem-mes");
+  const wrap = document.getElementById("vis-origem-wrap");
+  const vazio = document.getElementById("vis-origem-vazio");
+  const leg = document.getElementById("vis-origem-legenda");
+  if(!sel || !wrap) return;
+  const mes = sel.value;
+  const filtered = mes ? _origemRows.filter(r=>utcToLocalDate(r.visited_at).slice(0,7)===mes) : _origemRows;
+  const LABELS = {whatsapp:'WhatsApp',instagram:'Instagram',google:'Google',facebook:'Facebook',tiktok:'TikTok'};
+  const counts = {};
+  filtered.forEach(r=>{
+    const raw=(r.utm_source||'').trim().toLowerCase();
+    const label = raw ? (LABELS[raw]||raw.charAt(0).toUpperCase()+raw.slice(1)) : 'Desconhecido';
+    counts[label]=(counts[label]||0)+1;
+  });
+  const labels=Object.keys(counts).sort((a,b)=>(a==='Desconhecido'?1:b==='Desconhecido'?-1:counts[b]-counts[a]));
+  const data=labels.map(l=>counts[l]);
+  const CORES=['#E8A52A','#2E7D52','#1565C0','#7B1FA2','#C62828','#00695C','#F57C00','#37474F'];
+  if(!labels.length){
+    wrap.style.display='none';
+    vazio.style.display='';
+    return;
+  }
+  wrap.style.display='flex';
+  vazio.style.display='none';
+  const canvas=document.getElementById("vis-origem-chart");
+  if(_origemChart){_origemChart.destroy();_origemChart=null;}
+  _origemChart=new Chart(canvas,{
+    type:'pie',
+    data:{labels,datasets:[{data,backgroundColor:CORES.slice(0,labels.length),borderWidth:2,borderColor:'transparent'}]},
+    options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{
+      const total=ctx.dataset.data.reduce((a,b)=>a+b,0);
+      return ` ${ctx.label}: ${ctx.parsed} (${Math.round(ctx.parsed/total*100)}%)`;
+    }}}}}
+  });
+  const total=data.reduce((a,b)=>a+b,0);
+  leg.innerHTML=labels.map((l,i)=>`<div style="display:flex;align-items:center;gap:8px;font-size:13px;">
+    <span style="width:12px;height:12px;border-radius:50%;background:${CORES[i]};flex-shrink:0;display:inline-block;"></span>
+    <span style="color:var(--dl);">${l}</span>
+    <b style="margin-left:auto;padding-left:12px;">${counts[l]}</b>
+    <span style="color:var(--dl);font-size:11px;">${Math.round(counts[l]/total*100)}%</span>
+  </div>`).join('');
 }
 
 let _wppTel = null; // telefone selecionado
@@ -7982,6 +8049,8 @@ async function renderAgendaTabela(){
 // RELATÓRIO
 // ══════════════════════════════════════════
 let _relChart = null;
+let _origemChart = null;
+let _origemRows = [];
 function relLimparFiltro(){
   const de=document.getElementById("rel-de"); if(de) de.value="";
   const ate=document.getElementById("rel-ate"); if(ate) ate.value="";
