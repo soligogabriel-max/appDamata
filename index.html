@@ -26,10 +26,21 @@
       if(!sid){ sid = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,function(c){return(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)}); localStorage.setItem('dmv_sid',sid); }
       var ref = document.referrer || '';
       var dev = /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+      var p = new URLSearchParams(location.search);
+      var utms = {};
+      ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(function(k){
+        var v = p.get(k);
+        if(v) utms[k] = v;
+      });
+      if(Object.keys(utms).length){
+        localStorage.setItem('dmv_utms', JSON.stringify(utms));
+      } else {
+        try{ utms = JSON.parse(localStorage.getItem('dmv_utms')||'{}'); }catch(e2){}
+      }
       fetch('https://wwnndsprpofmgbklqdgg.supabase.co/rest/v1/site_visits',{
         method:'POST',
         headers:{'apikey':'sb_publishable__RQxBa8P-lryd0LtWgTJPw_-aSWERWK','Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify({session_id:sid,referrer:ref,device:dev})
+        body:JSON.stringify(Object.assign({session_id:sid,referrer:ref,device:dev},utms))
       });
     } catch(e){}
   })();
