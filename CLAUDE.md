@@ -33,7 +33,18 @@ b64 = base64.b64encode(html.encode('utf-8')).decode('ascii')
 
 ## Backend: Supabase (PostgREST)
 
-- Apenas anon key disponível no código — DDL requer Dashboard > SQL Editor
+- Projeto: `wwnndsprpofmgbklqdgg`
+- Anon key (no código): ver `index.html` linha ~31
+- Service role key e Personal Access Token (PAT): guardados em `~/.claude/damata-secrets` no ambiente de execução
+- Para DDL (ALTER TABLE, CREATE TABLE, etc.) usar sempre a Management API com o PAT:
+  ```bash
+  PAT=$(cat ~/.claude/damata-secrets 2>/dev/null | grep PAT | cut -d= -f2)
+  curl -s -X POST "https://api.supabase.com/v1/projects/wwnndsprpofmgbklqdgg/database/query" \
+    -H "Authorization: Bearer $PAT" \
+    -H "Content-Type: application/json" \
+    -d '{"query": "SQL AQUI"}'
+  ```
+- Se o arquivo não existir, pedir o PAT ao usuário e recriar com `mkdir -p ~/.claude && printf 'PAT=TOKEN\n' > ~/.claude/damata-secrets`
 - Tabela principal: `agenda` (eventos/contratos)
 - Campos relevantes: `cod`, `nome_evento`, `data_evento`, `data_fim`, `tipo_evento`,
   `valor_locacao`, `cin`, `cout`, `status`, `payments_json`, `spaces_json`, `obs`
