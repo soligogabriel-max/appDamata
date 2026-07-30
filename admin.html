@@ -1896,8 +1896,7 @@ const WD=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 const ET={casamento:{label:"Casamento",color:"#2E3C44",bg:"#E8EEF0"},aniversario:{label:"Aniversário",color:"#7A5C1A",bg:"#FDF0CC"},corporativo:{label:"Corporativo",color:"#2A4A3A",bg:"#D8EDE2"},hospedagem:{label:"Hospedagem",color:"#1A4A5C",bg:"#D8EAF0"},festa:{label:"Festa",color:"#5C2A6A",bg:"#EDE0F5"},outro:{label:"Outro",color:"#4A4A4A",bg:"#EBEBEB"}};
 const SM={confirmado:{label:"Confirmado",color:"#2A6644"},proposta:{label:"Proposta",color:"#C08820"},cancelado:{label:"Cancelado",color:"#A03030"}};
 const RL={admin:"Admin",equipe:"Equipe",fornecedor:"Fornecedor",cliente:"Cliente",assessoria:"Assessoria"};
-const ADMIN_EMAILS=["soligogabriel@gmail.com"];
-function isAdmin(u){ return u && (u.role==="admin" || ADMIN_EMAILS.includes(u.email)); }
+function isAdmin(u){ return u && u.role==="admin"; }
 
 // ══════════════════════════════════════════
 // AUTH (simples — sem Supabase Auth ainda)
@@ -2216,8 +2215,8 @@ async function doCadastroCliente() {
       er.style.display="block"; er.textContent="Erro ao criar conta: "+authErr.message; return;
     }
     await dbInsert("app_users", {
-      name: nome, email, phone: cel, password: '',
-      role: "cliente", status: "approved",
+      name: nome, email, phone: cel,
+      role: "cliente", status: "pending",
       event_ids: [], personal,
     });
     showSc("cad-ok");
@@ -2245,7 +2244,7 @@ async function doReg() {
     if (authErr && !authErr.message.toLowerCase().includes("already registered")) {
       er.style.display="block"; er.textContent="Erro ao criar conta: "+authErr.message; return;
     }
-    await dbInsert("app_users", {name, email:em, phone, password:'', role:"pending", status:"pending", event_ids:[], personal:{}});
+    await dbInsert("app_users", {name, email:em, phone, role:"pending", status:"pending", event_ids:[], personal:{}});
     showSc("pending");
   } catch(e) {
     er.style.display="block"; er.textContent="Erro ao enviar. Tente novamente.";
