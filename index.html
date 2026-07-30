@@ -627,7 +627,7 @@ async function confirmarVisitaPublica() {
   err.style.display = "none";
   try {
     const vid = (()=>{ try { return localStorage.getItem("dmv_sid"); } catch(e) { return null; } })();
-    const res = await fetch(SB_URL+"/rest/v1/visitas_comerciais", {
+    const res = await fetch(SB_URL+"/rest/v1/visitas_comerciais?select=id", {
       method: "POST",
       headers: { apikey:SB_KEY, Authorization:"Bearer "+SB_KEY, "Content-Type":"application/json", Prefer:"return=representation" },
       body: JSON.stringify({ slot_id:_vSelSlotId, nome, whatsapp:wpp||null, visitor_id:vid, status:"agendada" })
