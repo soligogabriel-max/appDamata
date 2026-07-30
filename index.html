@@ -649,7 +649,7 @@ async function confirmarVisitaPublica() {
   }
 }
 
-function _checkVisitaHash() { if (location.hash === "#visita") abrirVisita(); }
+function _checkVisitaHash() { if (location.hash === "#visita" || location.search.includes("visita")) abrirVisita(); }
 window.addEventListener("hashchange", _checkVisitaHash);
 
 async function init() {
