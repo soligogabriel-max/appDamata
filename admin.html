@@ -389,7 +389,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.30a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.30b</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3297,7 +3297,7 @@ async function abrirHistoricoVisitante(visitorId, nome, whatsapp) {
     if (visitorId) vcFilters.push("visitor_id.eq."+visitorId);
     if (whatsapp)  vcFilters.push("whatsapp.eq."+encodeURIComponent(whatsapp));
     const vcQ = vcFilters.length ? "or=("+vcFilters.join(",")+")" : null;
-    promises.push(vcQ ? dbGet("visitas_comerciais", vcQ+"&select=id,created_at,status,obs,slot_id,slots_visita(data,hora)&order=created_at.desc&limit=50") : Promise.resolve([]));
+    promises.push(vcQ ? dbGet("visitas_comerciais", vcQ+"&select=id,created_at,status,obs,feedback,feedback_motivo,slot_id,slots_visita(data,hora)&order=created_at.desc&limit=50") : Promise.resolve([]));
 
     const [siteVisits, orcamentos, vcVisitas] = await Promise.all(promises);
 
@@ -3360,6 +3360,7 @@ async function abrirHistoricoVisitante(visitorId, nome, whatsapp) {
             </div>
           </div>
           ${v.obs?`<div style="font-size:11px;color:var(--dl);border-top:1px solid var(--br);padding-top:5px;margin-top:2px;white-space:pre-wrap;">${v.obs}</div>`:''}
+          ${v.feedback?`<div style="font-size:11px;margin-top:4px;padding:3px 7px;border-radius:4px;display:inline-block;background:${v.feedback==='interesse'?'#d1fae5':'#fee2e2'};color:${v.feedback==='interesse'?'#065f46':'#991b1b'};">${v.feedback==='interesse'?'✅ Interesse após visita':'❌ Sem interesse'}${v.feedback_motivo?' — '+v.feedback_motivo:''}</div>`:''}
         </div>`;
       }).join("");
     }
@@ -3729,7 +3730,7 @@ async function _vcLoadAgendadas() {
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);font-weight:600;">${fmtSlot(v.slot_id)}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.nome ? `<button onclick='abrirHistoricoVisitante(${JSON.stringify(v.visitor_id||null)},${JSON.stringify(v.nome||"")},${JSON.stringify(v.whatsapp||null)})' style='background:none;border:none;cursor:pointer;color:var(--a);font-weight:600;font-size:13px;text-decoration:underline;text-underline-offset:2px;padding:0;'>${v.nome}</button>` : "—"}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.whatsapp?`<a href="https://wa.me/55${v.whatsapp.replace(/\D/g,'')}" target="_blank" style="color:var(--a);">${v.whatsapp}</a>`:"—"}</td>
-        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${statusLabel[v.status]||v.status}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${statusLabel[v.status]||v.status}${v.feedback?` <span style="font-size:10px;background:${v.feedback==='interesse'?'#d1fae5':'#fee2e2'};color:${v.feedback==='interesse'?'#065f46':'#991b1b'};border-radius:4px;padding:1px 5px;margin-left:4px;">${v.feedback==='interesse'?'✅ Interesse':'❌ Sem interesse'}</span>`:''}${v.feedback==='sem_interesse'&&v.feedback_motivo?`<div style="font-size:10px;color:var(--dl);margin-top:2px;">${v.feedback_motivo}</div>`:''}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">
           <div style="display:flex;align-items:center;gap:6px;">
           <button onclick="vcAbrirEdicao('${v.id}')" title="Editar visita" style="padding:4px 10px;background:none;border:1px solid var(--br);border-radius:6px;cursor:pointer;font-size:12px;color:var(--a);line-height:1;white-space:nowrap;">✏️ Editar</button>
@@ -3780,8 +3781,10 @@ async function vcAbrirEdicao(vcId) {
     // include current status if it's a legacy value
     const legacyStatus = !statusOpts.find(o => o.v === v.status) ? [{ v: v.status, l: v.status }] : [];
     document.getElementById("vce-form").innerHTML = `
-      <input type="hidden" id="vce-id" value="${vcId}">
-      <input type="hidden" id="vce-gcal" value="${v.gcal_event_id || ''}">
+      <input type="hidden" id="vce-id"   value="${vcId}">
+      <input type="hidden" id="vce-gcal"  value="${v.gcal_event_id || ''}">
+      <input type="hidden" id="vce-nome"  value="${(v.nome||'').replace(/"/g,'&quot;')}">
+      <input type="hidden" id="vce-wpp"   value="${v.whatsapp||''}">
       <label class="lbl">Data e horário</label>
       <select id="vce-slot" class="inp">
         ${!v.slot_id ? '<option value="">— sem horário —</option>' : ''}
@@ -3825,11 +3828,60 @@ async function vcSalvarEdicao() {
     document.getElementById("m-vc-edit").classList.remove("open");
     _vcLoadAgendadas();
     toast("✅ Visita atualizada.");
+    if (["visitado_alta","visitado_baixa"].includes(status)) {
+      const nome = document.getElementById("vce-nome")?.value || "";
+      const wpp  = document.getElementById("vce-wpp")?.value  || "";
+      vcAbrirFollowUp(vcId, nome, wpp);
+    }
   } catch(e) {
     err.textContent = "Erro: " + e.message;
     err.style.display = "";
     btn.disabled = false; btn.textContent = "💾 Salvar";
   }
+}
+
+
+function vcAbrirFollowUp(vcId, nome, whatsapp) {
+  const baseUrl = "https://fazendadamata.com/?feedback=" + vcId;
+  const msg = "Olá " + (nome||"") + "! 🌿\n\n"
+    + "Foi um prazer te receber aqui na Fazenda Damata! Gostaríamos de saber: surgiu alguma dúvida após a visita? Você ainda tem interesse em realizar seu evento aqui?\n\n"
+    + "👇 Responda em um clique:\n"
+    + baseUrl + "\n\n"
+    + "Qualquer dúvida, estamos sempre à disposição! 🤍\nEquipe Fazenda Damata";
+  let m = document.getElementById("m-vc-followup");
+  if (!m) {
+    m = document.createElement("div");
+    m.id = "m-vc-followup";
+    m.className = "moverlay";
+    m.onclick = function(e) { if (e.target === this) m.classList.remove("open"); };
+    m.innerHTML = `<div class="modal-inner" style="max-width:500px;width:100%;">
+      <div style="font-size:18px;font-weight:800;margin-bottom:4px;">📲 Follow-up da visita</div>
+      <div id="fup-sub" style="font-size:13px;color:var(--dl);margin-bottom:14px;"></div>
+      <label class="lbl">Mensagem (edite se quiser)</label>
+      <textarea id="fup-msg" class="inp" rows="9" style="resize:vertical;font-size:13px;line-height:1.55;white-space:pre-wrap;"></textarea>
+      <div style="margin-top:6px;font-size:11px;color:var(--dl);">O link já está incluído na mensagem — o cliente clica e responde diretamente.</div>
+      <div style="display:flex;gap:10px;margin-top:14px;">
+        <a id="fup-wpp-btn" href="#" target="_blank" style="flex:1;padding:12px;background:#25d366;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px;text-decoration:none;text-align:center;">📲 Enviar no WhatsApp</a>
+        <button onclick="document.getElementById('m-vc-followup').classList.remove('open')" style="padding:12px 18px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;">Agora não</button>
+      </div>
+    </div>`;
+    document.body.appendChild(m);
+  }
+  document.getElementById("fup-msg").value = msg;
+  document.getElementById("fup-sub").textContent = whatsapp
+    ? "Para: " + nome + " · " + whatsapp
+    : "⚠️ Sem WhatsApp cadastrado — copie a mensagem manualmente.";
+  const wppBtn = document.getElementById("fup-wpp-btn");
+  wppBtn.onclick = function(e) {
+    e.preventDefault();
+    const txt = encodeURIComponent(document.getElementById("fup-msg").value);
+    const num = (whatsapp || "").replace(/\D/g, "");
+    if (num) window.open("https://wa.me/55" + num + "?text=" + txt, "_blank");
+    else { navigator.clipboard?.writeText(document.getElementById("fup-msg").value); toast("📋 Mensagem copiada!"); }
+  };
+  wppBtn.style.opacity = whatsapp ? "1" : "0.6";
+  if (!whatsapp) wppBtn.textContent = "📋 Copiar mensagem";
+  m.classList.add("open");
 }
 
 
