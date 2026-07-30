@@ -739,3 +739,47 @@ GRANT UPDATE (gcal_event_id, feedback, feedback_motivo) ON public.visitas_comerc
 -- 3. Login como assessoria → deve ver APENAS seus eventos
 -- 4. Formulário público de agendamento e feedback (landing) → testado OK
 -- ═══════════════════════════════════════════════════════════════════
+
+
+-- ═══════════════════════════════════════════════════════════════════
+-- FASE 2.1 — fecha leitura anônima de inventário e tabelas de preço
+-- Executado em 2026-07-30.
+--
+-- Auditoria pós-Fase 2 mostrou 4 políticas antigas sobrevivendo à
+-- limpeza: inventário (18 itens) e tabelas de preço (79 itens com
+-- valor_unitario) seguiam legíveis por qualquer um com a chave
+-- publishable — que está no HTML e portanto é pública.
+--
+-- Elas eram load-bearing: gerador-contrato-damata.html lia tudo com a
+-- chave anon. Corrigido antes deste script (v2026.07.30e) — o gerador
+-- agora recebe o JWT do admin.html via postMessage.
+--
+-- Não afeta usuários logados: as políticas {anon} nunca se aplicaram a
+-- role authenticated, e a de inventário era {public} mas só cobria
+-- roles sem nenhuma conta ativa. authenticated mantém SELECT.
+-- ═══════════════════════════════════════════════════════════════════
+
+DROP POLICY IF EXISTS "anon_read_inventario_orc"        ON public.inventario;
+DROP POLICY IF EXISTS "anon_read_tabelas_preco"         ON public.tabelas_preco;
+DROP POLICY IF EXISTS "anon_read_tabelas_preco_grupos"  ON public.tabelas_preco_grupos;
+DROP POLICY IF EXISTS "anon_read_tabelas_preco_itens"   ON public.tabelas_preco_itens;
+
+-- Grants residuais (INSERT/UPDATE/DELETE/TRUNCATE) que o anon ainda
+-- carregava. O RLS já bloqueava por falta de política, mas defesa em
+-- profundidade: sem grant, nem chega a avaliar política.
+REVOKE ALL ON public.inventario           FROM anon;
+REVOKE ALL ON public.tabelas_preco        FROM anon;
+REVOKE ALL ON public.tabelas_preco_grupos FROM anon;
+REVOKE ALL ON public.tabelas_preco_itens  FROM anon;
+
+-- Verificado após execução: as 4 tabelas retornam 42501 para anon;
+-- authenticated mantém SELECT; políticas admin/equipe intactas.
+--
+-- Políticas anon que permanecem (todas intencionais, fluxos públicos):
+--   app_config          SELECT   config da landing
+--   app_users           INSERT   cadastro
+--   orcamentos          INSERT   pedido de orçamento pela landing
+--   site_visits         INSERT   tracker
+--   slots_visita        SELECT   disponibilidade de visita
+--   visitas_comerciais  SELECT/INSERT/UPDATE  restrito por coluna
+-- ═══════════════════════════════════════════════════════════════════
