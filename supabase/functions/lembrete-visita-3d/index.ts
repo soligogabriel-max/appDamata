@@ -1,19 +1,18 @@
-// Edge Function: lembrete-visita
-// Busca visitas para amanhã e envia lembrete via WhatsApp.
+// Edge Function: lembrete-visita-3d
+// Busca visitas agendadas para daqui a 3 dias e envia WhatsApp pedindo confirmação.
 // Chamada pelo pg_cron diariamente às 12h UTC (9h BRT).
 //
-// status=agendada   → template lembrete_visita_damata   (confirme ou cancele)
-// status=confirmada → template lembrete_visita_confirmada (confirmada, pode cancelar)
-//
 // Secrets: META_WPP_TOKEN, META_WPP_PHONE_ID, LEMBRETE_SECRET
+// Template: confirme_visita_damata (UTILITY, pt_BR)
+//   Body: {{1}}=nome {{2}}=data {{3}}=hora
+//   Botão URL dinâmico: sufixo {{1}} = BASE64URL(id|token)
 
 const SB_URL    = Deno.env.get("SUPABASE_URL")!;
 const SB_KEY    = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const WPP_TOKEN = Deno.env.get("META_WPP_TOKEN")!;
 const PHONE_ID  = Deno.env.get("META_WPP_PHONE_ID")!;
 const SECRET    = Deno.env.get("LEMBRETE_SECRET") ?? "damata2026";
-const TEMPLATE_AGENDADA    = "lembrete_visita_damata";
-const TEMPLATE_CONFIRMADA  = "lembrete_visita_confirmada";
+const TEMPLATE  = "confirme_visita_damata";
 const FUNC_BASE = `${Deno.env.get("SUPABASE_URL")?.replace("supabase.co", "supabase.co/functions/v1") ?? ""}/confirmar-visita?v=`;
 
 const CORS = {
@@ -47,17 +46,17 @@ Deno.serve(async (req) => {
   try {
     const agora = new Date();
     agora.setUTCHours(agora.getUTCHours() + 3);
-    const amanha = new Date(agora);
-    amanha.setDate(amanha.getDate() + 1);
-    const dataAmanha = amanha.toISOString().slice(0, 10);
+    const em3d = new Date(agora);
+    em3d.setDate(em3d.getDate() + 3);
+    const data3d = em3d.toISOString().slice(0, 10);
 
-    // Busca visitas de amanhã com status agendada OU confirmada
+    // Busca visitas agendadas (não confirmadas ainda) para daqui a 3 dias
     const res = await fetch(
-      `${SB_URL}/rest/v1/visitas_comerciais?status=in.(agendada,confirmada)&select=id,nome,whatsapp,status,slot_id,slots_visita(data,hora)&slots_visita.data=eq.${dataAmanha}`,
+      `${SB_URL}/rest/v1/visitas_comerciais?status=eq.agendada&select=id,nome,whatsapp,slot_id,slots_visita(data,hora)&slots_visita.data=eq.${data3d}`,
       { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
     );
     const visitas = await res.json();
-    const alvos = visitas.filter((v: any) => v.slots_visita?.data === dataAmanha);
+    const alvos = visitas.filter((v: any) => v.slots_visita?.data === data3d);
 
     const results = [];
     for (const v of alvos) {
@@ -66,24 +65,20 @@ Deno.serve(async (req) => {
       const token    = await makeToken(v.id);
       const vEncoded = encodeV(v.id, token);
       const slot     = v.slots_visita;
-      const dataFmt  = new Date(slot.data + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+      const dataFmt  = new Date(slot.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
       const hora     = slot.hora.slice(0, 5);
       const phone    = normalizePhone(v.whatsapp);
       const nome     = (v.nome || "").split(" ")[0];
 
-      const isConfirmada = v.status === "confirmada";
-      const templateName = isConfirmada ? TEMPLATE_CONFIRMADA : TEMPLATE_AGENDADA;
-
-      // lembrete_visita_confirmada: URL button com ?v=
-      // lembrete_visita_damata (legado): link como {{4}} no body
-      let body: object;
-      if (isConfirmada) {
-        body = JSON.stringify({
+      const r = await fetch(`https://graph.facebook.com/v19.0/${PHONE_ID}/messages`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${WPP_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
           messaging_product: "whatsapp",
           to: phone,
           type: "template",
           template: {
-            name: templateName,
+            name: TEMPLATE,
             language: { code: "pt_BR" },
             components: [
               { type: "body", parameters: [
@@ -95,44 +90,20 @@ Deno.serve(async (req) => {
                 parameters: [{ type: "text", text: vEncoded }] },
             ],
           },
-        });
-      } else {
-        // Template legado com 4 params no body (nome, data, hora, link)
-        const link = FUNC_BASE + vEncoded;
-        body = JSON.stringify({
-          messaging_product: "whatsapp",
-          to: phone,
-          type: "template",
-          template: {
-            name: templateName,
-            language: { code: "pt_BR" },
-            components: [{ type: "body", parameters: [
-              { type: "text", text: nome },
-              { type: "text", text: dataFmt },
-              { type: "text", text: hora },
-              { type: "text", text: link },
-            ]}],
-          },
-        });
-      }
-
-      const r = await fetch(`https://graph.facebook.com/v19.0/${PHONE_ID}/messages`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${WPP_TOKEN}`, "Content-Type": "application/json" },
-        body,
+        }),
       }).then(r => r.json());
 
       if (r.messages) {
         await fetch(`${SB_URL}/rest/v1/wpp_mensagens`, {
           method: "POST",
           headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
-          body: JSON.stringify({ telefone: phone, mensagem: `[Lembrete D-1 ${v.status}] ${dataFmt} às ${hora}`, direcao: "enviada", nome: v.nome || null, tipo: "template", wamid: r.messages[0]?.id || null }),
+          body: JSON.stringify({ telefone: phone, mensagem: `[Confirme sua visita D-3] ${dataFmt} às ${hora}`, direcao: "enviada", nome: v.nome || null, tipo: "template", wamid: r.messages[0]?.id || null }),
         });
       }
-      results.push({ id: v.id, phone, status: r.messages ? "enviado" : "erro", template: templateName, detail: r });
+      results.push({ id: v.id, phone, status: r.messages ? "enviado" : "erro", detail: r });
     }
 
-    return new Response(JSON.stringify({ data: dataAmanha, total: alvos.length, results }), {
+    return new Response(JSON.stringify({ data: data3d, total: alvos.length, results }), {
       headers: { ...CORS, "Content-Type": "application/json" }
     });
   } catch (e) {
