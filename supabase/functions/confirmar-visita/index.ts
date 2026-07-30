@@ -1,12 +1,19 @@
 // Edge Function: confirmar-visita
 // Página pública para o visitante confirmar ou cancelar visita agendada
-// GET ?id=UUID&token=HMAC         → página com botões Confirmar / Cancelar
-// GET ?id=UUID&acao=confirmar&token=HMAC → processa confirmação
-// GET ?id=UUID&acao=cancelar&token=HMAC  → processa cancelamento
+//
+// Formatos aceitos:
+//   GET ?v=BASE64URL(id|token)           → página com botões
+//   GET ?v=BASE64URL(id|token)&acao=confirmar → processa confirmação
+//   GET ?v=BASE64URL(id|token)&acao=cancelar  → processa cancelamento
+//   GET ?id=UUID&token=HMAC (legado)           → compatibilidade com lembrete-visita antigo
 
-const SB_URL = Deno.env.get("SUPABASE_URL")!;
-const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SECRET = Deno.env.get("LEMBRETE_SECRET") ?? "damata2026";
+const SB_URL  = Deno.env.get("SUPABASE_URL")!;
+const SB_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SECRET  = Deno.env.get("LEMBRETE_SECRET") ?? "damata2026";
+const WPP_TOKEN = Deno.env.get("META_WPP_TOKEN")!;
+const PHONE_ID  = Deno.env.get("META_WPP_PHONE_ID")!;
+const TEAM_PHONE = "5519996784361";
+const TEMPLATE_CANCELAMENTO = "cancelamento_visita_equipe";
 
 async function makeToken(id: string): Promise<string> {
   const key = await crypto.subtle.importKey(
@@ -16,6 +23,19 @@ async function makeToken(id: string): Promise<string> {
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(id));
   return btoa(String.fromCharCode(...new Uint8Array(sig)))
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+function encodeV(id: string, token: string): string {
+  return btoa(id + "|" + token).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+function decodeV(v: string): { id: string; token: string } | null {
+  try {
+    const decoded = atob(v.replace(/-/g, "+").replace(/_/g, "/"));
+    const sep = decoded.indexOf("|");
+    if (sep < 0) return null;
+    return { id: decoded.slice(0, sep), token: decoded.slice(sep + 1) };
+  } catch { return null; }
 }
 
 function page(body: string) {
@@ -52,11 +72,43 @@ ${body}
   });
 }
 
+async function notificarEquipeCancelamento(nome: string, dataHora: string) {
+  if (!WPP_TOKEN || !PHONE_ID) return;
+  await fetch(`https://graph.facebook.com/v21.0/${PHONE_ID}/messages`, {
+    method: "POST",
+    headers: { Authorization: "Bearer " + WPP_TOKEN, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: TEAM_PHONE,
+      type: "template",
+      template: {
+        name: TEMPLATE_CANCELAMENTO,
+        language: { code: "pt_BR" },
+        components: [{ type: "body", parameters: [
+          { type: "text", text: nome },
+          { type: "text", text: dataHora },
+        ]}],
+      },
+    }),
+  }).catch(() => {});
+}
+
 Deno.serve(async (req) => {
-  const url = new URL(req.url);
-  const id    = url.searchParams.get("id") ?? "";
-  const acao  = url.searchParams.get("acao") ?? "";
-  const token = url.searchParams.get("token") ?? "";
+  const url  = new URL(req.url);
+  const acao = url.searchParams.get("acao") ?? "";
+
+  // Suporte a ?v=BASE64URL(id|token) (novo) e ?id=...&token=... (legado)
+  let id = "", token = "";
+  const vParam = url.searchParams.get("v");
+  if (vParam) {
+    const decoded = decodeV(vParam);
+    if (!decoded) return page(`<div class="msg">❌</div><div class="msg-title">Link inválido</div><div class="msg-text">Este link é inválido ou expirou.</div>`);
+    id = decoded.id;
+    token = decoded.token;
+  } else {
+    id    = url.searchParams.get("id")    ?? "";
+    token = url.searchParams.get("token") ?? "";
+  }
 
   if (!id || !token) return page(`<div class="msg">❌</div><div class="msg-title">Link inválido</div><div class="msg-text">Este link é inválido ou expirou.</div>`);
 
@@ -69,20 +121,31 @@ Deno.serve(async (req) => {
   });
   const visits = await res.json();
   const v = visits?.[0];
-
   if (!v) return page(`<div class="msg">❌</div><div class="msg-title">Visita não encontrada</div><div class="msg-text">Entre em contato: (19) 99783-0437</div>`);
 
-  const slot = v.slots_visita;
-  const dataFmt = slot ? new Date(slot.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" }) : "";
-  const hora = slot?.hora?.slice(0, 5) ?? "";
-  const base = url.origin + url.pathname;
-  const confirmUrl = `${base}?id=${id}&acao=confirmar&token=${token}`;
-  const cancelUrl  = `${base}?id=${id}&acao=cancelar&token=${token}`;
+  const slot     = v.slots_visita;
+  const dataFmt  = slot ? new Date(slot.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" }) : "";
+  const hora     = slot?.hora?.slice(0, 5) ?? "";
+  const dataHora = `${dataFmt} às ${hora}`;
 
-  // Página principal — mostrar opções
+  // Monta links com o novo formato ?v=
+  const vEncoded    = vParam ?? (id && token ? encodeV(id, token) : "");
+  const base        = url.origin + url.pathname;
+  const confirmUrl  = `${base}?v=${vEncoded}&acao=confirmar`;
+  const cancelUrl   = `${base}?v=${vEncoded}&acao=cancelar`;
+
+  // ── Página principal ─────────────────────────────────────────────────────
   if (!acao) {
     if (v.status === "cancelada") {
       return page(`<div class="msg">😔</div><div class="msg-title">Visita cancelada</div><div class="msg-text">Esta visita já foi cancelada.<br><br>Para reagendar: <a class="link" href="https://fazendadamata.com/#visita">fazendadamata.com</a></div>`);
+    }
+    if (v.status === "confirmada") {
+      return page(`
+        <div class="msg">✅</div>
+        <h2>Presença já confirmada!</h2>
+        <div class="info">Sua visita está confirmada para<br><strong>${dataFmt}</strong><br>às <strong>${hora}</strong>.<br><br>Aguardamos você! 🌿</div>
+        <a class="btn btn-cancel" href="${cancelUrl}">❌ Cancelar visita</a>
+      `);
     }
     return page(`
       <h2>Sua visita está agendada</h2>
@@ -92,19 +155,27 @@ Deno.serve(async (req) => {
     `);
   }
 
-  // Confirmar
+  // ── Confirmar ─────────────────────────────────────────────────────────────
   if (acao === "confirmar") {
+    if (v.status !== "confirmada") {
+      await fetch(`${SB_URL}/rest/v1/visitas_comerciais?id=eq.${id}`, {
+        method: "PATCH",
+        headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "confirmada" }),
+      });
+    }
     return page(`<div class="msg">✅</div><div class="msg-title">Presença confirmada!</div><div class="msg-text">Sua visita está confirmada para<br><strong>${dataFmt} às ${hora}</strong>.<br><br>Aguardamos você! 🌿</div>`);
   }
 
-  // Cancelar
+  // ── Cancelar ──────────────────────────────────────────────────────────────
   if (acao === "cancelar") {
     if (v.status !== "cancelada") {
       await fetch(`${SB_URL}/rest/v1/visitas_comerciais?id=eq.${id}`, {
         method: "PATCH",
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
-        body: JSON.stringify({ status: "cancelada" })
+        body: JSON.stringify({ status: "cancelada" }),
       });
+      await notificarEquipeCancelamento(v.nome || "Visitante", dataHora);
     }
     return page(`<div class="msg">😔</div><div class="msg-title">Visita cancelada</div><div class="msg-text">Sua visita de <strong>${dataFmt} às ${hora}</strong> foi cancelada.<br><br>Quando quiser reagendar:<br><a class="link" href="https://fazendadamata.com/#visita">fazendadamata.com</a></div>`);
   }
