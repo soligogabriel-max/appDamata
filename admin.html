@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.30d</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.30e</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1542,6 +1542,10 @@ const _sb = supabase.createClient(SB_URL, SB_KEY);
 let _authToken = SB_KEY;
 _sb.auth.onAuthStateChange((event, session) => {
   _authToken = session?.access_token || SB_KEY;
+  // Repassa o token novo aos iframes (gerador de contratos)
+  document.querySelectorAll("iframe").forEach(f => {
+    try { f.contentWindow.postMessage({type:"damata_auth_token", token:_authToken}, window.location.origin); } catch(_) {}
+  });
   if (!session && event === 'SIGNED_OUT' && getCU() && typeof showSc === 'function') {
     setCU(null); showSc("login");
   }
@@ -5047,6 +5051,10 @@ async function salvarContrato(preset) {
 
 // Recebe mensagem do iframe do gerador
 window.addEventListener("message", e => {
+  if(e.origin === window.location.origin && e.data && e.data.type === "damata_pedir_token") {
+    if(e.source) e.source.postMessage({type:"damata_auth_token", token:_authToken}, window.location.origin);
+    return;
+  }
   if(e.data && e.data.type === "damata_salvar_contrato") {
     const src = e.source;
     salvarContrato(e.data.preset)

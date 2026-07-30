@@ -224,8 +224,25 @@ select.inp{cursor:pointer}
 // ── Supabase ──
 var SB_URL="https://wwnndsprpofmgbklqdgg.supabase.co";
 var SB_KEY="sb_publishable__RQxBa8P-lryd0LtWgTJPw_-aSWERWK";
+// Token de sessao vindo do admin.html (iframe pai). Sem ele as leituras
+// caem no anon e o RLS bloqueia inventario/tabelas_preco.
+var _authToken=SB_KEY, _tokenReady=null, _tokenDone=null;
+if(window.parent&&window.parent!==window){
+  _tokenReady=new Promise(function(res){_tokenDone=res;});
+  window.addEventListener("message",function(e){
+    if(e.origin!==window.location.origin) return;
+    if(e.data&&e.data.type==="damata_auth_token"){
+      _authToken=e.data.token||SB_KEY;
+      if(_tokenDone){_tokenDone();_tokenDone=null;}
+    }
+  });
+  window.parent.postMessage({type:"damata_pedir_token"},window.location.origin);
+  // Fallback: admin.html antigo em cache do SW nao responde. Nao trava a UI.
+  setTimeout(function(){if(_tokenDone){_tokenDone();_tokenDone=null;}},3000);
+}
 async function sbGet(path){
-  var r=await fetch(SB_URL+"/rest/v1/"+path,{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}});
+  if(_tokenReady) await _tokenReady;
+  var r=await fetch(SB_URL+"/rest/v1/"+path,{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken}});
   var t=await r.text(); return t?JSON.parse(t):[];
 }
 
