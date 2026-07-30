@@ -43,6 +43,10 @@
         body:JSON.stringify(Object.assign({session_id:sid,referrer:ref,device:dev},utms))
       });
     } catch(e){}
+    // Redirect params diretos para admin.html
+    if(location.search.includes('visita') || location.hash === '#visita'){
+      location.replace('/admin.html#visita');
+    }
   })();
   </script>
   <!-- End rastreamento -->
