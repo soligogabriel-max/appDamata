@@ -32,8 +32,8 @@ $$;
 
 -- Retorna o array de event_ids do usuário logado (fornecedor/assessoria)
 CREATE OR REPLACE FUNCTION public.get_my_event_ids()
-RETURNS jsonb LANGUAGE sql SECURITY DEFINER STABLE AS $$
-  SELECT COALESCE(event_ids, '[]'::jsonb) FROM public.app_users
+RETURNS text[] LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT COALESCE(event_ids, '{}'::text[]) FROM public.app_users
   WHERE email = auth.email() AND status = 'approved'
   LIMIT 1
 $$;
@@ -88,9 +88,9 @@ CREATE POLICY "agenda_select" ON agenda
     get_my_role() = 'equipe'
     OR (get_my_role() = 'assessoria'
         AND assessoria_cod IS NOT NULL
-        AND assessoria_cod = get_my_assessoria_cod())
+        AND assessoria_cod::text = get_my_assessoria_cod())
     OR (get_my_role() = 'fornecedor'
-        AND get_my_event_ids() @> jsonb_build_array(cod))
+        AND cod = ANY(get_my_event_ids()))
   );
 
 CREATE POLICY "agenda_equipe_insert" ON agenda
@@ -122,7 +122,7 @@ CREATE POLICY "ficha_do_evento_select" ON ficha_do_evento
           SELECT 1 FROM agenda a
           WHERE a.cod = ficha_do_evento.cod
             AND a.assessoria_cod IS NOT NULL
-            AND a.assessoria_cod = get_my_assessoria_cod()
+            AND a.assessoria_cod::text = get_my_assessoria_cod()
         ))
   );
 
@@ -164,7 +164,7 @@ CREATE POLICY "contas_a_receber_assessoria_select" ON contas_a_receber
       SELECT 1 FROM agenda a
       WHERE a.cod = contas_a_receber.cod_evento
         AND a.assessoria_cod IS NOT NULL
-        AND a.assessoria_cod = get_my_assessoria_cod()
+        AND a.assessoria_cod::text = get_my_assessoria_cod()
     )
   );
 
@@ -414,7 +414,7 @@ CREATE POLICY "pedidos_select" ON pedidos
           SELECT 1 FROM agenda a
           WHERE a.cod = pedidos.cod_evento
             AND a.assessoria_cod IS NOT NULL
-            AND a.assessoria_cod = get_my_assessoria_cod()
+            AND a.assessoria_cod::text = get_my_assessoria_cod()
         ))
   );
 
@@ -449,7 +449,7 @@ CREATE POLICY "itens_pedido_select" ON itens_pedido
           JOIN agenda a ON a.cod = p.cod_evento
           WHERE p.id = itens_pedido.pedido_id
             AND a.assessoria_cod IS NOT NULL
-            AND a.assessoria_cod = get_my_assessoria_cod()
+            AND a.assessoria_cod::text = get_my_assessoria_cod()
         ))
   );
 
@@ -591,10 +591,10 @@ CREATE POLICY "visitas_tecnicas_select" ON visitas_tecnicas
           SELECT 1 FROM agenda a
           WHERE a.cod = visitas_tecnicas.cod_evento
             AND a.assessoria_cod IS NOT NULL
-            AND a.assessoria_cod = get_my_assessoria_cod()
+            AND a.assessoria_cod::text = get_my_assessoria_cod()
         ))
     OR (get_my_role() = 'fornecedor'
-        AND get_my_event_ids() @> jsonb_build_array(visitas_tecnicas.cod_evento))
+        AND visitas_tecnicas.cod_evento = ANY(get_my_event_ids()))
   );
 
 CREATE POLICY "visitas_tecnicas_equipe_insert" ON visitas_tecnicas
@@ -629,13 +629,13 @@ CREATE POLICY "vt_linhas_select" ON vt_linhas
           JOIN agenda a ON a.cod = vt.cod_evento
           WHERE vt.id = vt_linhas.vt_id
             AND a.assessoria_cod IS NOT NULL
-            AND a.assessoria_cod = get_my_assessoria_cod()
+            AND a.assessoria_cod::text = get_my_assessoria_cod()
         ))
     OR (get_my_role() = 'fornecedor'
         AND EXISTS (
           SELECT 1 FROM visitas_tecnicas vt
           WHERE vt.id = vt_linhas.vt_id
-            AND get_my_event_ids() @> jsonb_build_array(vt.cod_evento)
+            AND vt.cod_evento = ANY(get_my_event_ids())
         ))
   );
 
@@ -654,14 +654,88 @@ CREATE POLICY "vt_linhas_equipe_delete" ON vt_linhas
 
 
 -- ═══════════════════════════════════════════════════════════════════
--- FIM DO SCRIPT
+-- LIMPEZA: remoção das políticas antigas amplas (executado 2026-07-30)
+-- Elas usavam USING(true) ou is_staff()/auth.uid() (mecanismo antigo)
+-- e, por serem permissivas (OR), anulavam as políticas granulares acima.
+-- ═══════════════════════════════════════════════════════════════════
+
+-- acesso_authenticated (FOR ALL, USING true — qualquer autenticado via tudo)
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.agenda;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.app_config;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.app_users;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.assessorias;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.cartao_c6;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.centros_de_custo;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.contas_a_pagar;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.contas_a_receber;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.extrato_bancario;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.ficha_do_evento;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.fornecedores;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.inventario;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.itens_pedido;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.naturezas;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.notas_fiscais;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.pedidos;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.visitas_tecnicas;
+DROP POLICY IF EXISTS "acesso_authenticated" ON public.vt_linhas;
+
+-- staff_all_* (is_staff() via auth_role(), mecanismo antigo por auth.uid())
+DROP POLICY IF EXISTS "staff_all_agenda" ON public.agenda;
+DROP POLICY IF EXISTS "staff_all_app_users" ON public.app_users;
+DROP POLICY IF EXISTS "staff_all_assessorias" ON public.assessorias;
+DROP POLICY IF EXISTS "staff_all_cartao_c6" ON public.cartao_c6;
+DROP POLICY IF EXISTS "staff_all_centros_de_custo" ON public.centros_de_custo;
+DROP POLICY IF EXISTS "staff_all_pagar" ON public.contas_a_pagar;
+DROP POLICY IF EXISTS "staff_all_receber" ON public.contas_a_receber;
+DROP POLICY IF EXISTS "staff_all_extrato" ON public.extrato_bancario;
+DROP POLICY IF EXISTS "staff_all_ficha" ON public.ficha_do_evento;
+DROP POLICY IF EXISTS "staff_all_fornecedores" ON public.fornecedores;
+DROP POLICY IF EXISTS "staff_all_inventario" ON public.inventario;
+DROP POLICY IF EXISTS "staff_all_itens_pedido" ON public.itens_pedido;
+DROP POLICY IF EXISTS "staff_all_naturezas" ON public.naturezas;
+DROP POLICY IF EXISTS "staff_all_notas_fiscais" ON public.notas_fiscais;
+DROP POLICY IF EXISTS "staff_all_orcamentos" ON public.orcamentos;
+DROP POLICY IF EXISTS "staff_all_pedidos" ON public.pedidos;
+DROP POLICY IF EXISTS "staff_all_slots" ON public.slots_visita;
+DROP POLICY IF EXISTS "staff_all_tabelas_preco" ON public.tabelas_preco;
+DROP POLICY IF EXISTS "staff_all_tabelas_preco_grupos" ON public.tabelas_preco_grupos;
+DROP POLICY IF EXISTS "staff_all_tabelas_preco_itens" ON public.tabelas_preco_itens;
+DROP POLICY IF EXISTS "staff_all_visita_comercial" ON public.visitas_comerciais;
+DROP POLICY IF EXISTS "staff_all_visitas_tecnicas" ON public.visitas_tecnicas;
+DROP POLICY IF EXISTS "staff_all_vt_linhas" ON public.vt_linhas;
+DROP POLICY IF EXISTS "staff_read_site_visits" ON public.site_visits;
+
+-- client_own_* (lógica antiga por auth.uid()), orcamentos_all (FOR ALL public!),
+-- wpp aberta a qualquer autenticado e anons duplicadas
+DROP POLICY IF EXISTS "client_own_agenda" ON public.agenda;
+DROP POLICY IF EXISTS "client_own_ficha" ON public.ficha_do_evento;
+DROP POLICY IF EXISTS "client_own_app_users" ON public.app_users;
+DROP POLICY IF EXISTS "orcamentos_all" ON public.orcamentos;
+DROP POLICY IF EXISTS "Admin can read wpp_mensagens" ON public.wpp_mensagens;
+DROP POLICY IF EXISTS "admin_all_app_config" ON public.app_config;
+DROP POLICY IF EXISTS "anon_read_landing_config" ON public.app_config;
+DROP POLICY IF EXISTS "anon_read_slots" ON public.slots_visita;
+DROP POLICY IF EXISTS "anon_insert_visita_comercial" ON public.visitas_comerciais;
+
+-- ═══════════════════════════════════════════════════════════════════
+-- Privilégios de coluna para anon em visitas_comerciais
+-- A landing precisa de: SELECT slot_id/status (disponibilidade),
+-- INSERT (agendar), UPDATE feedback/gcal_event_id. As políticas anon
+-- eram USING(true) — restringimos por coluna para não vazar nome/whatsapp.
+-- Requer index.html com POST ...?select=id (return=representation).
+-- ═══════════════════════════════════════════════════════════════════
+
+REVOKE ALL ON public.visitas_comerciais FROM anon;
+GRANT SELECT (id, slot_id, status) ON public.visitas_comerciais TO anon;
+GRANT INSERT (slot_id, orc_id, visitor_id, nome, whatsapp, email, status, obs) ON public.visitas_comerciais TO anon;
+GRANT UPDATE (gcal_event_id, feedback, feedback_motivo) ON public.visitas_comerciais TO anon;
+
+-- ═══════════════════════════════════════════════════════════════════
+-- FIM DO SCRIPT — executado integralmente em 2026-07-30
 --
--- Após executar, testar obrigatoriamente:
+-- Testar obrigatoriamente:
 -- 1. Login como admin → deve ver tudo normalmente
 -- 2. Login como equipe → deve ver eventos, pedidos, etc.
 -- 3. Login como assessoria → deve ver APENAS seus eventos
--- 4. Formulário público de agendamento de visitas (landing page):
---    se der erro 403, adicionar a política anon INSERT em visitas_comerciais
--- 5. Analytics da landing page (site_visits):
---    se não registrar mais visitas, adicionar política anon INSERT em site_visits
+-- 4. Formulário público de agendamento e feedback (landing) → testado OK
 -- ═══════════════════════════════════════════════════════════════════
