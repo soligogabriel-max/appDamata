@@ -4275,7 +4275,7 @@ async function renderVisitas() {
     const tableSince = new Date(); tableSince.setDate(tableSince.getDate() - (isMes ? 365 : 30)); tableSince.setHours(0,0,0,0);
     const since = tableSince < cardSince ? tableSince : cardSince; // o mais antigo entre os dois
     const [rows, orcRows, vcRows] = await Promise.all([
-      dbGet("site_visits", "visited_at=gte."+since.toISOString()+"&select=visited_at,session_id,referrer,device,utm_source&order=visited_at.desc&limit=5000"),
+      dbGetAll("site_visits", "visited_at=gte."+since.toISOString()+"&select=visited_at,session_id,referrer,device,utm_source&order=visited_at.desc"),
       dbGet("orcamentos", "created_at=gte."+since.toISOString()+"&select=created_at,visitor_id&limit=5000"),
       dbGet("visitas_comerciais", "status=neq.cancelada&select=created_at&limit=2000")
     ]);
