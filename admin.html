@@ -389,7 +389,7 @@ select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.28f</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.30a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3297,7 +3297,7 @@ async function abrirHistoricoVisitante(visitorId, nome, whatsapp) {
     if (visitorId) vcFilters.push("visitor_id.eq."+visitorId);
     if (whatsapp)  vcFilters.push("whatsapp.eq."+encodeURIComponent(whatsapp));
     const vcQ = vcFilters.length ? "or=("+vcFilters.join(",")+")" : null;
-    promises.push(vcQ ? dbGet("visitas_comerciais", vcQ+"&select=created_at,status,slot_id,slots_visita(data,hora)&order=created_at.desc&limit=50") : Promise.resolve([]));
+    promises.push(vcQ ? dbGet("visitas_comerciais", vcQ+"&select=id,created_at,status,obs,slot_id,slots_visita(data,hora)&order=created_at.desc&limit=50") : Promise.resolve([]));
 
     const [siteVisits, orcamentos, vcVisitas] = await Promise.all(promises);
 
@@ -3346,14 +3346,20 @@ async function abrirHistoricoVisitante(visitorId, nome, whatsapp) {
     }
 
     // ── Seção: Visitas comerciais ──
-    const statusVcLabel = { agendada:"🟡 Agendada", realizada:"✅ Realizada", cancelada:"❌ Cancelada", nao_compareceu:"⚠️ Não compareceu" };
+    const statusVcLabel = { agendada:"🟡 Agendada", realizada:"✅ Realizada", cancelada:"❌ Cancelada", nao_compareceu:"⚠️ Não compareceu", visitado_alta:"🌟 Visitado · Alta", visitado_baixa:"👍 Visitado · Baixa" };
     let vcHtml = '<div style="color:var(--dl);font-size:13px;">Nenhuma visita encontrada.</div>';
     if (vcVisitas.length) {
       vcHtml = vcVisitas.map(v => {
         const slotStr = v.slots_visita ? fmtD(v.slots_visita.data)+" às "+(v.slots_visita.hora||"").slice(0,5) : "—";
-        return `<div style="background:var(--bg2);border-radius:8px;padding:10px 12px;font-size:12px;display:flex;justify-content:space-between;align-items:center;">
-          <div style="font-weight:700;color:var(--dk);">📅 ${slotStr}</div>
-          <div>${statusVcLabel[v.status]||v.status}</div>
+        return `<div style="background:var(--bg2);border-radius:8px;padding:10px 12px;font-size:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${v.obs?'6px':'0'}">
+            <div style="font-weight:700;color:var(--dk);">📅 ${slotStr}</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span>${statusVcLabel[v.status]||v.status}</span>
+              <button onclick="vcAbrirEdicao('${v.id}')" style="background:none;border:1px solid var(--br);border-radius:5px;padding:2px 7px;cursor:pointer;font-size:11px;color:var(--a);">✏️</button>
+            </div>
+          </div>
+          ${v.obs?`<div style="font-size:11px;color:var(--dl);border-top:1px solid var(--br);padding-top:5px;margin-top:2px;white-space:pre-wrap;">${v.obs}</div>`:''}
         </div>`;
       }).join("");
     }
@@ -3709,7 +3715,7 @@ async function _vcLoadAgendadas() {
     ]);
     const slotMap = {}; slots.forEach(s => slotMap[s.id] = s);
     if(!visitas.length) { el.innerHTML = '<div class="empty"><div class="eicon">📅</div>Nenhuma visita agendada.</div>'; return; }
-    const statusLabel = { agendada:"🟡 Agendada", realizada:"✅ Realizada", cancelada:"❌ Cancelada", nao_compareceu:"⚠️ Não compareceu" };
+    const statusLabel = { agendada:"🟡 Agendada", realizada:"✅ Realizada", cancelada:"❌ Cancelada", nao_compareceu:"⚠️ Não compareceu", visitado_alta:"🌟 Visitado · Alta", visitado_baixa:"👍 Visitado · Baixa" };
     const fmtSlot = id => { const s=slotMap[id]; return s ? new Date(s.data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"})+" às "+s.hora.slice(0,5) : "—"; };
     el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead><tr style="background:var(--bg2);color:var(--dl);">
@@ -3726,13 +3732,7 @@ async function _vcLoadAgendadas() {
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${statusLabel[v.status]||v.status}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">
           <div style="display:flex;align-items:center;gap:6px;">
-          <select onchange="vcMudarStatus('${v.id}','${v.gcal_event_id||''}',this.value)" style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--br);background:var(--bg2);">
-            <option value="">Mudar...</option>
-            <option value="agendada">Agendada</option>
-            <option value="realizada">Realizada</option>
-            <option value="cancelada">Cancelada</option>
-            <option value="nao_compareceu">Não compareceu</option>
-          </select>
+          <button onclick="vcAbrirEdicao('${v.id}')" title="Editar visita" style="padding:4px 10px;background:none;border:1px solid var(--br);border-radius:6px;cursor:pointer;font-size:12px;color:var(--a);line-height:1;white-space:nowrap;">✏️ Editar</button>
           ${!v.gcal_event_id ? `<button onclick="vcSyncGCal('${v.id}',this)" title="Sincronizar com Google Calendar" style="padding:4px 7px;background:none;border:1px solid #b0c4de;border-radius:6px;cursor:pointer;font-size:12px;color:#1e3a5f;line-height:1;white-space:nowrap;">📅 Sync</button>` : ''}
           <button onclick="vcDeletarVisita('${v.id}','${v.gcal_event_id||''}')" title="Excluir visita" style="padding:4px 7px;background:none;border:1px solid #fca5a5;border-radius:6px;cursor:pointer;font-size:13px;color:#dc2626;line-height:1;">🗑️</button>
           </div>
@@ -3743,6 +3743,95 @@ async function _vcLoadAgendadas() {
     el.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro: '+e.message+'</div>';
   }
 }
+
+async function vcAbrirEdicao(vcId) {
+  let m = document.getElementById("m-vc-edit");
+  if (!m) {
+    m = document.createElement("div");
+    m.id = "m-vc-edit";
+    m.className = "moverlay";
+    m.onclick = function(e) { if (e.target === this) m.classList.remove("open"); };
+    m.innerHTML = `<div class="modal-inner" style="max-width:480px;width:100%;">
+      <div class="sec-t" style="font-size:15px;margin-bottom:16px;">Editar Visita</div>
+      <div id="vce-loading" class="empty"><div class="eicon">⏳</div>Carregando...</div>
+      <div id="vce-form"></div>
+    </div>`;
+    document.body.appendChild(m);
+  }
+  document.getElementById("vce-loading").style.display = "";
+  document.getElementById("vce-form").innerHTML = "";
+  m.classList.add("open");
+  try {
+    const [visits, allSlots] = await Promise.all([
+      dbGet("visitas_comerciais", "id=eq." + vcId + "&select=*"),
+      dbGet("slots_visita", "order=data.asc,hora.asc&limit=500")
+    ]);
+    const v = visits[0];
+    if (!v) throw new Error("Visita não encontrada");
+    const hoje = localDate();
+    const fmtSlotOpt = s => new Date(s.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday:"short", day:"2-digit", month:"short" }) + " às " + s.hora.slice(0, 5);
+    const slots = allSlots.filter(s => s.data >= hoje || s.id === v.slot_id);
+    const statusOpts = [
+      { v:"agendada",       l:"🟡 Agendada" },
+      { v:"cancelada",      l:"❌ Cancelada" },
+      { v:"visitado_alta",  l:"🌟 Visitado · Alta" },
+      { v:"visitado_baixa", l:"👍 Visitado · Baixa" }
+    ];
+    // include current status if it's a legacy value
+    const legacyStatus = !statusOpts.find(o => o.v === v.status) ? [{ v: v.status, l: v.status }] : [];
+    document.getElementById("vce-form").innerHTML = `
+      <input type="hidden" id="vce-id" value="${vcId}">
+      <input type="hidden" id="vce-gcal" value="${v.gcal_event_id || ''}">
+      <label class="lbl">Data e horário</label>
+      <select id="vce-slot" class="inp">
+        ${!v.slot_id ? '<option value="">— sem horário —</option>' : ''}
+        ${slots.map(s => `<option value="${s.id}"${s.id === v.slot_id ? ' selected' : ''}>${fmtSlotOpt(s)}</option>`).join("")}
+      </select>
+      <label class="lbl">Status</label>
+      <select id="vce-status" class="inp">
+        ${[...statusOpts, ...legacyStatus].map(o => `<option value="${o.v}"${o.v === v.status ? ' selected' : ''}>${o.l}</option>`).join("")}
+      </select>
+      <label class="lbl">Observações</label>
+      <textarea id="vce-obs" class="inp" rows="4" style="resize:vertical;">${v.obs || ''}</textarea>
+      <div id="vce-err" style="color:#c00;font-size:12px;margin-top:4px;display:none;"></div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button onclick="vcSalvarEdicao()" style="flex:1;padding:11px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;" id="vce-btn">💾 Salvar</button>
+        <button onclick="document.getElementById('m-vc-edit').classList.remove('open')" style="padding:11px 18px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;">Cancelar</button>
+      </div>`;
+    document.getElementById("vce-loading").style.display = "none";
+  } catch(e) {
+    document.getElementById("vce-loading").innerHTML = `<div class="eicon">⚠️</div>${e.message}`;
+  }
+}
+
+async function vcSalvarEdicao() {
+  const vcId   = document.getElementById("vce-id").value;
+  const gcalId = document.getElementById("vce-gcal").value;
+  const slotId = document.getElementById("vce-slot").value;
+  const status = document.getElementById("vce-status").value;
+  const obs    = (document.getElementById("vce-obs").value || "").trim();
+  const btn    = document.getElementById("vce-btn");
+  const err    = document.getElementById("vce-err");
+  btn.disabled = true; btn.textContent = "Salvando…";
+  err.style.display = "none";
+  try {
+    const patch = { status, obs: obs || null };
+    if (slotId) patch.slot_id = slotId;
+    if (status === "cancelada" && gcalId) {
+      await _vcDeleteGcal(gcalId);
+      patch.gcal_event_id = null;
+    }
+    await sbFetch("visitas_comerciais?id=eq." + vcId, { method:"PATCH", body:patch, prefer:"return=minimal" });
+    document.getElementById("m-vc-edit").classList.remove("open");
+    _vcLoadAgendadas();
+    toast("✅ Visita atualizada.");
+  } catch(e) {
+    err.textContent = "Erro: " + e.message;
+    err.style.display = "";
+    btn.disabled = false; btn.textContent = "💾 Salvar";
+  }
+}
+
 
 async function vcMudarStatus(id, gcalId, status) {
   if(!status) return;
