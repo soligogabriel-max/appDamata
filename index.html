@@ -657,6 +657,14 @@ async function confirmarVisitaPublica() {
         });
       }
     }).catch(()=>{});
+    // Notifica visitante e equipe via WhatsApp (fire-and-forget)
+    if (insertedId) {
+      fetch(SB_URL+"/functions/v1/notificar-visita-nova", {
+        method: "POST",
+        headers: { apikey:SB_KEY, Authorization:"Bearer "+SB_KEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ visita_id: insertedId })
+      }).catch(()=>{});
+    }
     const fmtData = new Date(_vSelData+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long",year:"numeric"});
     document.getElementById("v-form").style.display = "none";
     document.getElementById("v-done").style.display = "";
