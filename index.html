@@ -298,6 +298,30 @@
   <div id="footer-copy">FAZENDA DAMATA · Mogi Mirim · SP</div>
 </footer>
 
+<!-- MODAL: FEEDBACK PÓS-VISITA -->
+<div id="feedback-overlay" style="display:none;position:fixed;inset:0;background:rgba(46,60,68,.6);z-index:200;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(6px);">
+  <div id="feedback-card" style="background:#fff;border-radius:20px;padding:32px 28px;max-width:420px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.2);font-family:'DM Sans',sans-serif;">
+    <div style="text-align:center;font-size:48px;margin-bottom:8px;">🌿</div>
+    <h2 style="font-size:20px;font-weight:800;color:#2E3C44;text-align:center;margin-bottom:6px;">Fazenda Damata</h2>
+    <p id="fb-subtitulo" style="font-size:14px;color:#6A7D75;text-align:center;margin-bottom:28px;line-height:1.5;">Ficamos felizes em receber você!<br>Nos conte como se sente em relação ao espaço.</p>
+    <div id="fb-botoes" style="display:flex;flex-direction:column;gap:12px;">
+      <button onclick="_fbResponder('interesse')" style="padding:16px;background:#2E7D52;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;">✅ Tenho interesse</button>
+      <button onclick="_fbResponder('sem_interesse')" style="padding:16px;background:#fff;color:#2E3C44;border:2px solid #D0D8D4;border-radius:12px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;">❌ Não tenho mais interesse</button>
+    </div>
+    <div id="fb-motivo-area" style="display:none;margin-top:16px;">
+      <label style="font-size:13px;font-weight:600;color:#2E3C44;display:block;margin-bottom:6px;">Pode nos contar o motivo? (opcional)</label>
+      <textarea id="fb-motivo" rows="3" placeholder="Ex: data indisponível, fora do orçamento..." style="width:100%;border:1.5px solid #D0D8D4;border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>
+      <button onclick="_fbEnviar()" id="fb-btn-enviar" style="margin-top:10px;width:100%;padding:14px;background:#E8A52A;color:#2E3C44;border:none;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;">Enviar</button>
+    </div>
+    <div id="fb-obrigado" style="display:none;text-align:center;padding:16px 0 8px;">
+      <div style="font-size:44px;margin-bottom:10px;">🙏</div>
+      <div style="font-size:18px;font-weight:800;color:#2E3C44;margin-bottom:8px;">Obrigado pelo retorno!</div>
+      <div style="font-size:14px;color:#6A7D75;line-height:1.6;">Sua resposta foi registrada.<br>Nossa equipe entrará em contato em breve.</div>
+    </div>
+    <div id="fb-erro" style="display:none;color:#c00;font-size:13px;text-align:center;margin-top:10px;"></div>
+  </div>
+</div>
+
 <!-- MODAL: AGENDAR VISITA COMERCIAL -->
 <div id="visita-overlay" onclick="if(event.target===this)fecharVisita()" role="dialog" aria-modal="true">
   <div id="visita-card">
@@ -645,6 +669,57 @@ async function confirmarVisitaPublica() {
   }
 }
 
+// ── Feedback pós-visita (?feedback=ID) ──────────────────────────────────────
+let _fbVisitaId = null;
+let _fbEscolha  = null;
+
+function _checkFeedbackParam() {
+  const p = new URLSearchParams(location.search);
+  const vid = p.get("feedback");
+  if (!vid) return;
+  _fbVisitaId = vid;
+  const ov = document.getElementById("feedback-overlay");
+  ov.style.display = "flex";
+}
+
+function _fbResponder(escolha) {
+  _fbEscolha = escolha;
+  if (escolha === "interesse") {
+    _fbEnviar();
+  } else {
+    document.getElementById("fb-botoes").style.display = "none";
+    document.getElementById("fb-motivo-area").style.display = "";
+    document.getElementById("fb-motivo").focus();
+  }
+}
+
+async function _fbEnviar() {
+  const btn = document.getElementById("fb-btn-enviar");
+  const err = document.getElementById("fb-erro");
+  err.style.display = "none";
+  if (btn) { btn.disabled = true; btn.textContent = "Enviando…"; }
+  try {
+    const motivo = (document.getElementById("fb-motivo")?.value || "").trim();
+    const patch = { feedback: _fbEscolha };
+    if (motivo) patch.feedback_motivo = motivo;
+    const res = await fetch(SB_URL + "/rest/v1/visitas_comerciais?id=eq." + encodeURIComponent(_fbVisitaId), {
+      method: "PATCH",
+      headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify(patch)
+    });
+    if (!res.ok) { const t = await res.text(); throw new Error(t); }
+    document.getElementById("fb-botoes").style.display = "none";
+    document.getElementById("fb-motivo-area").style.display = "none";
+    document.getElementById("fb-obrigado").style.display = "";
+    document.getElementById("fb-subtitulo").style.display = "none";
+  } catch(e) {
+    err.textContent = "Erro ao enviar. Tente novamente.";
+    err.style.display = "";
+    if (btn) { btn.disabled = false; btn.textContent = "Enviar"; }
+  }
+}
+
+
 function _checkVisitaHash() { if (location.hash === "#visita" || location.search.includes("visita")) abrirVisita(); }
 window.addEventListener("hashchange", _checkVisitaHash);
 
@@ -677,7 +752,7 @@ async function init() {
   }
 }
 
-init().then(() => _checkVisitaHash());
+init().then(() => { _checkVisitaHash(); _checkFeedbackParam(); });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
 </script>
 </body>
