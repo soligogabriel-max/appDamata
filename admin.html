@@ -4411,7 +4411,7 @@ function renderOrigemChart() {
   if(!sel || !wrap) return;
   const mes = sel.value;
   const filtered = mes ? _origemRows.filter(r=>utcToLocalDate(r.visited_at).slice(0,7)===mes) : _origemRows;
-  const LABELS = {whatsapp:'WhatsApp',instagram:'Instagram',google:'Google',facebook:'Facebook',tiktok:'TikTok'};
+  const LABELS = {whatsapp:'WhatsApp',instagram:'Instagram',ig:'Instagram',google:'Google',facebook:'Facebook',fb:'Facebook',tiktok:'TikTok',tt:'TikTok'};
   const counts = {};
   filtered.forEach(r=>{
     const raw=(r.utm_source||'').trim().toLowerCase();
