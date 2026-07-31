@@ -211,9 +211,9 @@ select.inp{cursor:pointer}
 <div class="card">
   <div class="ctitle">⚡ Ações</div>
   <div style="display:flex;flex-direction:column;gap:10px">
-    <button class="btn" onclick="generateFile()" style="background:#1d4ed8;color:white;font-size:15px;padding:14px 20px">
-      <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-      Gerar arquivo para o cliente (.html)
+    <button class="btn" onclick="gerarLinkContrato()" style="background:#1d4ed8;color:white;font-size:15px;padding:14px 20px">
+      <svg width="20" height="20" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5m4.5-4.5l1.5-1.5a4 4 0 015.656 5.656l-3 3a4 4 0 01-5.656 0"/></svg>
+      Salvar e copiar link do contrato
     </button>
   </div>
 </div>
@@ -635,14 +635,14 @@ function salvarNoSistema(){
   }
 }
 
-// ── Gerar arquivo HTML para cliente ──
-async function generateFile(){
+// ── Salva o contrato e devolve o link para o cliente ──
+async function gerarLinkContrato(){
   var isH=_contractType==="hospedagem";
   var noiva=v("o-noiva"),noivo=v("o-noivo"),locatario=v("o-locatario");
   if(!isH&&!noiva&&!noivo){alert("Preencha pelo menos o nome da noiva ou do noivo.");return;}
   if(isH&&!locatario){alert("Preencha o nome do locatário.");return;}
   if(!v("o-d1")){alert("Preencha a data do evento.");return;}
-  // Garante que o código está preenchido antes de gerar o arquivo
+  // Garante que o código está preenchido antes de salvar
   if(!v("o-code")&&!_gcEvt){
     try{
       g("o-code").value=await sbRpc("proximo_cod_contrato");
