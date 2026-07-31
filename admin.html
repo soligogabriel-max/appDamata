@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.31f</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.31g</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -422,11 +422,12 @@
           <button onclick="setTab('contratos');document.getElementById('contratos-gerador').style.display='block';document.getElementById('contratos-gerador').scrollIntoView({behavior:'smooth'})" style="background:var(--a);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;">+ Novo contrato</button>
         </div>
         <div style="margin-bottom:12px;">
-          <input id="contratos-filtro" type="text" placeholder="Buscar por código, nome ou data…" oninput="filtrarContratos()" style="width:100%;max-width:400px;padding:8px 14px;border:1px solid var(--br);border-radius:8px;background:var(--s1);color:var(--dt);font-size:13px;outline:none;box-sizing:border-box;">
+          <input id="contratos-filtro" type="text" placeholder="Buscar por código, nome ou data…" oninput="filtrarContratos()" autocomplete="off" style="width:100%;max-width:400px;padding:8px 14px;border:1px solid var(--br);border-radius:8px;background:var(--s1);color:var(--dt);font-size:13px;outline:none;box-sizing:border-box;">
         </div>
         <div id="contratos-list" style="overflow-x:auto;">
           <div style="color:var(--dl);padding:20px;text-align:center;font-size:13px;">Carregando…</div>
         </div>
+        <div id="contratos-pager" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;"></div>
       </div>
       <!-- Gerador (iframe) abaixo -->
       <div id="contratos-gerador" style="margin-top:16px;">
@@ -5171,28 +5172,96 @@ async function _contratoApagar(cod) {
   renderContratos();
 }
 
-function filtrarContratos() {
-  const q = (document.getElementById("contratos-filtro")?.value || "").toLowerCase().trim();
-  if (!q) { _renderContratosTabela(_contratosRows); return; }
-  const filtrado = _contratosRows.filter(r =>
-    (r.cod||"").toLowerCase().includes(q) ||
-    (r.nome_evento||"").toLowerCase().includes(q) ||
-    (r.data_evento||"").includes(q)
-  );
-  _renderContratosTabela(filtrado);
+const CONTRATOS_POR_PAGINA = 50;
+let _contratosPagina = 0;
+let _contratosTemMais = false;
+let _contratosFiltroTimer = null;
+
+// A busca vai ao servidor, não à página carregada: filtrar só as 50 linhas
+// visíveis faria a lupa mentir sobre o resto do acervo.
+function _contratosFiltroQuery(q) {
+  if (!q) return "";
+  // ( ) e , são separadores na sintaxe do or= — fora daqui viram espaço.
+  const termo = q.replace(/[(),]/g, " ").trim();
+  if (!termo) return "";
+  const alvo = "*" + termo + "*";
+  const conds = [`cod.ilike.${alvo}`, `nome_evento.ilike.${alvo}`];
+
+  // Data: aceita 2027, 2027-09 ou 2027-09-04 e vira intervalo, já que não dá
+  // para fazer ilike em coluna date.
+  const m = /^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?$/.exec(termo);
+  if (m) {
+    const [ , ano, mes, dia ] = m;
+    const ini = new Date(Date.UTC(+ano, mes ? +mes - 1 : 0, dia ? +dia : 1));
+    const fim = new Date(ini);
+    if (dia)      fim.setUTCDate(fim.getUTCDate() + 1);
+    else if (mes) fim.setUTCMonth(fim.getUTCMonth() + 1);
+    else          fim.setUTCFullYear(fim.getUTCFullYear() + 1);
+    const iso = d => d.toISOString().slice(0, 10);
+    conds.push(`and(data_evento.gte.${iso(ini)},data_evento.lt.${iso(fim)})`);
+  }
+  return "&or=(" + conds.join(",") + ")";
 }
 
-async function renderContratos() {
+function filtrarContratos() {
+  // Sem debounce seria uma consulta por tecla digitada.
+  clearTimeout(_contratosFiltroTimer);
+  _contratosFiltroTimer = setTimeout(() => renderContratos(0), 300);
+}
+
+function irPaginaContratos(delta) {
+  const alvo = Math.max(0, _contratosPagina + delta);
+  renderContratos(alvo);
+  document.getElementById("contratos-list")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function _renderContratosPager(qtdNaPagina) {
+  const el = document.getElementById("contratos-pager");
+  if (!el) return;
+  if (_contratosPagina === 0 && !_contratosTemMais) { el.innerHTML = ""; return; }
+  const de = _contratosPagina * CONTRATOS_POR_PAGINA + 1;
+  const ate = _contratosPagina * CONTRATOS_POR_PAGINA + qtdNaPagina;
+  const btn = (txt, delta, ativo) =>
+    `<button onclick="irPaginaContratos(${delta})" ${ativo ? "" : "disabled"}
+      style="padding:8px 16px;border:1px solid var(--br);border-radius:8px;font-size:13px;font-weight:600;
+      cursor:${ativo ? "pointer" : "default"};background:${ativo ? "var(--s1)" : "transparent"};
+      color:${ativo ? "var(--dt)" : "var(--dl)"};opacity:${ativo ? "1" : ".45"};">${txt}</button>`;
+  el.innerHTML = btn("← Anteriores", -1, _contratosPagina > 0) +
+    `<span style="font-size:12px;color:var(--dl);">${de}–${ate}</span>` +
+    btn("Próximos →", 1, _contratosTemMais);
+}
+
+async function renderContratos(pagina) {
   const el = document.getElementById("contratos-list");
   if (!el) return;
+  // renderContratos() sem argumento (apos apagar, assinar etc.) mantem a
+  // pagina atual — voltar para a primeira seria perder o lugar do usuario.
+  _contratosPagina = Math.max(0, pagina == null ? _contratosPagina : pagina);
   el.innerHTML = `<div style="color:var(--dl);padding:20px;text-align:center;font-size:13px;">Carregando…</div>`;
   try {
-    _contratosRows = await dbGet("agenda", "select=cod,nome_evento,data_evento,assinatura_status,contrato_ok,assinatura_pdf_url,assinatura_doc_id&order=cod.desc&limit=200");
-    if(_userEventIds) _contratosRows = _contratosRows.filter(r=>_userEventIds.includes(r.cod));
     const q = (document.getElementById("contratos-filtro")?.value || "").trim();
-    if (q) filtrarContratos(); else _renderContratosTabela(_contratosRows);
+    // Pede uma linha a mais só para saber se existe página seguinte, sem
+    // precisar de uma segunda consulta de contagem.
+    const lim = CONTRATOS_POR_PAGINA + 1;
+    const off = _contratosPagina * CONTRATOS_POR_PAGINA;
+    // Assessoria/fornecedor: recorta no servidor, senão a paginação viria
+    // furada (páginas curtas depois de filtrar no cliente).
+    const escopo = (_userEventIds != null)
+      ? (_userEventIds.length ? `&cod=in.(${_userEventIds.join(",")})` : "&cod=eq.__nenhum__")
+      : "";
+    let rows = await dbGet("agenda",
+      "select=cod,nome_evento,data_evento,assinatura_status,contrato_ok,assinatura_pdf_url,assinatura_doc_id" +
+      "&order=cod.desc&limit=" + lim + "&offset=" + off + escopo + _contratosFiltroQuery(q));
+    _contratosTemMais = rows.length > CONTRATOS_POR_PAGINA;
+    rows = rows.slice(0, CONTRATOS_POR_PAGINA);
+    // Página vazia por ter passado do fim (ex.: apagaram registros): volta uma.
+    if (!rows.length && _contratosPagina > 0) { renderContratos(_contratosPagina - 1); return; }
+    _contratosRows = rows;
+    _renderContratosTabela(rows);
+    _renderContratosPager(rows.length);
   } catch(e) {
     el.innerHTML = `<div style="color:var(--er);padding:20px;font-size:13px;">Erro ao carregar contratos.</div>`;
+    document.getElementById("contratos-pager").innerHTML = "";
   }
 }
 
