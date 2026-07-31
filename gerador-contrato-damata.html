@@ -359,6 +359,7 @@ function autoNomeEvento(){
     var _acInfoEv={};
     Object.entries(_acCodMapEv).forEach(function(e){var cod=e[1];_acInfoEv[e[0]]={nome:_invDesc[cod]||cod,desc:_invDescOrc[cod]||""};});
     base.acomodacoesInfo=_acInfoEv;
+    base.catalogoInfo=_catalogoInfo();
   }
   if(_contractType==="hospedagem"){
     var loc=_primeiroNome(v("o-locatario"));
@@ -408,6 +409,28 @@ async function loadInventarioDesc(){
     var sp=document.getElementById("g-"+e[0]);if(sp&&_invDesc[e[1]])sp.textContent=_invDesc[e[1]];
     var sp2=document.getElementById("ge-"+e[0]);if(sp2&&_invDesc[e[1]])sp2.textContent=_invDesc[e[1]];
   });
+}
+
+// Espacos e mobiliario do Quadro Resumo (itens 3 e 5) do contrato de evento.
+// Os mesmos codigos que _af ja usa ao importar de um orcamento -- ver auto-mapeamento
+// em montarDeOrcamento. As linhas de hora extra / montagem / desmontagem ficam de
+// fora de proposito: sao cobrancas, nao itens de catalogo.
+var _CAT_COD_MAP={spTumb:"000004",spPeroba:"000007",spBrom:"000005",sp4:"000028",
+  fu1:"000003",fu2:"000001",fu3:"000025",fu4:"000010"};
+// Chave = id do <span> no template (sp1-txt, fu2-txt...). spTumb/spPeroba/spBrom
+// nao seguem a numeracao das flags do preset, entao mapeia explicitamente.
+var _CAT_SPAN={spTumb:"sp1",spPeroba:"sp2",spBrom:"sp3",sp4:"sp4",
+  fu1:"fu1",fu2:"fu2",fu3:"fu3",fu4:"fu4"};
+function _catalogoInfo(){
+  var out={};
+  Object.entries(_CAT_COD_MAP).forEach(function(e){
+    var cod=e[1];
+    // Sem descricao no inventario (ou inventario nao carregou) nao entra no preset:
+    // o template mantem o texto fixo dele em vez de imprimir uma linha vazia.
+    if(!_invDesc[cod]||!_invDescOrc[cod]) return;
+    out[_CAT_SPAN[e[0]]]={nome:_invDesc[cod],desc:_invDescOrc[cod]};
+  });
+  return out;
 }
 
 async function loadTabelasPreco(){
@@ -789,6 +812,7 @@ function collectPreset(){
     var _acInfoEv={};
     Object.entries(_acCodMapEv).forEach(function(e){var cod=e[1];_acInfoEv[e[0]]={nome:_invDesc[cod]||cod,desc:_invDescOrc[cod]||""};});
     base.acomodacoesInfo=_acInfoEv;
+    base.catalogoInfo=_catalogoInfo();
   }
   return base;
 }

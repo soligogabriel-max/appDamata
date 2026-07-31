@@ -221,6 +221,10 @@ var ASSINAR_KEY=SB_ANON_KEY;
 
 function g(id){return document.getElementById(id);}
 function tx(id,v){var el=g(id);if(el)el.textContent=v||"";}
+// Descricoes vem do inventario e sao montadas com innerHTML: escapar para que um
+// "<" digitado no cadastro nao coma o resto da linha do contrato.
+function esc(v){return String(v==null?'':v).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 
 var AC_MAP=[
   {pk:"loftFlamboyant",ik:"acLoft"},
@@ -279,7 +283,7 @@ function renderContract(){
       var checked=!!ac[m.pk];
       var nome=(acInfo[m.ik]&&acInfo[m.ik].nome)||m.pk;
       var desc=(acInfo[m.ik]&&acInfo[m.ik].desc)||"";
-      return "<tr><td style='text-align:center;'>"+(checked?"✔":"")+"</td><td style='text-align:center;'>"+(checked?"":"✔")+"</td><td><strong>"+nome.toUpperCase()+":</strong> "+desc+"</td></tr>";
+      return "<tr><td style='text-align:center;'>"+(checked?"✔":"")+"</td><td style='text-align:center;'>"+(checked?"":"✔")+"</td><td><strong>"+esc(nome.toUpperCase())+":</strong> "+esc(desc)+"</td></tr>";
     }).join("");
   }
 }
