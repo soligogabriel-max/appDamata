@@ -742,44 +742,69 @@ GRANT UPDATE (gcal_event_id, feedback, feedback_motivo) ON public.visitas_comerc
 
 
 -- ═══════════════════════════════════════════════════════════════════
--- FASE 2.1 — fecha leitura anônima de inventário e tabelas de preço
--- Executado em 2026-07-30.
+-- FASE 2.1 — restringe por coluna o que o anon lê de inventário e
+-- tabelas de preço. Executado em 2026-07-31.
 --
--- Auditoria pós-Fase 2 mostrou 4 políticas antigas sobrevivendo à
--- limpeza: inventário (18 itens) e tabelas de preço (79 itens com
--- valor_unitario) seguiam legíveis por qualquer um com a chave
--- publishable — que está no HTML e portanto é pública.
+-- HISTÓRICO: uma primeira tentativa DROPOU as políticas anon dessas
+-- tabelas, por leitura errada de que eram resíduo da limpeza da Fase 2.
+-- Não eram. O wizard de orçamento é PÚBLICO — admin.html:4707 abre em
+-- fazendadamata.com/?orcamento sem login (link enviado por WhatsApp), e
+-- orcamentos.js:579-594 lê as 4 tabelas com a chave publishable.
+-- Resultado: cliente recebeu 42501 ao tentar gerar orçamento. As
+-- políticas foram recriadas em minutos.
 --
--- Elas eram load-bearing: gerador-contrato-damata.html lia tudo com a
--- chave anon. Corrigido antes deste script (v2026.07.30e) — o gerador
--- agora recebe o JWT do admin.html via postMessage.
+-- Lição: admin.html não é só área autenticada — também é a landing, e
+-- carrega fluxos públicos (?orcamento, ?visita, ?contrato). Antes de
+-- fechar acesso anon, checar as entradas por query string nele.
 --
--- Não afeta usuários logados: as políticas {anon} nunca se aplicaram a
--- role authenticated, e a de inventário era {public} mas só cobria
--- roles sem nenhuma conta ativa. authenticated mantém SELECT.
+-- O que sobra de real: o wizard precisa de nome/descrição/preço de
+-- venda, mas NÃO de custo. inventario.valor_unitario e
+-- inventario.valor_reposicao (custo de reposição) vazavam porque a
+-- política permitia select=*. Fechado por grant de coluna — mesmo
+-- padrão já usado em visitas_comerciais.
 -- ═══════════════════════════════════════════════════════════════════
 
-DROP POLICY IF EXISTS "anon_read_inventario_orc"        ON public.inventario;
-DROP POLICY IF EXISTS "anon_read_tabelas_preco"         ON public.tabelas_preco;
-DROP POLICY IF EXISTS "anon_read_tabelas_preco_grupos"  ON public.tabelas_preco_grupos;
-DROP POLICY IF EXISTS "anon_read_tabelas_preco_itens"   ON public.tabelas_preco_itens;
-
--- Grants residuais (INSERT/UPDATE/DELETE/TRUNCATE) que o anon ainda
--- carregava. O RLS já bloqueava por falta de política, mas defesa em
--- profundidade: sem grant, nem chega a avaliar política.
 REVOKE ALL ON public.inventario           FROM anon;
 REVOKE ALL ON public.tabelas_preco        FROM anon;
 REVOKE ALL ON public.tabelas_preco_grupos FROM anon;
 REVOKE ALL ON public.tabelas_preco_itens  FROM anon;
 
--- Verificado após execução: as 4 tabelas retornam 42501 para anon;
--- authenticated mantém SELECT; políticas admin/equipe intactas.
+-- Somente as colunas que orcamentos.js:579-594 realmente consome.
+-- exibir_orcamento/deleted_at entram porque o cliente filtra por elas
+-- (Postgres exige SELECT na coluna usada no WHERE).
+GRANT SELECT (cod, descricao, imagem, descricao_orc, exibir_orcamento, deleted_at)
+  ON public.inventario TO anon;
+GRANT SELECT (id, nome, deleted_at)
+  ON public.tabelas_preco TO anon;
+GRANT SELECT (id, tabela_id, nome, desconto, ordem)
+  ON public.tabelas_preco_grupos TO anon;
+GRANT SELECT (id, tabela_id, grupo_id, cod_item, descricao, valor_unitario)
+  ON public.tabelas_preco_itens TO anon;
+
+-- As políticas anon_read_* das 4 tabelas permanecem (recriadas iguais
+-- às originais). São necessárias: sem elas o wizard público não carrega.
 --
--- Políticas anon que permanecem (todas intencionais, fluxos públicos):
---   app_config          SELECT   config da landing
---   app_users           INSERT   cadastro
---   orcamentos          INSERT   pedido de orçamento pela landing
---   site_visits         INSERT   tracker
---   slots_visita        SELECT   disponibilidade de visita
---   visitas_comerciais  SELECT/INSERT/UPDATE  restrito por coluna
+-- Verificado após execução, com a chave publishable:
+--   as 4 queries do wizard  -> 200 com dados
+--   inventario?select=*                 -> 42501
+--   inventario?select=valor_reposicao   -> 42501
+--   inventario?select=valor_unitario    -> 42501
+--   tabelas_preco?select=descricao      -> 42501
+-- ═══════════════════════════════════════════════════════════════════
+
+
+-- ═══════════════════════════════════════════════════════════════════
+-- PENDENTE — fluxo ?contrato=CODIGO quebrado desde a Fase 2
+--
+-- admin.html:4721 abre abrirCompletarContrato(cod) para cliente NÃO
+-- logado, que lê agenda?cod=eq.<cod>. A Fase 2 não deixou política anon
+-- em agenda, então retorna [] e o cliente não consegue preencher os
+-- dados do contrato. Confirmado em 2026-07-31 com um cod real.
+--
+-- NÃO resolver com política anon ampla em agenda: cod é sequencial de
+-- 6 dígitos (ex. 202624), trivial de enumerar — exporia dados de todos
+-- os eventos.
+--
+-- Caminho recomendado: Edge Function com service role, como já existe
+-- em orcamento-publico (acesso por UUID, não por cod adivinhável).
 -- ═══════════════════════════════════════════════════════════════════
