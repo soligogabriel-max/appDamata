@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.31h</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.31i</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -431,7 +431,20 @@
       </div>
       <!-- Gerador (iframe) abaixo -->
       <div id="contratos-gerador" style="margin-top:16px;">
-        <iframe src="./gerador-contrato-damata.html" style="width:100%;height:calc(100vh - 130px);border:none;display:block;"></iframe>
+        <iframe id="gerador-frame" style="width:100%;height:calc(100vh - 130px);border:none;display:block;"></iframe>
+        <script>
+        // src definido aqui, com a versão na query, em vez de fixo no HTML.
+        // O GitHub Pages serve o gerador com Cache-Control: max-age=600 e, por
+        // estar num iframe, ele ficava até 10 minutos preso na versão anterior
+        // mesmo depois de o admin.html já ter atualizado — foi exatamente isso
+        // que fez o botão continuar anunciando o arquivo .html depois da troca.
+        // Sem src no HTML para não carregar duas vezes.
+        (function(){
+          var f = document.getElementById("gerador-frame");
+          var v = (document.getElementById("ll-version") || {}).textContent || "";
+          f.src = "./gerador-contrato-damata.html?v=" + encodeURIComponent(v.trim());
+        })();
+        </script>
       </div>
     </div>
 
