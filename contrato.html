@@ -71,7 +71,12 @@ function aviso(titulo, texto){
     if(!tr.ok) throw new Error("template " + tr.status);
     var tmpl = await tr.text();
 
-    var out = tmpl.replace("null;/*DAMATA_PRESET*/", JSON.stringify(d.preset) + ";");
+    // O JSON entra dentro de um <script> inline do template, então um "<" vindo
+    // do preset (descrição do inventário, nome ou endereço digitado pelo cliente)
+    // fecharia a tag e deixaria o contrato em branco. Dentro de JSON o "<" só
+    // aparece em valor de string, onde < é o mesmo caractere.
+    var json = JSON.stringify(d.preset).replace(/</g, "\\u003c");
+    var out = tmpl.replace("null;/*DAMATA_PRESET*/", json + ";");
     if(out === tmpl) throw new Error("marcador de dados não encontrado no template");
 
     document.open(); document.write(out); document.close();
