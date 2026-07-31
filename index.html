@@ -147,6 +147,20 @@
     .ll-vid iframe{width:100%;height:100%;border:none;display:block;}
     .ll-vid-empty{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.3);font-size:12px;}
 
+
+    /* ── YOUTUBE LAZY-LOAD THUMBNAIL ────────────── */
+    .ll-vid-thumb{
+      width:100%;height:100%;position:relative;cursor:pointer;
+      background:#000;border-radius:10px;overflow:hidden;
+    }
+    .ll-vid-thumb img{width:100%;height:100%;object-fit:cover;display:block;opacity:.85;}
+    .ll-vid-thumb .yt-play{
+      position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      pointer-events:none;
+    }
+    .ll-vid-thumb .yt-play svg{width:64px;height:64px;transition:transform .18s;filter:drop-shadow(0 2px 8px rgba(0,0,0,.5));}
+    .ll-vid-thumb:hover .yt-play svg{transform:scale(1.1);}
+
     /* ── FOOTER ──────────────────────────────────── */
     #footer{
       width:100%;background:#1A252D;
@@ -296,6 +310,7 @@
     </a>
   </div>
   <div id="footer-copy">FAZENDA DAMATA · Mogi Mirim · SP</div>
+  <div id="ll-version" style="font-size:9px;color:rgba(255,255,255,.15);letter-spacing:1px;">v2026.07.31a</div>
 </footer>
 
 <!-- MODAL: FEEDBACK PÓS-VISITA -->
@@ -379,15 +394,25 @@ const SB_KEY = "sb_publishable__RQxBa8P-lryd0LtWgTJPw_-aSWERWK";
 const PDFJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
 const PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-async function loadPdfList() {
+const _CFG_KEY = 'dm_lp_cfg';
+const _CFG_TTL = 3600000; // 1 hora
+
+async function loadLandingConfig() {
   try {
-    const res = await fetch(SB_URL + "/rest/v1/app_config?chave=eq.landing_pdfs&select=valor", {
-      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY }
-    });
-    const data = await res.json();
-    const v = data && data[0] && data[0].valor;
-    return Array.isArray(v) ? v : [];
-  } catch (_) { return []; }
+    const c = JSON.parse(localStorage.getItem(_CFG_KEY) || 'null');
+    if (c && (Date.now() - c.ts) < _CFG_TTL) return c.d;
+  } catch(_) {}
+  try {
+    const res = await fetch(
+      SB_URL + "/rest/v1/app_config?chave=in.(landing_pdfs,fotos_landing,videos_landing)&select=chave,valor",
+      { headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY } }
+    );
+    const rows = await res.json();
+    const d = {};
+    (rows || []).forEach(r => { d[r.chave] = r.valor; });
+    try { localStorage.setItem(_CFG_KEY, JSON.stringify({ ts: Date.now(), d })); } catch(_) {}
+    return d;
+  } catch(_) { return {}; }
 }
 
 function loadScript(src) {
@@ -452,17 +477,9 @@ function renderPdf(pdfEntry, container) {
 
 let _llTimer = null, _llIdx = 0;
 
-async function loadLandingCarousel() {
-  let urls = [];
-  try {
-    const res = await fetch(SB_URL + "/rest/v1/app_config?chave=eq.fotos_landing&select=valor", {
-      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY }
-    });
-    const data = await res.json();
-    const raw = (data && data[0] && Array.isArray(data[0].valor)) ? data[0].valor : [];
-    const arr = raw.map(x => typeof x === "string" ? x : x.url).filter(u => u && u.trim());
-    if (arr.length) urls = arr.map(u => /^https?:\/\//i.test(u) ? u : ('./' + u.replace(/^\.?\//,'')));
-  } catch(_) {}
+function loadLandingCarousel(rawUrls) {
+  const arr = (rawUrls || []).map(x => typeof x === "string" ? x : x.url).filter(u => u && u.trim());
+  const urls = arr.map(u => /^https?:\/\//i.test(u) ? u : ('./' + u.replace(/^\.?\//,'')));
 
   const wrap = document.getElementById("ll-carousel-wrap");
   const dots = document.getElementById("ll-dots");
@@ -507,21 +524,24 @@ function _ytId(url) {
   return m2 ? m2[1] : null;
 }
 
-async function loadLandingVideos() {
-  let urls = [];
-  try {
-    const res = await fetch(SB_URL + "/rest/v1/app_config?chave=eq.videos_landing&select=valor", {
-      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY }
-    });
-    const data = await res.json();
-    if (data && data[0] && Array.isArray(data[0].valor)) urls = data[0].valor;
-  } catch(_) {}
+function loadLandingVideos(urls) {
+  const YT_PLAY_SVG = `<svg viewBox="0 0 68 48" xmlns="http://www.w3.org/2000/svg">
+    <rect width="68" height="48" rx="10" fill="rgba(0,0,0,.75)"/>
+    <polygon points="27,14 27,34 47,24" fill="#fff"/>
+  </svg>`;
   for (let i = 0; i < 3; i++) {
     const cell = document.getElementById("ll-vid-" + i);
     if (!cell) continue;
-    const id = _ytId(urls[i]);
+    const id = _ytId((urls || [])[i]);
     if (id) {
-      cell.innerHTML = `<iframe src="https://www.youtube.com/embed/${id}" title="Vídeo Fazenda Damata" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+      const thumb = document.createElement("div");
+      thumb.className = "ll-vid-thumb";
+      thumb.innerHTML = `<img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="Vídeo" loading="lazy">
+        <div class="yt-play">${YT_PLAY_SVG}</div>`;
+      thumb.onclick = () => {
+        cell.innerHTML = `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1" title="Vídeo Fazenda Damata" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+      };
+      cell.appendChild(thumb);
     } else {
       cell.innerHTML = `<div class="ll-vid-empty">Vídeo em breve</div>`;
     }
@@ -735,24 +755,35 @@ async function init() {
   const infoArea = document.getElementById("pdf-frame");
   const loading = document.getElementById("pdf-loading");
 
-  loadLandingCarousel();
-  loadLandingVideos();
+  // Busca config (1 request, cacheado) e carrega PDF.js em paralelo
+  let config = {};
+  try {
+    [config] = await Promise.all([
+      loadLandingConfig(),
+      loadScript(PDFJS_URL)
+    ]);
+  } catch(_) {
+    try { config = await loadLandingConfig(); } catch(__) {}
+  }
 
-  const pdfList = await loadPdfList();
+  const pdfList   = Array.isArray(config.landing_pdfs)   ? config.landing_pdfs   : [];
+  const photoUrls = Array.isArray(config.fotos_landing)   ? config.fotos_landing   : [];
+  const videoUrls = Array.isArray(config.videos_landing)  ? config.videos_landing  : [];
+
+  loadLandingCarousel(photoUrls);
+  loadLandingVideos(videoUrls);
 
   if (!pdfList.length) {
     loading.textContent = "";
     return;
   }
 
-  try {
-    await loadScript(PDFJS_URL);
-    pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
-  } catch (_) {
+  if (typeof pdfjsLib === "undefined") {
     loading.textContent = "Erro ao carregar visualizador de PDF.";
     return;
   }
 
+  pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
   loading.remove();
 
   for (const entry of pdfList) {
