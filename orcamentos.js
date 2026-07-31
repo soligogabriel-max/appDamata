@@ -355,6 +355,23 @@ function _orcStep(){
   else if(_orc.step===4) _orcLoadSlots();
 }
 
+// O tracker que cria dmv_sid vive no index.html. Quem abre o wizard direto
+// pelo admin.html nao passa por la, entao garantimos o id aqui — sem ele a
+// Edge Function nao consegue provar que o orcamento e de quem esta pedindo.
+let _vidMem=null;
+function _orcVisitorId(){
+  if(_vidMem) return _vidMem;
+  let v=null;
+  try{ v=localStorage.getItem('dmv_sid'); }catch(e){}
+  if(!v){
+    v=(self.crypto&&crypto.randomUUID)?crypto.randomUUID()
+      :(Date.now()+"-"+Math.random().toString(16).slice(2));
+    try{ localStorage.setItem('dmv_sid',v); }catch(e){}
+  }
+  _vidMem=v;
+  return v;
+}
+
 // Insere o orçamento na 1ª passagem e atualiza nas seguintes (captura de lead)
 async function _orcUpsertLead(){
   const validade=new Date(); validade.setDate(validade.getDate()+7);
@@ -373,16 +390,36 @@ async function _orcUpsertLead(){
     whatsapp:_orc.whatsapp||null,
     email:_orc.email||null,
     status:_orc._stage||"lead",
-    visitor_id: (()=>{try{return localStorage.getItem('dmv_sid');}catch(e){return null;}})()
+    visitor_id: _orcVisitorId()
   };
+  // Logado, o RLS libera a escrita direta. Sem login o wizard fala como anon,
+  // e orcamentos nao tem politica de SELECT para anon — o INSERT ... RETURNING
+  // que o PostgREST faz para return=representation morre com 42501. Nesse caso
+  // a Edge Function grava com service role e devolve o id.
+  const _logado = (typeof _authToken!=="undefined") && _authToken!==SB_KEY;
   try{
-    if(_orc._dbId){
-      await sbFetch("orcamentos?id=eq."+_orc._dbId,{method:"PATCH",body});
+    if(_logado){
+      if(_orc._dbId){
+        await sbFetch("orcamentos?id=eq."+_orc._dbId,{method:"PATCH",body});
+      }else{
+        const r=await sbFetch("orcamentos",{method:"POST",body});
+        if(r&&r[0]&&r[0].id) _orc._dbId=r[0].id;
+      }
     }else{
-      const r=await sbFetch("orcamentos",{method:"POST",body});
-      if(r&&r[0]&&r[0].id) _orc._dbId=r[0].id;
+      const res=await fetch(SB_URL+"/functions/v1/salvar-orcamento-publico",{
+        method:"POST",
+        headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"},
+        body:JSON.stringify(Object.assign({},body,{id:_orc._dbId||null}))
+      });
+      const d=await res.json().catch(()=>({}));
+      if(!res.ok) throw new Error(d.error||("HTTP "+res.status));
+      if(d.id) _orc._dbId=d.id;
     }
-  }catch(_){}
+  }catch(e){
+    // Segue sem travar o wizard, mas deixa rastro: foi um catch mudo aqui que
+    // escondeu por um dia inteiro que nenhum lead estava sendo gravado.
+    console.warn("[orcamento] falha ao salvar:",e);
+  }
 }
 
 function _orcNameFieldsHTML(tipo){
