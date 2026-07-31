@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.30e</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.31a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3791,7 +3791,10 @@ async function _orcConfirmarVisita() {
   try {
     const vid = (()=>{try{return localStorage.getItem("dmv_sid");}catch(e){return null;}})();
     const nome = [_orc.nome_noiva,_orc.nome_noivo].filter(Boolean).join(" e ")||_orc.nome_contratante||"";
-    const rows = await sbFetch("visitas_comerciais",{
+    // ?select=id e obrigatorio: o anon so tem GRANT SELECT (id, slot_id,
+    // status). Sem isso o return=representation devolve todas as colunas
+    // e o PostgREST responde 42501.
+    const rows = await sbFetch("visitas_comerciais?select=id",{
       method:"POST",
       body:{ slot_id:_vcSelectedSlotId, orc_id:_orc._dbId||null, visitor_id:vid, nome, whatsapp:_orc.whatsapp||null, email:_orc.email||null, status:"agendada" }
     });
