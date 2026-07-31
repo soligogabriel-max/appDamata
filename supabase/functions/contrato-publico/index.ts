@@ -142,8 +142,12 @@ Deno.serve(async (req) => {
   const sbH = { apikey: SB_SR, Authorization: "Bearer " + SB_SR };
 
   // ── Evento ────────────────────────────────────────────────────────────
+  // deleted_at=is.null: evento apagado nao serve mais contrato. Sem isto o
+  // link continua abrindo depois do evento ser removido da agenda — e como o
+  // gerador reaproveitava codigos de eventos apagados, o link poderia acabar
+  // apontando para dados de outro contrato.
   const evRes = await fetch(
-    `${SB_URL}/rest/v1/agenda?contrato_token=eq.${token}&select=*&limit=1`,
+    `${SB_URL}/rest/v1/agenda?contrato_token=eq.${token}&deleted_at=is.null&select=*&limit=1`,
     { headers: sbH },
   );
   if (!evRes.ok) return erro("Erro ao carregar", "Tente novamente em instantes.", 502);
