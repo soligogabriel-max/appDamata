@@ -1,7 +1,13 @@
 // Edge Function: contrato-publico
 // Devolve, em JSON, os dados do contrato de um evento a partir de um link.
 //
-// GET ?token=<uuid> → { contractType: "evento"|"hospedagem", preset: {...} }
+// GET  ?token=<uuid> → { contractType, preset }
+// POST ?token=<uuid> → grava os dados do cliente e devolve { ok: true }
+//
+// O POST é o motivo de tudo isto existir: hoje o cliente preenche o contrato
+// dentro de um arquivo HTML solto, o navegador dele vira aquilo em PDF e manda
+// para o Autentique — e nada encosta na base. cliente_json está nulo em todos
+// os contratos já emitidos.
 //
 // Quem monta a página é fazendadamata.com/contrato.html, que pega este JSON e
 // injeta no template. A página NÃO pode ser servida daqui: o gateway do
@@ -23,7 +29,7 @@
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -59,9 +65,72 @@ function parseJson(v: unknown, fallback: unknown) {
   try { return JSON.parse(String(v)); } catch { return fallback; }
 }
 
+// Só estes campos são aceitos do cliente. O resto do payload é descartado.
+const CAMPOS_CLIENTE = [
+  "nome", "nacionalidade", "profissao", "rg", "cpf", "endereco", "whatsapp", "email",
+  "razaoSocial", "cnpj", "enderecoEmpresa",
+  "testemunhaNome", "testemunhaCpf", "testemunhaWhatsapp", "testemunhaEmail",
+];
+const MAX_TEXTO = 300;
+
+function limpa(v: unknown): string | null {
+  if (v === null || v === undefined) return null;
+  const t = String(v).trim();
+  return t ? t.slice(0, MAX_TEXTO) : null;
+}
+
+async function gravar(
+  SB_URL: string, sbH: Record<string, string>,
+  cod: string, p: Record<string, unknown>,
+) {
+  const dados: Record<string, string | null> = {};
+  for (const c of CAMPOS_CLIENTE) dados[c] = limpa(p[c]);
+  if (!dados.nome || !dados.whatsapp) {
+    return erro("Dados incompletos", "Nome e WhatsApp do contratante são obrigatórios.", 400);
+  }
+
+  const jsonH = { ...sbH, "Content-Type": "application/json" };
+
+  const up = await fetch(`${SB_URL}/rest/v1/agenda?cod=eq.${encodeURIComponent(cod)}`, {
+    method: "PATCH",
+    headers: { ...jsonH, Prefer: "return=minimal" },
+    body: JSON.stringify({ cliente_json: dados, assinatura_status: "dados_preenchidos" }),
+  });
+  if (!up.ok) {
+    return erro("Não foi possível salvar", "Tente novamente em instantes.", 502);
+  }
+
+  // Retroalimenta a ficha do evento. Não bloqueia: o que importa para a
+  // assinatura já está em cliente_json.
+  try {
+    await fetch(`${SB_URL}/rest/v1/ficha_do_evento?on_conflict=cod`, {
+      method: "POST",
+      headers: { ...jsonH, Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({
+        cod,
+        nome_contratante: dados.nome,
+        nacionalidade: dados.nacionalidade,
+        profissao: dados.profissao,
+        rg: dados.rg,
+        cpf: dados.cpf,
+        endereco: dados.endereco,
+        celular: dados.whatsapp,
+        email: dados.email,
+        nome_testemunha: dados.testemunhaNome,
+        cpf_testemunha: dados.testemunhaCpf,
+        email_testemunha: dados.testemunhaEmail,
+      }),
+    });
+  } catch (_) { /* segue */ }
+
+  return json({ ok: true });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
-  if (req.method !== "GET") return erro("Método não permitido", "Use o link que você recebeu.", 405);
+  if (req.method !== "GET" && req.method !== "POST") {
+    return erro("Método não permitido", "Use o link que você recebeu.", 405);
+  }
 
   const token = new URL(req.url).searchParams.get("token") || "";
   if (!UUID_RE.test(token)) {
@@ -135,6 +204,7 @@ Deno.serve(async (req) => {
     w2Cpf: personal.w2cpf || "",
     w2Email: personal.w2email || "",
     isCorporativo: tipo === "corporativo",
+    contratoToken: token,   // o template usa para gravar antes de assinar
   };
 
   if (isHosp) {
@@ -181,6 +251,12 @@ Deno.serve(async (req) => {
     }
     preset.acomodacoesInfo = info;
   } catch (_) { /* template cai no nome padrão */ }
+
+  if (req.method === "POST") {
+    let p: Record<string, unknown>;
+    try { p = await req.json(); } catch { return erro("Dados inválidos", "Recarregue a página e tente de novo.", 400); }
+    return await gravar(SB_URL, sbH, String(ev.cod), p);
+  }
 
   return json({ contractType: isHosp ? "hospedagem" : "evento", preset });
 });

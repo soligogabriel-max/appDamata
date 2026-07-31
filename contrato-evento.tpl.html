@@ -420,6 +420,54 @@ function maskPhone(el){
 function phoneDigits(v){return (v||"").replace(/\D/g,"");}
 function phoneValido(v){var d=phoneDigits(v);return d.length===10||d.length===11;}
 
+// Envia o que o cliente preencheu para contrato-publico, que grava em
+// agenda.cliente_json e na ficha_do_evento. Uma retentativa: falha de rede no
+// celular do cliente é comum e não deve custar a assinatura.
+var CONTRATO_FN="https://wwnndsprpofmgbklqdgg.supabase.co/functions/v1/contrato-publico";
+async function salvarDados(){
+  var token=(PRESET&&PRESET.contratoToken)||
+            new URLSearchParams(location.search).get("token")||"";
+  if(!token){
+    // Arquivo antigo, aberto fora do link: não há onde gravar. Segue para a
+    // assinatura em vez de travar o cliente.
+    return true;
+  }
+  var corpo={
+    nome:(g("f-name")||{}).value||"", nacionalidade:(g("f-nat")||{}).value||"",
+    profissao:(g("f-prof")||{}).value||"", rg:(g("f-rg")||{}).value||"",
+    cpf:(g("f-cpf")||{}).value||"", endereco:(g("f-addr")||{}).value||"",
+    whatsapp:(g("f-phone")||{}).value||"", email:(g("f-email")||{}).value||"",
+    razaoSocial:(g("f-razao")||{}).value||"", cnpj:(g("f-cnpj")||{}).value||"",
+    enderecoEmpresa:(g("f-addr-empresa")||{}).value||"",
+    testemunhaNome:(g("w-name")||{}).value||"", testemunhaCpf:(g("w-cpf")||{}).value||"",
+    testemunhaWhatsapp:(g("w-phone")||{}).value||"", testemunhaEmail:(g("w-email")||{}).value||""
+  };
+  for(var tentativa=1;tentativa<=2;tentativa++){
+    try{
+      var r=await fetch(CONTRATO_FN+"?token="+encodeURIComponent(token),{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(corpo)
+      });
+      var d=await r.json().catch(function(){return {};});
+      if(r.ok&&d.ok) return true;
+      if(tentativa===2){
+        var e=d.erro||{};
+        _amsg("Não foi possível salvar seus dados: "+
+              (e.texto||"tente novamente em instantes.")+
+              " O contrato ainda não foi enviado para assinatura.",false);
+        return false;
+      }
+    }catch(err){
+      if(tentativa===2){
+        _amsg("Não foi possível salvar seus dados. Verifique sua conexão e tente novamente."+
+              " O contrato ainda não foi enviado para assinatura.",false);
+        return false;
+      }
+    }
+  }
+  return false;
+}
+
 async function assinarWhatsApp(){
   var nome=(g("f-name")||{}).value||"";
   var fone=(g("f-phone")||{}).value||"";
@@ -463,7 +511,17 @@ async function assinarWhatsApp(){
 
   renderContract();
   var btn=g("btn-assinar-wpp");
-  btn.disabled=true; var _o=btn.innerHTML; btn.innerHTML="Gerando contrato…";
+  btn.disabled=true; var _o=btn.innerHTML; btn.innerHTML="Salvando seus dados…";
+  _amsg("Salvando seus dados…",true);
+
+  // Grava na base ANTES de gerar o PDF. Se falhar, não assina: o objetivo do
+  // link é justamente que os dados existam fora do PDF.
+  if(!(await salvarDados())){
+    btn.disabled=false; btn.innerHTML=_o;
+    return;
+  }
+
+  btn.innerHTML="Gerando contrato…";
   _amsg("Gerando o contrato e enviando para assinatura…",true);
   try{
     var el=document.querySelector(".cp-wrap");
