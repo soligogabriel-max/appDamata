@@ -43,7 +43,11 @@ Deno.serve(async (req) => {
     if (!phone || phone.length < 13) return new Response(JSON.stringify({ error: `Telefone inválido: ${o.whatsapp}` }), { status: 422, headers: { ...CORS, "Content-Type": "application/json" } });
 
     const nome = (o.nome_contratante || "Cliente").split(" ")[0];
-    const link = `${SB_URL.replace("supabase.co", "supabase.co/functions/v1")}/orcamento-publico?id=${id}`;
+    // O link aponta para o site da Damata, não direto para a função: o gateway
+    // do Supabase força content-type: text/plain e CSP sandbox no domínio
+    // compartilhado, então o cliente que abria a função via código-fonte.
+    // orcamento.html busca o HTML da função e renderiza.
+    const link = `https://fazendadamata.com/orcamento.html?id=${id}`;
 
     // Envia template WhatsApp
     const wppRes = await fetch(`https://graph.facebook.com/v19.0/${PHONE_ID}/messages`, {

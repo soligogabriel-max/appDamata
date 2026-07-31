@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Contrato DAMATA</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9}
+.cf{font-family:'Times New Roman',Georgia,serif}
+.tc{display:none}.tc.active{display:block}
+/* fallback CSS-only para iOS quando JS está bloqueado */
+#tab-preview:target{display:block}
+body:has(#tab-preview:target) #tab-form{display:none}
+body:has(#tab-form:target) #tab-preview{display:none}
+body:has(#tab-form:target) #tab-form{display:block}
+.cp{font-size:10.5pt;line-height:1.7;text-align:justify;margin-bottom:8px}
+.ct{font-size:11pt;font-weight:700;text-transform:uppercase;margin:18px 0 8px}
+.sub{padding-left:20px}
+.tb{border-collapse:collapse;width:100%;margin-bottom:10px}
+.tb td,.tb th{border:1px solid #555;padding:5px 8px;font-size:10pt;vertical-align:top}
+.tb th{background:#f0f0f0;font-weight:700}
+.inp{width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;outline:none;background:white;transition:border .2s;font-family:inherit}
+.inp:focus{border-color:#1e3a5f}
+.sl{font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px}
+.ib{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px;margin-bottom:8px}
+.ir{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #dbeafe}
+.ir:last-child{border-bottom:none}
+.ik{color:#64748b}.iv{color:#1e3a5f;font-weight:600}
+@media print{.np{display:none!important}body{background:white}.cp-wrap{box-shadow:none!important;padding:1.5cm 2cm!important;max-width:100%!important;border-radius:0!important}}
+</style>
+</head>
+<body>
+<script>var PRESET=null;/*DAMATA_PRESET*/</script>
+
+<div class="np" style="background:white;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:50">
+  <div style="max-width:760px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:12px">
+    <div style="width:36px;height:36px;background:#1e3a5f;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <svg width="18" height="18" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+    </div>
+    <div style="flex:1"><div style="font-weight:700;font-size:15px;color:#1e293b">Contrato DAMATA</div><div id="hdr-code" style="font-size:12px;color:#64748b"></div></div>
+  </div>
+  <div style="max-width:760px;margin:0 auto;padding:0 16px;display:flex;gap:24px">
+    <a href="#tab-form" onclick="showTab('form');return false" id="tbf" style="padding:10px 0;font-size:14px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #1e3a5f;color:#1e3a5f;text-decoration:none;display:inline-block">Seus Dados</a>
+    <a href="#tab-preview" onclick="showTab('preview');return false" id="tbp" style="padding:10px 0;font-size:14px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:#64748b;text-decoration:none;display:inline-block">Contrato Completo</a>
+  </div>
+</div>
+
+<div id="tab-form" class="tc np">
+<div style="max-width:600px;margin:0 auto;padding:24px 16px">
+  <div id="evt-summary" style="display:none;margin-bottom:20px">
+    <div style="background:#1e3a5f;color:white;border-radius:14px 14px 0 0;padding:14px 18px">
+      <div style="font-weight:700;font-size:15px">Dados do Evento</div>
+      <div style="font-size:12px;opacity:.7;margin-top:2px">Preenchido pela DAMATA – somente leitura</div>
+    </div>
+    <div class="ib" style="border-radius:0 0 14px 14px;border-top:none;margin-bottom:0">
+      <div class="ir"><span class="ik">Cód. Contrato</span><span class="iv" id="s-code">—</span></div>
+      <div class="ir"><span class="ik">Data do Evento</span><span class="iv" id="s-d1">—</span></div>
+      <div class="ir"><span class="ik">Data Final</span><span class="iv" id="s-d2">—</span></div>
+      <div class="ir"><span class="ik">Check-in / Check-out</span><span class="iv" id="s-times">—</span></div>
+      <div class="ir"><span class="ik">Espaços</span><span class="iv" id="s-spaces">—</span></div>
+      <div class="ir"><span class="ik">Acomodações</span><span class="iv" id="s-accoms">—</span></div>
+      <div class="ir"><span class="ik">Valor Total</span><span class="iv" id="s-total">—</span></div>
+    </div>
+  </div>
+  <div style="background:white;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:22px;margin-bottom:14px">
+    <div id="personal-section-title" style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #f1f5f9">Seus Dados Pessoais</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div><span class="sl">Nome Completo *</span><input class="inp" type="text" id="f-name" placeholder="Nome completo" oninput="liveSync()"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><span class="sl">Nacionalidade</span><input class="inp" type="text" id="f-nat" value="brasileira" oninput="liveSync()"></div>
+        <div><span class="sl">Profissão</span><input class="inp" type="text" id="f-prof" placeholder="Profissão" oninput="liveSync()"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><span class="sl">RG</span><input class="inp" type="text" id="f-rg" placeholder="00.000.000-0" oninput="liveSync()"></div>
+        <div><span class="sl">CPF</span><input class="inp" type="text" id="f-cpf" placeholder="000.000.000-00" oninput="liveSync()"></div>
+      </div>
+      <div><span class="sl">Endereço Completo</span><input class="inp" type="text" id="f-addr" placeholder="Rua, número, bairro, cidade - UF" oninput="liveSync()"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><span class="sl">WhatsApp / Celular *</span><input class="inp" type="tel" id="f-phone" placeholder="(00) 00000-0000" oninput="maskPhone(this);liveSync()"></div>
+        <div><span class="sl">Confirmar WhatsApp *</span><input class="inp" type="tel" id="f-phone2" placeholder="(00) 00000-0000" oninput="maskPhone(this)"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><span class="sl">E-mail</span><input class="inp" type="email" id="f-email" placeholder="email@exemplo.com" oninput="liveSync()"></div>
+      </div>
+    </div>
+  </div>
+  <div id="corp-section" style="display:none;background:white;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:22px;margin-bottom:14px">
+    <div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #f1f5f9">Dados da Empresa</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div><span class="sl">Razão Social *</span><input class="inp" type="text" id="f-razao" placeholder="Nome da empresa" oninput="liveSync()"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><span class="sl">CNPJ *</span><input class="inp" type="text" id="f-cnpj" placeholder="00.000.000/0000-00" oninput="maskCnpj(this);liveSync()"></div>
+        <div><span class="sl">Endereço da Empresa</span><input class="inp" type="text" id="f-addr-empresa" placeholder="Rua, número, cidade - UF" oninput="liveSync()"></div>
+      </div>
+    </div>
+  </div>
+  <div style="background:white;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:22px;margin-bottom:16px">
+    <div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:4px">Testemunha 2</div>
+    <div style="font-size:13px;color:#64748b;margin-bottom:14px">Indique uma testemunha de sua escolha</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div><span class="sl">Nome Completo</span><input class="inp" type="text" id="w-name" placeholder="Nome completo" oninput="liveSync()"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><span class="sl">WhatsApp / Celular *</span><input class="inp" type="tel" id="w-phone" placeholder="(00) 00000-0000" oninput="maskPhone(this)"></div>
+        <div><span class="sl">Confirmar WhatsApp *</span><input class="inp" type="tel" id="w-phone2" placeholder="(00) 00000-0000" oninput="maskPhone(this)"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><span class="sl">CPF</span><input class="inp" type="text" id="w-cpf" placeholder="000.000.000-00" oninput="liveSync()"></div>
+        <div><span class="sl">E-mail</span><input class="inp" type="email" id="w-email" placeholder="email@exemplo.com" oninput="liveSync()"></div>
+      </div>
+    </div>
+  </div>
+  <div id="alert-msg" style="display:none;padding:12px 16px;border-radius:10px;margin-bottom:12px;font-size:13px;line-height:1.5"></div>
+  <a href="#tab-preview" onclick="showTab('preview');return false" style="width:100%;padding:14px;background:#1e3a5f;color:white;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;text-decoration:none;display:block;text-align:center;box-sizing:border-box">Ver Contrato Completo →</a>
+</div>
+</div>
+
+<div id="tab-preview" class="tc active">
+<div style="max-width:800px;margin:0 auto;padding:20px 8px">
+  <div class="np" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+    <button onclick="window.print()" style="display:flex;align-items:center;gap:6px;background:#1e3a5f;color:white;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
+      <svg width="15" height="15" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+      Salvar PDF / Imprimir
+    </button>
+    <a href="#tab-form" onclick="showTab('form');return false" style="background:white;border:1.5px solid #e2e8f0;color:#334155;padding:10px 18px;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-block">← Editar</a>
+  </div>
+  <div class="np" style="max-width:800px;margin:0 auto;padding:0 0 14px">
+    <div id="alert-msg2" style="display:none;padding:12px 16px;border-radius:10px;margin-bottom:14px;font-size:13px;line-height:1.5"></div>
+    <button id="btn-assinar-wpp" onclick="assinarWhatsApp()" style="display:flex;align-items:center;gap:6px;background:#25D366;color:white;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;width:100%;justify-content:center;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.533 5.855L0 24l6.335-1.652A11.954 11.954 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.65-.498-5.18-1.369l-.372-.22-3.758.98.998-3.652-.242-.378A9.957 9.957 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+      Assinar por WhatsApp
+    </button>
+    <div style="font-size:11px;color:#64748b;margin-top:10px;text-align:center">Ao enviar, você receberá o contrato para assinatura no WhatsApp informado.</div>
+  </div>
+  <div class="cp-wrap cf" style="background:white;padding:36px;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.1)">
+
+    <p class="cp" style="text-align:center;font-weight:700;font-size:13pt;text-transform:uppercase;margin-bottom:4px">CONTRATO DE LOCAÇÃO DE ESPAÇO PARA EVENTOS – FAZENDA DAMATA</p>
+    <p class="cp" style="text-align:center;font-size:10pt;color:#555" id="c-codeline"></p>
+
+    <p class="cp">Pelo presente instrumento particular, de um lado</p>
+    <p class="cp"><strong>ESPAÇO DAMATA EVENTOS LTDA</strong>, CNPJ/MF sob o nº. 35.602.719/0001-87, com sede na Estrada da Servidão, S/N, Bairro da Cachoeira, cidade de Mogi Mirim, Estado de São Paulo, CEP n. 13.800-970, neste ato representada por sua sócia Vitória Bedutti Rodrigues, CPF n. 329.098.078-27, doravante denominada <strong>LOCADORA/CONTRATADA</strong>;</p>
+    <p id="loc-pf-intro" class="cp">e de outro lado, doravante denominado(a) <strong>LOCATÁRIO(A)/CONTRATANTE</strong>,</p>
+    <p id="loc-pj-intro" class="cp" style="display:none">e de outro lado, <strong id="c-razao-inline"></strong>, pessoa jurídica de direito privado, inscrita no CNPJ/MF sob o nº. <strong id="c-cnpj-inline"></strong>, com sede em <span id="c-addr-empresa-inline"></span>, neste ato representada por seu(sua) representante legal <strong id="c-name-repres"></strong>, portador(a) do CPF n. <strong id="c-cpf-repres"></strong> e RG n. <strong id="c-rg-repres"></strong>, doravante denominada <strong>LOCATÁRIA/CONTRATANTE</strong>,</p>
+
+    <table id="loc-pf-table" class="tb" style="margin-bottom:14px">
+      <tr><th style="width:38%">NOME COMPLETO:</th><td id="c-name"></td></tr>
+      <tr><th>NACIONALIDADE:</th><td id="c-nat"></td></tr>
+      <tr><th>PROFISSÃO:</th><td id="c-prof"></td></tr>
+      <tr><th>RG:</th><td id="c-rg"></td></tr>
+      <tr><th>CPF:</th><td id="c-cpf"></td></tr>
+      <tr><th>ENDEREÇO:</th><td id="c-addr"></td></tr>
+      <tr><th>TELEFONE/CELULAR:</th><td id="c-phone"></td></tr>
+      <tr><th>E-MAIL:</th><td id="c-email"></td></tr>
+    </table>
+    <table id="loc-pj-table" class="tb" style="display:none;margin-bottom:14px">
+      <tr><th colspan="2" style="background:#f0f4f8;font-size:10pt">Pessoa Jurídica</th></tr>
+      <tr><th style="width:38%">RAZÃO SOCIAL:</th><td id="c-razao"></td></tr>
+      <tr><th>CNPJ:</th><td id="c-cnpj"></td></tr>
+      <tr><th>ENDEREÇO DA EMPRESA:</th><td id="c-addr-empresa"></td></tr>
+      <tr><th colspan="2" style="background:#f0f4f8;font-size:10pt">Representante Legal / Signatário</th></tr>
+      <tr><th style="width:38%">NOME COMPLETO:</th><td id="c-pj-name"></td></tr>
+      <tr><th>NACIONALIDADE:</th><td id="c-pj-nat"></td></tr>
+      <tr><th>PROFISSÃO:</th><td id="c-pj-prof"></td></tr>
+      <tr><th>RG:</th><td id="c-pj-rg"></td></tr>
+      <tr><th>CPF:</th><td id="c-pj-cpf"></td></tr>
+      <tr><th>TELEFONE/CELULAR:</th><td id="c-pj-phone"></td></tr>
+      <tr><th>E-MAIL:</th><td id="c-pj-email"></td></tr>
+    </table>
+
+    <p class="cp">celebram este <strong>CONTRATO</strong>, que se regerá pelo disposto no Código Civil Brasileiro e pelas cláusulas e condições seguintes, sendo que as partes têm entre si ajustada a <strong>LOCAÇÃO</strong> de partes ou da totalidade do imóvel descrito no item 1 do Quadro Resumo abaixo.</p>
+
+    <p class="ct" style="text-align:center">QUADRO RESUMO</p>
+
+    <table class="tb"><tr><th colspan="2">1. Do lugar:</th></tr>
+    <tr><td colspan="2">O DAMATA é uma área verde de 60.000m² totalmente cercada por uma reserva de mata virgem, com lagos e jardins, localizado na Cidade de Mogi Mirim, Estado de São Paulo, na proximidade da Estrada da Cachoeira, KM 2,5.</td></tr></table>
+
+    <table class="tb"><tr><th colspan="2">2. Das Especificações e Detalhes do Evento:</th></tr>
+    <tr><th style="width:38%">Período da Locação:</th>
+    <td>Do dia <strong id="c-d1">___/___/______</strong> a <strong id="c-d2">___/___/______</strong>, com check-in às <strong id="c-cin">__:__</strong>h e check-out às <strong id="c-cout">__:__</strong>h, destinado à realização do evento.</td></tr></table>
+
+    <table class="tb">
+      <tr><th style="width:8%">SIM</th><th style="width:8%">NÃO</th><th>3. Dos Espaços Locados:</th></tr>
+      <tr><td id="sp1-s" style="text-align:center;font-weight:700"></td><td id="sp1-n" style="text-align:center;font-weight:700">✓</td><td><strong>SALÃO TUMBÉRGIA</strong>: Capacidade para até 600 pessoas acomodadas em mesas ou 1.200 em eventos informais; área coberta com 1.000m², ambiente climatizado; estacionamento para até 500 carros.</td></tr>
+      <tr><td id="sp2-s" style="text-align:center;font-weight:700"></td><td id="sp2-n" style="text-align:center;font-weight:700">✓</td><td><strong>PEROBA ROSA (coberto ou ao ar livre)</strong>: Gramado entre o lago e a mata para cerimônias ao ar livre ou cerimonial coberto, capacidade para até 400 pessoas.</td></tr>
+      <tr><td id="sp3-s" style="text-align:center;font-weight:700"></td><td id="sp3-n" style="text-align:center;font-weight:700">✓</td><td><strong>SALÃO BROMÉLIAS</strong>: Capacidade para até 180 pessoas, área coberta com 300m².</td></tr>
+      <tr><td id="sp4-s" style="text-align:center;font-weight:700"></td><td id="sp4-n" style="text-align:center;font-weight:700">✓</td><td><strong>PISCINA "DAY USE"</strong>: Raia de 25m com bar e banheiro anexos. <span id="c-dayqty"></span></td></tr>
+    </table>
+
+    <table class="tb">
+      <tr><th style="width:8%">SIM</th><th style="width:8%">NÃO</th><th>4. Das Acomodações:</th></tr><tbody id="ac-table-body"></tbody>
+    </table>
+
+    <table class="tb">
+      <tr><th style="width:8%">SIM</th><th style="width:8%">NÃO</th><th>5. Do Mobiliário DAMATA:</th></tr>
+      <tr><td id="fu1-s" style="text-align:center;font-weight:700"></td><td id="fu1-n" style="text-align:center;font-weight:700">✓</td><td><strong>BALCÃO HEXAGONAL (completo)</strong>: Balcão/bar hexagonal modular em madeira maciça, diâmetro de 9,9m e altura de 1,10m.</td></tr>
+      <tr><td id="fu2-s" style="text-align:center;font-weight:700"></td><td id="fu2-n" style="text-align:center;font-weight:700">✓</td><td><strong>MESAS DE MADEIRA DE DEMOLIÇÃO</strong>: Madeira maciça com pés de ferro, capacidade para até 10 lugares. <strong>Qtd.: <span id="c-mesas">0</span></strong></td></tr>
+      <tr><td id="fu3-s" style="text-align:center;font-weight:700"></td><td id="fu3-n" style="text-align:center;font-weight:700">✓</td><td><strong>CADEIRA TIFFANY</strong>: Polipropileno cor marrom com estofado capuccino. <strong>Qtd.: <span id="c-cad">0</span></strong></td></tr>
+      <tr><td id="fu4-s" style="text-align:center;font-weight:700"></td><td id="fu4-n" style="text-align:center;font-weight:700">✓</td><td><strong>BANCOS EM MADEIRA MACIÇA</strong>: Capacidade para 4/5 lugares. <strong>Qtd.: <span id="c-ban">0</span></strong></td></tr>
+      <tr id="r-horas" style="display:none"><td style="text-align:center;font-weight:700">✓</td><td></td><td><strong>HORAS EXTRAS DE RECEPÇÃO</strong>: <strong><span id="c-horas">0</span> hora(s)</strong> adicionais além das 6h padrão — R$ 500,00/hora.</td></tr>
+      <tr id="r-mont" style="display:none"><td style="text-align:center;font-weight:700">✓</td><td></td><td><strong>DIÁRIA(S) DE MONTAGEM EXTRA</strong>: <strong><span id="c-mont">0</span> dia(s)</strong> — R$ 500,00/dia.</td></tr>
+      <tr id="r-desm" style="display:none"><td style="text-align:center;font-weight:700">✓</td><td></td><td><strong>DIÁRIA(S) DE DESMONTAGEM EXTRA</strong>: <strong><span id="c-desm">0</span> dia(s)</strong> — R$ 500,00/dia.</td></tr>
+    </table>
+
+    <table class="tb" style="margin-bottom:18px">
+      <tr><th>6. DOS PREÇOS – TOTAL GERAL:</th></tr>
+      <tr><td><strong id="c-total">R$ ___________________________</strong>, a ser pago nos termos especificados na Cláusula 2 do presente instrumento.</td></tr>
+    </table>
+
+    <p class="ct">CLÁUSULA PRIMEIRA – DO OBJETO E PRAZO DA CONTRATAÇÃO</p>
+    <p class="cp">1.1 O presente ajuste tem por objeto a locação ao <strong>LOCATÁRIO(A)</strong> do espaço físico para eventos especificado no <strong>Quadro Resumo item 3</strong>, das Acomodações especificadas no <strong>Quadro Resumo item 4</strong> e dos mobiliários na quantidade especificada no <strong>Quadro Resumo item 5</strong>, no período compreendido e para o evento determinado no <strong>Quadro Resumo item 2</strong>.</p>
+    <p class="cp">1.2. As datas contratadas poderão ser alteradas a depender da disponibilidade da <strong>LOCADORA</strong>, sendo que o(a) <strong>LOCATÁRIO(A)</strong> arcará com uma taxa de 40% do TOTAL GERAL a título de indenização, além de eventual reequilíbrio econômico financeiro (IGPM) caso a nova data seja superior a 6 meses da data contratada, salvo convenção diversa entre as partes.</p>
+    <p class="cp sub"><strong>Parágrafo Único</strong> – Esta taxa não se aplica quando, em razão de caso fortuito e/ou força maior, o poder público proibir a realização de todo e qualquer tipo de evento no período contratado.</p>
+    <p class="cp">1.3. O(A) <strong>LOCATÁRIO(A)</strong> somente poderá iniciar a montagem nos salões locados no dia do evento previsto no <strong>Quadro Resumo item 2</strong>, salvo acordo prévio e expresso entre as partes.</p>
+    <p class="cp sub"><strong>Parágrafo Primeiro</strong> – Para eventos com início antes das 16h, os salões estarão disponíveis para montagem a partir das 8h; para eventos com início após as 16h, os salões estarão disponíveis 8 horas antes do início.</p>
+    <p class="cp sub"><strong>Parágrafo Segundo</strong> – A desmontagem deverá ocorrer até no máximo 02 horas após o fim do evento.</p>
+    <p class="cp sub"><strong>Parágrafo Terceiro</strong> – Para diária extra de montagem ou desmontagem, será cobrado R$ 500,00 por dia. <span id="c-extdays"></span></p>
+    <p class="cp">1.4. O DAMATA deverá ser desocupado até às 14h00min do último dia previsto no <strong>Quadro Resumo item 2</strong>, sob pena de multa de R$ 150,00 por pessoa.</p>
+
+    <p class="ct">CLÁUSULA SEGUNDA – DO VALOR DA LOCAÇÃO</p>
+    <p class="cp">2.1. Pela locação ora ajustada o(a) <strong>LOCATÁRIO(A)</strong> pagará à <strong>LOCADORA</strong>, através de PIX (chave: 35.602.719/0001-87), a quantia de <strong id="c-total2">R$ ___________________________</strong>, da seguinte forma:</p>
+    <div id="c-pmts" style="margin:10px 0"></div>
+    <p class="cp">2.2. No caso de impontualidade, será cobrada multa de 1% do valor atrasado, além de juros de 1% ao mês, acrescidos de custas processuais e 20% de honorários advocatícios em caso de cobrança judicial.</p>
+    <p class="cp sub"><strong>Parágrafo Primeiro</strong> – O recebimento de valores em atraso constituirá ato de mera tolerância, permanecendo exigíveis as sanções contratuais.</p>
+    <p class="cp sub"><strong>Parágrafo Segundo</strong> – A falta de pagamento integral até a data prevista rescindirá automaticamente o contrato, exonerando a <strong>LOCADORA</strong> da disponibilização dos espaços.</p>
+    <p class="cp sub"><strong>Parágrafo Terceiro</strong> – Havendo parcela em atraso, não será permitido o agendamento de visita técnica no DAMATA.</p>
+    <p class="cp">2.3. O(A) <strong>LOCATÁRIO(A)</strong> deverá fornecer, em até 2 dias antes do período locado, a título de caução, o montante de R$ 1.000,00 via PIX (chave: 35.602.719/0001-87), a ser devolvido no primeiro dia útil após a locação caso não haja danos.</p>
+
+    <p class="ct">CLÁUSULA TERCEIRA – DAS OBRIGAÇÕES DOS CONTRATANTES</p>
+    <p class="cp"><strong>Obrigações da LOCADORA:</strong></p>
+    <p class="cp sub">a) Disponibilizar as dependências locadas limpas e em condições de uso, desde que o valor pactuado tenha sido adimplido;</p>
+    <p class="cp sub">b) Realizar obras ou benfeitorias a qualquer tempo, exceto durante o evento, sem necessidade de anuência prévia do <strong>LOCATÁRIO(A)</strong>;</p>
+    <p class="cp sub">c) Não se comprometer com a imutabilidade da formação vegetativa no entorno das áreas alugadas.</p>
+    <p class="cp"><strong>Obrigações do(a) LOCATÁRIO(A):</strong></p>
+    <p class="cp sub">a) Usar com zelo as dependências e todos os equipamentos, sem qualquer dano ou deterioração;</p>
+    <p class="cp sub">b) Fornecer à <strong>LOCADORA</strong> lista detalhada de todos os fornecedores do evento, cuja contratação dependerá da aprovação da <strong>LOCADORA</strong>;</p>
+    <p class="cp sub">c) Realizar REUNIÃO final com fornecedores junto à equipe da <strong>LOCADORA</strong> em até 20 dias antes do evento, sob pena de não liberação do espaço;</p>
+    <p class="cp sub">d) Exigir que fornecedores retirem caixas e cases antes do início do evento, sob pena de multa de R$ 500,00;</p>
+    <p class="cp sub">e) Caso o evento ultrapasse 06 horas<span id="c-hclause"></span>, pagar R$ 500,00 por hora adicional;</p>
+    <p class="cp sub">f) Brinquedos infantis somente podem ser montados nas áreas contratadas, sendo OBRIGATÓRIA a contratação de equipe de monitores;</p>
+    <p class="cp sub">g) Fornecer alimentação adequada para toda a equipe de staff da <strong>LOCADORA</strong> durante o evento;</p>
+    <p class="cp sub">h) Locar gerador de energia elétrica, sob pena de multa de R$ 2.000,00. A <strong>LOCADORA</strong> disponibiliza disjuntor de 80A bifásico (17 Kw) para som e iluminação;</p>
+    <p class="cp sub">i) Não montar tendas sem autorização prévia da <strong>LOCADORA</strong>;</p>
+    <p class="cp sub">j) Responsabilizar-se pelo uso e volume do som durante o evento;</p>
+    <p class="cp sub">k) Garantir a integralidade física de toda a vegetação do DAMATA, responsabilizando-se por sua restituição em caso de deterioração;</p>
+    <p class="cp sub">l) Garantir que fornecedores façam o recolhimento de todo o lixo gerado, sob pena de multa de R$ 500,00;</p>
+    <p class="cp sub">m) Para eventos com bilheteria, responsabilizar-se por toda documentação e alvarás necessários;</p>
+    <p class="cp sub">n) Arcar com todos os impostos, tributos e taxas incidentes, inclusive eventuais obrigações ao ECAD;</p>
+    <p class="cp sub">o) Responsabilizar-se pela segurança do evento, contratando serviço de segurança para todo o período, inclusive montagem e desmontagem;</p>
+    <p class="cp sub">p) Estar permanentemente proibido de usar fogos, bombas ou similares, lançar confetes, papéis picados, glitters, massinha de modelar ou adesivos, sob pena de multa de R$ 1.000,00;</p>
+    <p class="cp sub">q) Autorizar a divulgação de imagens captadas durante o evento para fins de propaganda do espaço, desde que não implique em violação à honra, intimidade ou privacidade.</p>
+
+    <p class="ct">CLÁUSULA QUARTA – RESPONSABILIDADE CÍVEL E CRIMINAL</p>
+    <p class="cp">4.1. O(A) <strong>LOCATÁRIO(A)</strong> responderá civil e criminalmente por todo e qualquer ato ocorrido nas dependências do DAMATA durante a locação.</p>
+    <p class="cp">4.2. O(A) <strong>LOCATÁRIO(A)</strong> responderá exclusivamente pelo comportamento, segurança e por quaisquer acidentes que venham a ocorrer com qualquer pessoa dentro do espaço locado.</p>
+    <p class="cp">4.3. A <strong>LOCADORA</strong> não se responsabiliza por eventuais danos, furtos ou tipificação penal realizada aos veículos ou objetos que se encontrem nas dependências do local durante o período locado.</p>
+    <p class="cp">4.4. A <strong>LOCADORA</strong> não se responsabiliza por eventos naturais e climáticos, danos por intempéries, nem nas hipóteses de caso fortuito e força maior.</p>
+
+    <p class="ct">CLÁUSULA QUINTA – DA DESISTÊNCIA E DO INADIMPLEMENTO</p>
+    <p class="cp">5.1. Em caso de desistência por parte do(a) <strong>LOCATÁRIO(A)</strong>, a <strong>LOCADORA</strong> cobrará multa contratual progressiva:</p>
+    <table class="tb" style="margin-bottom:8px">
+      <tr><th>Antecedência em relação à data do evento</th><th>Multa/Retenção</th></tr>
+      <tr><td>Até 18 meses antes</td><td>50% do valor total</td></tr>
+      <tr><td>Entre 18 e 12 meses antes</td><td>60% do valor total</td></tr>
+      <tr><td>Entre 12 e 6 meses antes</td><td>80% do valor total</td></tr>
+      <tr><td>Entre 6 meses e a data do evento</td><td>100% do valor total</td></tr>
+    </table>
+    <p class="cp">Em caso de desistência por parte da <strong>LOCADORA</strong>, além da devolução dos valores já pagos, será aplicada a mesma progressividade da multa em favor do(a) <strong>LOCATÁRIO(A)</strong>.</p>
+    <p class="cp sub"><strong>Parágrafo Primeiro</strong> – O termo "data do evento" corresponde à data do contrato originário, não de eventuais remarcações.</p>
+    <p class="cp sub"><strong>Parágrafo Segundo</strong> – A <strong>LOCADORA</strong> estará autorizada a reter os valores já pagos a título de multa, podendo cobrar a quantia remanescente inclusive judicialmente.</p>
+    <p class="cp">5.4. O inadimplemento de qualquer parcela implicará rescisão contratual independentemente de notificações ou avisos.</p>
+
+    <p class="ct">CLÁUSULA SEXTA – DO FORO DE ELEIÇÃO</p>
+    <p class="cp">Elegem os CONTRATANTES o foro de Mogi Mirim/SP para dirimir quaisquer dúvidas decorrentes do presente contrato.</p>
+
+    <p class="ct">DISPOSIÇÕES FINAIS</p>
+    <p class="cp">E, por estarem justos(as) e contratados, firmam e assinam perante as testemunhas abaixo o presente contrato por assinatura eletrônica (Clicksign), ficando cada parte com uma via em seu poder.</p>
+    <p class="cp" style="text-align:center"><strong>Mogi Mirim/SP, <span id="c-today"></span>.</strong></p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:48px">
+      <div style="text-align:center"><div style="border-top:1px solid #555;margin-top:64px;padding-top:8px">
+        <p class="cp" style="text-align:center"><strong>LOCADORA – DAMATA</strong><br>ESPAÇO DAMATA EVENTOS LTDA<br>CNPJ/MF: 35.602.719/0001-87</p>
+      </div></div>
+      <div style="text-align:center"><div style="border-top:1px solid #555;margin-top:64px;padding-top:8px">
+        <p class="cp" style="text-align:center" id="sig-blk-pf"><strong>LOCATÁRIO(A)</strong><br>Nome: <span id="sig-name">_____________________</span><br>CPF: <span id="sig-cpf">_____________________</span><br>E-mail: <span id="sig-email">_____________________</span></p>
+        <p class="cp" style="text-align:center;display:none" id="sig-blk-pj"><strong>LOCATÁRIA (EMPRESA)</strong><br>Empresa: <span id="sig-razao">_____________________</span><br>CNPJ: <span id="sig-cnpj">_____________________</span><br>Rep.: <span id="sig-name-pj">_____________________</span><br>CPF: <span id="sig-cpf-pj">_____________________</span></p>
+      </div></div>
+      <div style="text-align:center"><div style="border-top:1px solid #555;margin-top:64px;padding-top:8px">
+        <p class="cp" style="text-align:center"><strong>TESTEMUNHA 1</strong><br>Nome: Gabriel José Soligo<br>CPF: 302.326.678-61<br>E-mail: soligogabriel@gmail.com</p>
+      </div></div>
+      <div style="text-align:center"><div style="border-top:1px solid #555;margin-top:64px;padding-top:8px">
+        <p class="cp" style="text-align:center"><strong>TESTEMUNHA 2</strong><br>Nome: <span id="sig-wname">_____________________</span><br>CPF: <span id="sig-wcpf">_____________________</span><br>E-mail: <span id="sig-wemail">_____________________</span></p>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+var SB_ANON_KEY="sb_publishable__RQxBa8P-lryd0LtWgTJPw_-aSWERWK";
+var ASSINAR_URL="https://wwnndsprpofmgbklqdgg.supabase.co/functions/v1/assinar-contrato";
+var ASSINAR_KEY=SB_ANON_KEY;
+
+function showTab(t) {
+  var tabForm = document.getElementById('tab-form');
+  var tabPrev = document.getElementById('tab-preview');
+  var tbf = document.getElementById('tbf');
+  var tbp = document.getElementById('tbp');
+  if (t === 'preview') {
+    tabForm.classList.remove('active');
+    tabPrev.classList.add('active');
+    tbf.style.borderBottomColor = 'transparent'; tbf.style.color = '#64748b';
+    tbp.style.borderBottomColor = '#1e3a5f';     tbp.style.color = '#1e3a5f';
+    void tabPrev.offsetHeight;
+    renderContract();
+    requestAnimationFrame(renderContract);
+  } else {
+    tabPrev.classList.remove('active');
+    tabForm.classList.add('active');
+    tbf.style.borderBottomColor = '#1e3a5f'; tbf.style.color = '#1e3a5f';
+    tbp.style.borderBottomColor = 'transparent'; tbp.style.color = '#64748b';
+  }
+}
+function g(id){return document.getElementById(id);}
+function tx(id,v){var e=g(id);if(e)e.textContent=v||'';}
+function sn(s_id,n_id,yes){tx(s_id,yes?'✓':'');tx(n_id,yes?'':'✓');}
+function fd(d){if(!d)return null;var p=d.split('-');return p.length<3?d:p[2]+'/'+p[1]+'/'+p[0];}
+function fc(v){if(!v)return null;return parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function liveSync(){renderContract();}
+
+function renderContract(){
+  var p=PRESET||{};
+  var isCorp=!!(p&&p.isCorporativo);
+  tx('c-name',g('f-name').value);tx('c-nat',g('f-nat').value);tx('c-prof',g('f-prof').value);
+  tx('c-rg',g('f-rg').value);tx('c-cpf',g('f-cpf').value);tx('c-addr',g('f-addr').value);
+  tx('c-phone',g('f-phone').value);tx('c-email',g('f-email').value);
+  tx('sig-name',g('f-name').value||'_____________________');
+  tx('sig-cpf',g('f-cpf').value||'_____________________');
+  tx('sig-email',g('f-email').value||'_____________________');
+  tx('sig-wname',g('w-name').value||'_____________________');
+  tx('sig-wcpf',g('w-cpf').value||'_____________________');
+  tx('sig-wemail',g('w-email').value||'_____________________');
+  if(isCorp){
+    var razao=g('f-razao')?g('f-razao').value:'';
+    var cnpj=g('f-cnpj')?g('f-cnpj').value:'';
+    var addrEmp=g('f-addr-empresa')?g('f-addr-empresa').value:'';
+    tx('c-razao',razao);tx('c-cnpj',cnpj);tx('c-addr-empresa',addrEmp);
+    tx('c-razao-inline',razao);tx('c-cnpj-inline',cnpj);tx('c-addr-empresa-inline',addrEmp);
+    tx('c-name-repres',g('f-name').value);tx('c-cpf-repres',g('f-cpf').value);tx('c-rg-repres',g('f-rg').value);
+    tx('c-pj-name',g('f-name').value);tx('c-pj-nat',g('f-nat').value);tx('c-pj-prof',g('f-prof').value);
+    tx('c-pj-rg',g('f-rg').value);tx('c-pj-cpf',g('f-cpf').value);tx('c-pj-phone',g('f-phone').value);tx('c-pj-email',g('f-email').value);
+    tx('sig-razao',razao||'_____________________');tx('sig-cnpj',cnpj||'_____________________');
+    tx('sig-name-pj',g('f-name').value||'_____________________');tx('sig-cpf-pj',g('f-cpf').value||'_____________________');
+  }
+  tx('c-d1',fd(p.date1)||'___/___/______');
+  tx('c-d2',fd(p.date2)||(fd(p.date1)||'___/___/______'));
+  tx('c-cin',p.cin||'__:__');tx('c-cout',p.cout||'__:__');
+  if(p.code) tx('c-codeline','Código do Contrato: '+p.code);
+  sn('sp1-s','sp1-n',p.spTumb);sn('sp2-s','sp2-n',p.spPeroba);
+  sn('sp3-s','sp3-n',p.spBrom);sn('sp4-s','sp4-n',(p.dayQty||0)>0);
+  if((p.dayQty||0)>0) tx('c-dayqty','Qtd.: '+p.dayQty);
+  var _acCM=[{pk:"acLoft",ik:"acLoft"},{pk:"acCasa",ik:"acCasa"},{pk:"acSuiteAss",ik:"acSuiteAss"},
+    {pk:"acSf1",ik:"acSf1"},{pk:"acSf2",ik:"acSf2"},{pk:"acSf3",ik:"acSf3"},
+    {pk:"acSf4",ik:"acSf4"},{pk:"acSf5",ik:"acSf5"},
+    {pk:"acSb1",ik:"acSb1"},{pk:"acSb2",ik:"acSb2"},{pk:"acSb3",ik:"acSb3"}];
+  var _acInfo=p.acomodacoesInfo||{};
+  var _acTb=g('ac-table-body');
+  if(_acTb){_acTb.innerHTML=_acCM.map(function(m){
+    var chk=!!p[m.pk];
+    var nome=(_acInfo[m.ik]&&_acInfo[m.ik].nome)||m.pk;
+    var desc=(_acInfo[m.ik]&&_acInfo[m.ik].desc)||"";
+    return "<tr><td style='text-align:center;font-weight:700'>"+(chk?"✓":"")+"</td><td style='text-align:center;font-weight:700'>"+(chk?"":"✓")+"</td><td><strong>"+nome.toUpperCase()+"</strong>: "+desc+"</td></tr>";
+  }).join("");}
+  sn('fu1-s','fu1-n',p.fuBal);
+  sn('fu2-s','fu2-n',(p.fuMesas||0)>0);tx('c-mesas',p.fuMesas||0);
+  sn('fu3-s','fu3-n',(p.fuCad||0)>0);tx('c-cad',p.fuCad||0);
+  sn('fu4-s','fu4-n',(p.fuBan||0)>0);tx('c-ban',p.fuBan||0);
+  tx('c-horas',p.exHoras||0);tx('c-mont',p.exMont||0);tx('c-desm',p.exDesm||0);
+  g('r-horas').style.display=(p.exHoras||0)>0?'':'none';
+  g('r-mont').style.display=(p.exMont||0)>0?'':'none';
+  g('r-desm').style.display=(p.exDesm||0)>0?'':'none';
+  var ed='';
+  if((p.exMont||0)>0||(p.exDesm||0)>0) ed='Neste contrato: '+(p.exMont||0)+' diária(s) de montagem e '+(p.exDesm||0)+' diária(s) de desmontagem extras.';
+  tx('c-extdays',ed);
+  var hc=(p.exHoras||0)>0?' – sendo que neste contrato estão previstas '+p.exHoras+' hora(s) adicional(is) –':'';
+  tx('c-hclause',hc);
+  var tot=p.total?'R$ '+fc(p.total):'R$ ___________________________';
+  tx('c-total',tot);tx('c-total2',tot);
+  var pmts=p.payments||[];
+  if(pmts.length>0){
+    var h='<table class="tb"><thead><tr><th>#</th><th>Descrição</th><th>Vencimento</th><th>Valor</th></tr></thead><tbody>';
+    pmts.forEach(function(pm,i){h+='<tr><td style="text-align:center">'+(i+1)+'</td><td>'+(pm.desc||'—')+'</td><td>'+(pm.date?fd(pm.date):'—')+'</td><td>'+(pm.value?'R$ '+fc(pm.value):'—')+'</td></tr>';});
+    h+='</tbody></table>';
+    g('c-pmts').innerHTML=h;
+  }
+  var today=new Date();
+  tx('c-today',today.toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'}));
+}
+
+function _amsg(html,ok){
+  ["alert-msg","alert-msg2"].forEach(function(id){
+    var el=g(id);if(!el)return;
+    el.style.display="block";
+    el.style.background=ok?"#dcfce7":"#fee2e2";
+    el.style.color=ok?"#166534":"#991b1b";
+    el.innerHTML=html;
+  });
+}
+
+function maskPhone(el){
+  var v=el.value.replace(/\D/g,"");
+  if(v.length>11)v=v.slice(0,11);
+  if(v.length>10) v=v.replace(/^(\d{2})(\d{5})(\d{4})$/,"($1) $2-$3");
+  else if(v.length>6) v=v.replace(/^(\d{2})(\d{4})(\d*)$/,"($1) $2-$3");
+  else if(v.length>2) v=v.replace(/^(\d{2})(\d*)$/,"($1) $2");
+  el.value=v;
+}
+
+function phoneDigits(v){return (v||"").replace(/\D/g,"");}
+function phoneValido(v){var d=phoneDigits(v);return d.length===10||d.length===11;}
+
+async function assinarWhatsApp(){
+  var nome=(g("f-name")||{}).value||"";
+  var fone=(g("f-phone")||{}).value||"";
+  var fone2=(g("f-phone2")||{}).value||"";
+  var email=(g("f-email")||{}).value||"";
+  var wnome=(g("w-name")||{}).value||"";
+  var wfone=(g("w-phone")||{}).value||"";
+  var wfone2=(g("w-phone2")||{}).value||"";
+  var wemail=(g("w-email")||{}).value||"";
+
+  if(!nome.trim()||!fone.trim()){
+    showTab("form");
+    _amsg("Preencha pelo menos <strong>Nome Completo</strong> e <strong>WhatsApp</strong> do contratante.",false);
+    return;
+  }
+  if(!phoneValido(fone)){
+    showTab("form");
+    _amsg("O <strong>WhatsApp do contratante</strong> está incompleto. Use o formato (00) 00000-0000.",false);
+    return;
+  }
+  if(phoneDigits(fone)!==phoneDigits(fone2)){
+    showTab("form");
+    _amsg("Os campos de <strong>WhatsApp do contratante</strong> não coincidem. Verifique e tente novamente.",false);
+    return;
+  }
+  if(!wnome.trim()||!wfone.trim()){
+    showTab("form");
+    _amsg("Preencha o <strong>Nome</strong> e o <strong>WhatsApp da testemunha</strong>.",false);
+    return;
+  }
+  if(!phoneValido(wfone)){
+    showTab("form");
+    _amsg("O <strong>WhatsApp da testemunha</strong> está incompleto. Use o formato (00) 00000-0000.",false);
+    return;
+  }
+  if(phoneDigits(wfone)!==phoneDigits(wfone2)){
+    showTab("form");
+    _amsg("Os campos de <strong>WhatsApp da testemunha</strong> não coincidem. Verifique e tente novamente.",false);
+    return;
+  }
+
+  renderContract();
+  var btn=g("btn-assinar-wpp");
+  btn.disabled=true; var _o=btn.innerHTML; btn.innerHTML="Gerando contrato…";
+  _amsg("Gerando o contrato e enviando para assinatura…",true);
+  try{
+    var el=document.querySelector(".cp-wrap");
+    var opt={margin:[10,12,10,12],filename:"contrato.pdf",image:{type:"jpeg",quality:.95},
+      html2canvas:{scale:2,useCORS:true},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}};
+    var dataUri=await html2pdf().set(opt).from(el).outputPdf("datauristring");
+    var b64=dataUri.split(",")[1];
+    var code=(PRESET&&PRESET.code)||"";
+    var res=await fetch(ASSINAR_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+ASSINAR_KEY,"apikey":ASSINAR_KEY},
+      body:JSON.stringify({
+        cod:code,
+        signerName:nome.trim(),
+        signerPhone:fone.trim(),
+        signerEmail:email.trim(),
+        witnessName:wnome.trim(),
+        witnessPhone:wfone.trim(),
+        witnessEmail:wemail.trim(),
+        pdfBase64:b64,
+        filename:"contrato-"+(code||"damata")+".pdf",
+        docName:"Contrato "+(code?code+" ":"")+"Fazenda Damata"
+      })
+    });
+    var j=await res.json();
+    if(res.ok&&j.ok){
+      _amsg("✅ Contrato enviado! Você receberá o link de assinatura no WhatsApp <strong>"+fone+"</strong> em instantes.",true);
+      btn.style.display="none";
+    } else {
+      _amsg("Não foi possível enviar para assinatura. "+(j.error||"Tente novamente."),false);
+      btn.disabled=false; btn.innerHTML=_o;
+    }
+  } catch(e){
+    _amsg("Erro ao gerar o contrato: "+e.message,false);
+    btn.disabled=false; btn.innerHTML=_o;
+  }
+}
+
+function applyPreset(){
+  var p=PRESET;
+  if(!p) return;
+  if(p.code){tx('hdr-code','Cód. '+p.code);tx('s-code',p.code);}
+  tx('s-d1',fd(p.date1)||'—');tx('s-d2',fd(p.date2)||'—');
+  g('s-times').textContent=(p.cin||'--:--')+'h / '+(p.cout||'--:--')+'h';
+  var sp=[];
+  if(p.spTumb)sp.push('Tumbérgia');if(p.spPeroba)sp.push('Peroba Rosa');
+  if(p.spBrom)sp.push('Bromélias');if((p.dayQty||0)>0)sp.push('Day Use x'+(p.dayQty||1));
+  tx('s-spaces',sp.length?sp.join(', '):'Nenhum');
+  var ac=[];
+  var _acKeys=["acLoft","acCasa","acSuiteAss","acSf1","acSf2","acSf3","acSf4","acSf5","acSb1","acSb2","acSb3"];
+  var _acI=p.acomodacoesInfo||{};
+  _acKeys.forEach(function(k){if(p[k])ac.push((_acI[k]&&_acI[k].nome)||k);});
+  tx('s-accoms',ac.length?ac.join(', '):'Nenhuma');
+  if(p.total)tx('s-total','R$ '+fc(p.total));
+  g('evt-summary').style.display='block';
+}
+
+applyPreset();
+// Corporate mode: show company section, hide/show contract blocks
+if(PRESET&&PRESET.isCorporativo){
+  var _cs=document.getElementById('corp-section');if(_cs)_cs.style.display='';
+  var _pt=document.getElementById('personal-section-title');if(_pt)_pt.textContent='Dados do Responsável / Signatário';
+  var _pfi=document.getElementById('loc-pf-intro');if(_pfi)_pfi.style.display='none';
+  var _pji=document.getElementById('loc-pj-intro');if(_pji)_pji.style.display='';
+  var _pft=document.getElementById('loc-pf-table');if(_pft)_pft.style.display='none';
+  var _pjt=document.getElementById('loc-pj-table');if(_pjt)_pjt.style.display='';
+  var _sbf=document.getElementById('sig-blk-pf');if(_sbf)_sbf.style.display='none';
+  var _sbj=document.getElementById('sig-blk-pj');if(_sbj)_sbj.style.display='';
+}
+function maskCnpj(el){
+  var v=el.value.replace(/\D/g,'').slice(0,14);
+  if(v.length>12)v=v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2}).*/,'$1.$2.$3/$4-$5');
+  else if(v.length>8)v=v.replace(/^(\d{2})(\d{3})(\d{3})(\d{0,4}).*/,'$1.$2.$3/$4');
+  else if(v.length>5)v=v.replace(/^(\d{2})(\d{3})(\d{0,3}).*/,'$1.$2.$3');
+  else if(v.length>2)v=v.replace(/^(\d{2})(\d{0,3}).*/,'$1.$2');
+  el.value=v;
+}
+var _t=new Date();
+var _el=document.getElementById('c-today');
+if(_el)_el.textContent=_t.toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'});
+setTimeout(renderContract, 0);
+</script>
+</body>
+</html>

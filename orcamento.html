@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Orçamento — Fazenda Damata</title>
+<!--
+  Página do orçamento do cliente — o link que vai por WhatsApp.
+
+  A Edge Function orcamento-publico monta a página inteira, mas não pode
+  entregá-la: o gateway do Supabase força content-type: text/plain e CSP
+  sandbox em tudo que sai de *.supabase.co/functions/v1/ (proteção
+  anti-phishing do domínio compartilhado). O cliente que abria o link da
+  função via código-fonte, não o orçamento.
+
+  Aqui buscamos o HTML da função e renderizamos no domínio da Damata. A função
+  segue intacta — só a entrega mudou de lugar.
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;background:#f5f0eb;min-height:100vh;
+     display:flex;align-items:center;justify-content:center;padding:24px;color:#222}
+.card{background:#fff;border-radius:16px;padding:40px 28px;max-width:460px;width:100%;
+      text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.brand{color:#8b5a2b;font-size:13px;font-weight:700;letter-spacing:.8px;margin-bottom:20px}
+h1{color:#8b5a2b;font-size:20px;margin-bottom:10px;font-weight:700}
+p{color:#666;font-size:14px;line-height:1.6}
+.spin{width:32px;height:32px;margin:0 auto 18px;border:3px solid #e8dfd5;border-top-color:#8b5a2b;
+      border-radius:50%;animation:g .8s linear infinite}
+@keyframes g{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="card" id="cx">
+  <div class="brand">FAZENDA DAMATA</div>
+  <div class="spin"></div>
+  <p>Carregando seu orçamento…</p>
+</div>
+
+<script>
+var FN = "https://wwnndsprpofmgbklqdgg.supabase.co/functions/v1/orcamento-publico";
+
+function aviso(titulo, texto){
+  document.getElementById("cx").innerHTML =
+    '<div class="brand">FAZENDA DAMATA</div><h1></h1><p></p>';
+  document.querySelector("#cx h1").textContent = titulo;
+  document.querySelector("#cx p").textContent  = texto;
+}
+
+(async function(){
+  var id = new URLSearchParams(location.search).get("id") || "";
+  if(!id){
+    aviso("Link inválido","Confira o link que você recebeu ou peça um novo à nossa equipe.");
+    return;
+  }
+  try{
+    var r = await fetch(FN + "?id=" + encodeURIComponent(id));
+    var html = await r.text();
+    if(!html || html.indexOf("<") === -1) throw new Error("resposta vazia");
+    document.open(); document.write(html); document.close();
+  }catch(err){
+    aviso("Não foi possível abrir o orçamento",
+          "Tente novamente em instantes. Se persistir, fale com a nossa equipe.");
+    console.error("[orcamento]", err);
+  }
+})();
+</script>
+</body>
+</html>
