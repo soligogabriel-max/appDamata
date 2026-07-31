@@ -83,7 +83,11 @@ async function gravar(
   SB_URL: string, sbH: Record<string, string>,
   cod: string, p: Record<string, unknown>,
 ) {
-  const dados: Record<string, string | null> = {};
+  // origem distingue quem digitou: o proprio cliente aqui, ou o payload da
+  // assinatura (assinar-contrato) quando o contrato veio de um arquivo antigo.
+  // Num contrato isso nao e detalhe — "o cliente preencheu" e "alguem
+  // transcreveu" nao tem o mesmo peso.
+  const dados: Record<string, string | null> = { origem: "cliente" };
   for (const c of CAMPOS_CLIENTE) dados[c] = limpa(p[c]);
   if (!dados.nome || !dados.whatsapp) {
     return erro("Dados incompletos", "Nome e WhatsApp do contratante são obrigatórios.", 400);

@@ -131,17 +131,19 @@ Deno.serve(async (req) => {
 
   // 2) Atualiza o evento (agenda) com o status e o id do documento
   if (cod) {
+    const SB_URL = Deno.env.get("SUPABASE_URL");
+    const SB_SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const sbH = {
+      apikey: SB_SR!,
+      Authorization: "Bearer " + SB_SR,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    };
+
     try {
-      const SB_URL = Deno.env.get("SUPABASE_URL");
-      const SB_SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
       await fetch(`${SB_URL}/rest/v1/agenda?cod=eq.${encodeURIComponent(cod)}`, {
         method: "PATCH",
-        headers: {
-          apikey: SB_SR!,
-          Authorization: "Bearer " + SB_SR,
-          "Content-Type": "application/json",
-          Prefer: "return=minimal",
-        },
+        headers: sbH,
         body: JSON.stringify({
           assinatura_status: "enviado",
           assinatura_doc_id: docId,
@@ -150,6 +152,52 @@ Deno.serve(async (req) => {
     } catch (_) {
       // não bloqueia: o documento já foi criado no Autentique
     }
+
+    // 3) Guarda o que sabemos do signatário.
+    //
+    // Estes campos sempre chegaram aqui no payload e eram descartados — por
+    // isso cliente_json ficou nulo em todos os contratos anteriores ao link,
+    // e o e-mail digitado pelo cliente se perdia duas vezes (nem vai ao
+    // Autentique, que só recebe nome e telefone, nem ficava na base).
+    //
+    // Vale para os arquivos .html antigos ainda em circulação: se um deles for
+    // assinado, o contrato deixa de nascer sem nenhum dado do cliente.
+    //
+    // É parcial de propósito — CPF, RG, endereço, profissão e nacionalidade
+    // não chegam nesta função, ficam só no corpo do PDF.
+    const dados: Record<string, string | null> = {
+      origem: "assinatura",   // veio do envio, não do formulário do link
+      nome: signerName || null,
+      whatsapp: signerPhone || null,
+      email: signerEmail || null,
+      testemunhaNome: witnessName || null,
+      testemunhaWhatsapp: witnessPhone || null,
+      testemunhaEmail: witnessEmail || null,
+    };
+
+    try {
+      // cliente_json=is.null no filtro: nunca sobrescreve o que o cliente
+      // preencheu pelo link, que tem muito mais campos que isto.
+      await fetch(
+        `${SB_URL}/rest/v1/agenda?cod=eq.${encodeURIComponent(cod)}&cliente_json=is.null`,
+        { method: "PATCH", headers: sbH, body: JSON.stringify({ cliente_json: dados }) },
+      );
+    } catch (_) { /* não bloqueia */ }
+
+    try {
+      await fetch(`${SB_URL}/rest/v1/ficha_do_evento?on_conflict=cod`, {
+        method: "POST",
+        headers: { ...sbH, Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({
+          cod,
+          nome_contratante: dados.nome,
+          celular: dados.whatsapp,
+          email: dados.email,
+          nome_testemunha: dados.testemunhaNome,
+          email_testemunha: dados.testemunhaEmail,
+        }),
+      });
+    } catch (_) { /* não bloqueia */ }
   }
 
   return json({ ok: true, docId, link });
