@@ -240,6 +240,18 @@ if(window.parent&&window.parent!==window){
   // Fallback: admin.html antigo em cache do SW nao responde. Nao trava a UI.
   setTimeout(function(){if(_tokenDone){_tokenDone();_tokenDone=null;}},3000);
 }
+// A regra do proximo codigo vive no banco (proximo_cod_contrato) — antes eram
+// tres copias em JS, com ordenacao de texto que trava no centesimo contrato.
+async function sbRpc(fn, body){
+  if(_tokenReady) await _tokenReady;
+  var r=await fetch(SB_URL+"/rest/v1/rpc/"+fn,{
+    method:"POST",
+    headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken,"Content-Type":"application/json"},
+    body:JSON.stringify(body||{})
+  });
+  if(!r.ok) throw new Error(await r.text());
+  var t=await r.text(); return t?JSON.parse(t):null;
+}
 async function sbGet(path){
   if(_tokenReady) await _tokenReady;
   var r=await fetch(SB_URL+"/rest/v1/"+path,{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken}});
@@ -624,11 +636,6 @@ function salvarNoSistema(){
 }
 
 // ── Gerar arquivo HTML para cliente ──
-function b64ToUtf8(b64){
-  var bin=atob(b64),bytes=new Uint8Array(bin.length);
-  for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
-  return new TextDecoder("utf-8").decode(bytes);
-}
 async function generateFile(){
   var isH=_contractType==="hospedagem";
   var noiva=v("o-noiva"),noivo=v("o-noivo"),locatario=v("o-locatario");
@@ -638,11 +645,7 @@ async function generateFile(){
   // Garante que o código está preenchido antes de gerar o arquivo
   if(!v("o-code")&&!_gcEvt){
     try{
-      var ano=new Date().getFullYear();
-      var rows=await sbGet("agenda?select=cod&cod=like."+ano+"%25&deleted_at=is.null&order=cod.desc&limit=1");
-      var seq=1;
-      if(rows.length) seq=parseInt(rows[0].cod.slice(4))+1;
-      g("o-code").value=String(ano)+String(seq).padStart(2,"0");
+      g("o-code").value=await sbRpc("proximo_cod_contrato");
     }catch(e){alert("Erro ao gerar código: "+e.message);return;}
   }
   // Gera o preset completo (com flags derivados dos itens por código)
@@ -684,16 +687,21 @@ async function generateFile(){
     g("o-code").value=codConfirmado;
     preset.code=codConfirmado;
   }
-  var pJson=JSON.stringify(preset);
-  var tmpl=b64ToUtf8(isH?HOSPEDAGEM_B64:CLIENT_B64);
-  var out=tmpl.replace("null;/*DAMATA_PRESET*/",pJson+";");
-  if(out===tmpl){alert("Erro: marcador de dados não encontrado no template.");return;}
-  var code=(preset.code||"contrato").replace(/[^a-zA-Z0-9]/g,"-");
-  var blob=new Blob(["﻿"+out],{type:"text/html;charset=utf-8"});
-  var a=document.createElement("a");
-  a.href=URL.createObjectURL(blob);
-  a.download="contrato-"+code+".html";
-  a.click();URL.revokeObjectURL(a.href);
+  // Em vez de baixar um arquivo HTML para mandar por WhatsApp, copia o link do
+  // contrato. A página é montada por fazendadamata.com/contrato.html e grava os
+  // dados do cliente na base antes da assinatura.
+  var codFinal=preset.code||v("o-code");
+  try{
+    var rows=await sbGet("agenda?cod=eq."+encodeURIComponent(codFinal)+"&select=contrato_token&limit=1");
+    if(!rows.length||!rows[0].contrato_token){alert("Contrato salvo, mas não foi possível obter o link. Copie pela tela de Contratos.");return;}
+    var link="https://fazendadamata.com/contrato.html?token="+rows[0].contrato_token;
+    try{
+      await navigator.clipboard.writeText(link);
+      alert("Contrato "+codFinal+" salvo.\n\nLink copiado — envie ao cliente:\n"+link);
+    }catch(_){
+      prompt("Contrato "+codFinal+" salvo. Copie o link e envie ao cliente:",link);
+    }
+  }catch(e){alert("Contrato salvo, mas houve erro ao obter o link: "+e.message);}
 }
 
 function collectPreset(){
@@ -808,8 +816,7 @@ window.addEventListener("load",function(){
   loadTabelasPreco();
   renderPayments();
 });
-var CLIENT_B64=(window.parent&&window.parent!==window)?window.parent.CLIENT_B64:"";
-var HOSPEDAGEM_B64=(window.parent&&window.parent!==window)?window.parent.HOSPEDAGEM_B64:"";
+
 </script>
 </body>
 </html>
