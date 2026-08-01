@@ -33,7 +33,7 @@ async function renderOrcamentos(){
       <th style="padding:10px 12px;"></th>
     </tr></thead>
     <tbody>${filtered.map(r=>{
-      const hoje=new Date().toISOString().slice(0,10);
+      const hoje=localDate();
       const exp=r.validade&&r.validade<hoje&&r.status==="pendente";
       const statusReal=exp?"expirado":r.status||"pendente";
       const nomes=[r.nome_noiva,r.nome_noivo].filter(Boolean).join(" e ")||r.nome_contratante||"—";
@@ -65,7 +65,7 @@ function verOrcamento(id){
   const row=(_orcRowsCache||[]).find(r=>r.id===id);
   if(!row) return;
   _orcDetId=id;
-  const hoje=new Date().toISOString().slice(0,10);
+  const hoje=localDate();
   const exp=row.validade&&row.validade<hoje&&row.status==="pendente";
   const statusReal=exp?"expirado":row.status||"pendente";
   const nomes=[row.nome_noiva,row.nome_noivo].filter(Boolean).join(" e ")||row.nome_contratante||"—";
@@ -386,7 +386,7 @@ async function _orcUpsertLead(){
     pacote_cod:_orc.pacote_cod||null,
     itens:(_orc._selectedItems||[]).map(i=>({cod:i.cod_item,descricao:i.descricao,qty:i.qty,valor_unitario:i.valor_unitario,subtotal:i.subtotal})),
     valor_total:_orc.valor_total||null,
-    validade:validade.toISOString().slice(0,10),
+    validade:localDate(validade),
     whatsapp:_orc.whatsapp||null,
     email:_orc.email||null,
     status:_orc._stage||"lead",
@@ -551,7 +551,7 @@ function _orcHTML1(){
     <label class="lbl">Tipo de evento *</label>
     <select id="orc-tipo" class="inp" onchange="_orcRenderNames()">${tipos}</select>
     <label class="lbl">Data do evento *</label>
-    <input type="date" id="orc-data" class="inp" value="${_orc.data_evento}" min="${new Date().toISOString().slice(0,10)}" onchange="_orcCheckDataConflito()"/>
+    <input type="date" id="orc-data" class="inp" value="${_orc.data_evento}" min="${localDate()}" onchange="_orcCheckDataConflito()"/>
     <div id="orc-warn-data" style="display:none;color:#b45309;font-size:12px;margin:-10px 0 14px;"></div>
     <label class="lbl">Número de convidados *</label>
     <input type="number" id="orc-conv" class="inp" value="${_orc.num_convidados}" placeholder="ex: 80" min="1" max="450"/>

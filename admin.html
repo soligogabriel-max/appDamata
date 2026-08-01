@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.01a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.01b</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -2873,8 +2873,7 @@ async function openGCalSync() {
   document.getElementById("gcal-ev-items").innerHTML = '<div style="padding:12px;color:var(--dl);font-size:13px;">Carregando eventos...</div>';
 
   // Carrega eventos futuros em paralelo com abertura
-  const hoje = new Date(); hoje.setHours(0,0,0,0);
-  const hojeStr = hoje.toISOString().slice(0,10);
+  const hojeStr = localDate();
   dbGet("agenda","select=*&data_evento=gte."+hojeStr+"&order=data_evento.asc&limit=500").then(rows => {
     _gcalFutEvts = rows.filter(r => r.data_evento && parseInt(r.data_evento.slice(0,4)) <= 2100);
     _gcalRenderEvList();
@@ -3511,7 +3510,7 @@ async function vcSalvarEdicao() {
     if (["visitado_alta","visitado_baixa"].includes(status)) {
       const d7 = new Date(); d7.setDate(d7.getDate() + 7);
       patch.followup_ativo    = true;
-      patch.proximo_followup  = d7.toISOString().slice(0,10);
+      patch.proximo_followup  = localDate(d7);
       patch.followup_count    = 0;
     } else {
       patch.followup_ativo = false;
@@ -5290,8 +5289,7 @@ async function renderFuturos() {
   const wr = document.getElementById("fut-grid");
   wr.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   try {
-    const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const hojeStr = hoje.toISOString().slice(0,10);
+    const hojeStr = localDate();
     const [rows, _futAssRows] = await Promise.all([
       dbGet("agenda","select=*&data_evento=gte."+hojeStr+"&order=data_evento.asc&limit=500"),
       dbGet("assessorias","select=cod,nome&limit=500")
@@ -5351,7 +5349,7 @@ async function renderFuturos() {
 let _agendaTabelaCache = null;
 
 async function exportAgendaFuturaPDF() {
-  const hoje = new Date().toISOString().slice(0,10);
+  const hoje = localDate();
   let evts = _agendaTabelaCache ? _agendaTabelaCache.filter(e => e.data_evento && e.data_evento >= hoje) : [];
   if(!evts.length) {
     const rows = await dbGet("agenda","select=cod,nome_evento,data_evento,data_fim,local_evento,assessoria_cod&data_evento=gte."+hoje+"&order=data_evento.asc&limit=500");
