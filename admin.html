@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.07.31j</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.01a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -4147,24 +4147,27 @@ async function renderVisitas() {
     document.getElementById("vis-vc-mes-ant").textContent = "mês passado: "+vcMesAnt;
 
     const th = t=>`<th style="text-align:center;padding:6px 4px;border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;">${t}</th>`;
-    const td = (v,color)=>`<td style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--br);font-weight:600;font-size:12px;color:${color||"var(--dk)"};">${v}</td>`;
+    const td = (v,color,title)=>`<td${title?' title="'+title+'"':''} style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--br);font-weight:600;font-size:12px;color:${color||"var(--dk)"};">${v}</td>`;
+    // A coluna conta orçamentos (igual ao card e à lista de Orçamentos Realizados).
+    // Quando o mesmo navegador pediu mais de um, o tooltip mostra quantos visitantes distintos foram.
+    const orcVisTitle = (n,vis)=> (n>1 && vis>0 && vis<n) ? n+" orçamentos de "+vis+" visitante"+(vis!==1?"s":"") : "";
 
     if(isMes) {
       // ── Agrupamento mensal ──
       const byMonth = {};
       rows.forEach(r=>{
         const m=utcToLocalDate(r.visited_at).slice(0,7);
-        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:0,orcVis:new Set(),vcs:0};
         byMonth[m].total++; byMonth[m].uniq.add(r.session_id);
       });
       orcRows.forEach((r,i)=>{
         const m=utcToLocalDate(r.created_at).slice(0,7);
-        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
-        byMonth[m].orcs.add(r.visitor_id||("__idx__"+i));
+        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:0,orcVis:new Set(),vcs:0};
+        byMonth[m].orcs++; byMonth[m].orcVis.add(r.visitor_id||("__anon__"+i));
       });
       vcRows.forEach(r=>{
         const m=utcToLocalDate(r.created_at).slice(0,7);
-        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:0,orcVis:new Set(),vcs:0};
         byMonth[m].vcs=(byMonth[m].vcs||0)+1;
       });
       const MESES=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -4177,13 +4180,14 @@ async function renderVisitas() {
           ${th("Únicos")}${th("Visitas")}${th("Orç.")}${th("Marcadas")}
         </tr></thead>
         <tbody>${months.map((m,i)=>{
-          const orcCount=byMonth[m].orcs?byMonth[m].orcs.size:0;
+          const orcCount=byMonth[m].orcs||0;
+          const orcVis=byMonth[m].orcVis?byMonth[m].orcVis.size:0;
           const vcCount=byMonth[m].vcs||0;
           return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
             <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;white-space:nowrap;">${fmtMes(m)}${m===mesAtual?' <span style="background:var(--a);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px;margin-left:3px;">atual</span>':''}</td>
             ${td(byMonth[m].uniq.size,"var(--a)")}
             ${td(byMonth[m].total)}
-            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)")}
+            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)",orcVisTitle(orcCount,orcVis))}
             ${td(vcCount||"—",vcCount>0?"#1565C0":"var(--dl)")}
           </tr>`;}).join("")}</tbody>
       </table>`;
@@ -4192,17 +4196,17 @@ async function renderVisitas() {
       const byDay={};
       rows.forEach(r=>{
         const day=utcToLocalDate(r.visited_at);
-        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:new Set()};
+        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:0,orcVis:new Set(),vcs:0};
         byDay[day].total++; byDay[day].uniq.add(r.session_id);
       });
       orcRows.forEach((r,i)=>{
         const day=utcToLocalDate(r.created_at);
-        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
-        byDay[day].orcs.add(r.visitor_id||("__idx__"+i));
+        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:0,orcVis:new Set(),vcs:0};
+        byDay[day].orcs++; byDay[day].orcVis.add(r.visitor_id||("__anon__"+i));
       });
       vcRows.forEach(r=>{
         const day=utcToLocalDate(r.created_at);
-        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:0,orcVis:new Set(),vcs:0};
         byDay[day].vcs=(byDay[day].vcs||0)+1;
       });
       const days=Object.keys(byDay).sort((a,b)=>b.localeCompare(a));
@@ -4214,13 +4218,14 @@ async function renderVisitas() {
           ${th("Únicos")}${th("Visitas")}${th("Orç.")}${th("Marcadas")}
         </tr></thead>
         <tbody>${days.map((d,i)=>{
-          const orcCount=byDay[d].orcs?byDay[d].orcs.size:0;
+          const orcCount=byDay[d].orcs||0;
+          const orcVis=byDay[d].orcVis?byDay[d].orcVis.size:0;
           const vcCount=byDay[d].vcs||0;
           return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
             <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;white-space:nowrap;">${fmtDate(d)}${d===hoje?' <span style="background:var(--a);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px;margin-left:3px;">hoje</span>':''}</td>
             ${td(byDay[d].uniq.size,"var(--a)")}
             ${td(byDay[d].total)}
-            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)")}
+            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)",orcVisTitle(orcCount,orcVis))}
             ${td(vcCount||"—",vcCount>0?"#1565C0":"var(--dl)")}
           </tr>`;}).join("")}</tbody>
       </table>`;
