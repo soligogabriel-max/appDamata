@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.01b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.01c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3992,7 +3992,7 @@ async function renderDashboard() {
       dbGet("agenda", "data_evento=gte."+hojStr+"&select=cod,nome_evento,data_evento,tipo_evento,status,valor_locacao&order=data_evento.asc&limit=2000"),
       dbGetAll("contas_a_receber", "select=valor,vencimento,status&order=vencimento.asc"),
       dbGet("site_visits", "visited_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=visited_at,session_id&limit=10000"),
-      dbGet("orcamentos", "created_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=created_at,valor_total,status,visitor_id&limit=2000")
+      dbGetAll("orcamentos", "created_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=created_at,valor_total,status,visitor_id")
     ]);
 
     // — Eventos futuros (exclui placeholders com ano > 2100, igual à view Futuros)
@@ -4115,9 +4115,12 @@ async function renderVisitas() {
     const since = tableSince < cardSince ? tableSince : cardSince; // o mais antigo entre os dois
     const [rows, orcRows, vcRows] = await Promise.all([
       dbGetAll("site_visits", "visited_at=gte."+since.toISOString()+"&select=visited_at,session_id,referrer,device,utm_source&order=visited_at.desc"),
-      dbGet("orcamentos", "created_at=gte."+since.toISOString()+"&select=created_at,visitor_id&limit=5000"),
-      dbGet("visitas_comerciais", "status=neq.cancelada&select=created_at&limit=2000")
+      dbGetAll("orcamentos", "created_at=gte."+since.toISOString()+"&select=created_at,visitor_id"),
+      dbGetAll("visitas_comerciais", "created_at=gte."+since.toISOString()+"&status=neq.cancelada&select=created_at")
     ]);
+    // Janela da tabela: sem isso, uma linha com data fora do período abriria um
+    // dia/mês a mais — a tabela "Últimos 30 dias" mostrava datas mais antigas.
+    const desdeDia = localDate(tableSince), desdeMes = desdeDia.slice(0,7);
 
     // ── Cards: este mês vs mês passado ──
     let totalMes=0, uniqMes=new Set(), totalMesAnt=0, uniqMesAnt=new Set();
@@ -4171,7 +4174,7 @@ async function renderVisitas() {
       });
       const MESES=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
       const fmtMes=m=>{const[y,mo]=m.split("-");return MESES[parseInt(mo)-1]+"/"+y.slice(2);};
-      const months=Object.keys(byMonth).sort((a,b)=>b.localeCompare(a));
+      const months=Object.keys(byMonth).filter(m=>m>=desdeMes).sort((a,b)=>b.localeCompare(a));
       if(!months.length){tabela.innerHTML='<div class="empty"><div class="eicon">📊</div>Nenhuma visita registrada ainda.</div>';return;}
       tabela.innerHTML=`<table style="width:100%;border-collapse:collapse;">
         <thead><tr style="background:var(--bg2);color:var(--dl);">
@@ -4208,7 +4211,7 @@ async function renderVisitas() {
         if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:0,orcVis:new Set(),vcs:0};
         byDay[day].vcs=(byDay[day].vcs||0)+1;
       });
-      const days=Object.keys(byDay).sort((a,b)=>b.localeCompare(a));
+      const days=Object.keys(byDay).filter(d=>d>=desdeDia).sort((a,b)=>b.localeCompare(a));
       if(!days.length){tabela.innerHTML='<div class="empty"><div class="eicon">📊</div>Nenhuma visita registrada ainda.</div>';return;}
       const fmtDate=d=>{const[,m,dd]=d.split("-");return dd+"/"+m;};
       tabela.innerHTML=`<table style="width:100%;border-collapse:collapse;">
@@ -5629,7 +5632,7 @@ async function renderRelOrcamentos() {
   totWr.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   tblWr.innerHTML = "";
   try {
-    const rows = await dbGet("orcamentos","select=id,created_at,data_evento,tipo_evento,nome_noiva,nome_noivo,nome_contratante,num_convidados,valor_total,salao,status&order=created_at.desc&limit=2000");
+    const rows = await dbGetAll("orcamentos","select=id,created_at,data_evento,tipo_evento,nome_noiva,nome_noivo,nome_contratante,num_convidados,valor_total,salao,status&order=created_at.desc");
 
     const tipo = tipoSel?.value || "";
     const de   = document.getElementById("relorc-de")?.value  || "";
@@ -5639,7 +5642,7 @@ async function renderRelOrcamentos() {
 
     const filtrado = rows.filter(r => {
       if(tipo && r.tipo_evento !== tipo) return false;
-      const ref = (r.created_at || "").slice(0,7);
+      const ref = r.created_at ? utcToLocalDate(r.created_at).slice(0,7) : "";
       if(de  && ref < de)  return false;
       if(ate && ref > ate) return false;
       if((fBromelias || fTumbergia)) {
@@ -5670,7 +5673,7 @@ async function renderRelOrcamentos() {
       <tbody>${filtrado.map(r => {
         const nomes = [r.nome_noiva,r.nome_noivo].filter(Boolean).join(" e ") || r.nome_contratante || "—";
         return `<tr>
-          <td>${r.created_at ? r.created_at.slice(0,10).split("-").reverse().join("/") : "—"}</td>
+          <td>${r.created_at ? utcToLocalDate(r.created_at).split("-").reverse().join("/") : "—"}</td>
           <td style="font-weight:600;">${_esc(nomes)}</td>
           <td>${_esc(r.tipo_evento||"—")}</td>
           <td>${_esc(r.salao||"—")}</td>

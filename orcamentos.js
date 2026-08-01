@@ -6,9 +6,9 @@ async function renderOrcamentos(){
   const busca=(document.getElementById("orc-fil-busca")?.value||"").toLowerCase();
   const filDe=document.getElementById("orc-fil-de")?.value||"";
   const filAte=document.getElementById("orc-fil-ate")?.value||"";
-  let q="orcamentos?order=created_at.desc&limit=200";
+  let q="order=created_at.desc";
   if(status) q+=`&status=eq.${status}`;
-  const rows=await sbFetch(q)||[];
+  const rows=await dbGetAll("orcamentos",q)||[];
   _orcRowsCache=rows;
   const list=document.getElementById("orc-list");
   let filtered=rows.filter(r=>{
@@ -38,7 +38,7 @@ async function renderOrcamentos(){
       const statusReal=exp?"expirado":r.status||"pendente";
       const nomes=[r.nome_noiva,r.nome_noivo].filter(Boolean).join(" e ")||r.nome_contratante||"—";
       return `<tr style="border-bottom:1px solid var(--br);">
-        <td style="padding:10px 12px;">${r.created_at?r.created_at.slice(0,10).split("-").reverse().join("/"):"—"}</td>
+        <td style="padding:10px 12px;">${r.created_at?utcToLocalDate(r.created_at).split("-").reverse().join("/"):"—"}</td>
         <td style="padding:10px 12px;">${r.data_evento?r.data_evento.split("-").reverse().join("/"):"—"}</td>
         <td style="padding:10px 12px;font-weight:600;cursor:pointer;" onclick="verOrcamento(${r.id})">${nomes}</td>
         <td style="padding:10px 12px;">${r.tipo_evento||"—"}</td>
@@ -85,7 +85,7 @@ function verOrcamento(id){
       <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Contratante</div><div style="font-weight:600;">${_esc(row.nome_contratante||"—")}</div></div>
       <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">WhatsApp</div><div style="font-weight:600;">${_esc(row.whatsapp||"—")}</div></div>
       ${row.email?`<div style="grid-column:span 2"><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">E-mail</div><div style="font-weight:600;">${_esc(row.email)}</div></div>`:""}
-      <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Solicitado em</div><div>${row.created_at?row.created_at.slice(0,10).split("-").reverse().join("/"):"—"}</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Solicitado em</div><div>${row.created_at?utcToLocalDate(row.created_at).split("-").reverse().join("/"):"—"}</div></div>
       <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Válido até</div><div>${row.validade?row.validade.split("-").reverse().join("/"):"—"}</div></div>
     </div>
     <div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Itens orçados</div>
