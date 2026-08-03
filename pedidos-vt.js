@@ -744,6 +744,8 @@ async function saveTp() {
       valor_unitario: parseFloat(tr.querySelector(".tp-vun").value)||null,
     })).filter(r=>r.cod_item);
     if(avulsos.length) await sbFetch("tabelas_preco_itens",{method:"POST",body:avulsos,prefer:"return=minimal"});
+    // O aviso "sem preço" do inventário depende desta lista
+    if(typeof _invPrecoInvalidate==="function") _invPrecoInvalidate();
     closeTpModal();
     renderTabelasPreco();
     toast("✅ Tabela salva!");

@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.01c</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.03c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1306,10 +1306,13 @@
         <button class="btn-cancel" style="font-size:12px;padding:5px 14px;" onclick="_tpAddItem()">+ Item</button>
       </div>
       <div style="border:1px solid var(--br);border-radius:10px;overflow:hidden;">
-        <table class="fin-table" style="margin:0;">
-          <thead><tr><th style="min-width:200px;">Item</th><th>Descrição</th><th style="width:130px;">Valor Unit.</th><th style="width:40px;"></th></tr></thead>
-          <tbody id="tpm-itens-body"></tbody>
-        </table>
+        <!-- scroll horizontal: sem ele a coluna de valor fica fora da tela no celular (igual aos pacotes) -->
+        <div style="overflow-x:auto;">
+          <table class="fin-table" style="margin:0;">
+            <thead><tr><th style="min-width:200px;">Item</th><th>Descrição</th><th style="width:130px;">Valor Unit.</th><th style="width:40px;"></th></tr></thead>
+            <tbody id="tpm-itens-body"></tbody>
+          </table>
+        </div>
       </div>
     </div>
     <div class="macts" style="margin-top:16px;">
@@ -4785,6 +4788,27 @@ async function loadLandingVideos(){
 // INVENTÁRIO
 // ══════════════════════════════════════════
 let _inventario = null;
+// O ✔️ "Exibir no Orçamento" não basta: o wizard monta a lista de itens a
+// partir de tabelas_preco_itens e usa o inventário só como filtro
+// (orcamentos.js, _orcBuildUnified). Item sem preço em nenhuma tabela fica
+// marcado e invisível — sinalizamos isso aqui em vez de deixar falhar calado.
+let _invComPreco = null;
+function _invPrecoInvalidate(){ _invComPreco = null; }
+async function _invCodsComPreco() {
+  if(_invComPreco) return _invComPreco;
+  try {
+    // Mesmas chamadas do wizard, para o aviso refletir o que ele enxerga
+    const tabelas = await sbFetch("tabelas_preco?select=id") || [];
+    const s = new Set();
+    if(tabelas.length) {
+      const ids = tabelas.map(t=>t.id).join(",");
+      const itens = await sbFetch("tabelas_preco_itens?tabela_id=in.("+ids+")&select=cod_item") || [];
+      itens.forEach(i=>{ if(i.cod_item!=null) s.add(String(i.cod_item)); });
+    }
+    _invComPreco = s;
+    return s;
+  } catch(e){ return null; }  // sem dado confiável, não avisa nada
+}
 async function renderInventario() {
   const wr = document.getElementById("inv-list");
   wr.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
@@ -4792,6 +4816,7 @@ async function renderInventario() {
     if(!_inventario) {
       _inventario = await dbGet("inventario","select=*&order=descricao.asc&limit=200");
     }
+    const comPreco = await _invCodsComPreco();
     const busca = (document.getElementById("inv-busca")?.value||"").toLowerCase();
     const rows = busca ? _inventario.filter(r=>(r.descricao||"").toLowerCase().includes(busca)) : _inventario;
     if(!rows.length){ wr.innerHTML='<div class="empty"><div class="eicon">📦</div>Nenhum item encontrado.</div>'; return; }
@@ -4802,7 +4827,7 @@ async function renderInventario() {
         <td style="font-weight:600;">${r.descricao||"—"}</td>
         <td style="text-align:center;">${r.quantidade_max??"—"}</td>
         <td>${r.valor_reposicao!=null?fmt(r.valor_reposicao):"—"}</td>
-        <td style="text-align:center;"><input type="checkbox" ${r.exibir_orcamento?"checked":""} title="Exibir no orçamento" onchange='toggleInvOrcamento("${_esc(r.cod)}",this.checked,this)' style="width:17px;height:17px;accent-color:var(--a);cursor:pointer;"></td>
+        <td style="text-align:center;white-space:nowrap;"><input type="checkbox" ${r.exibir_orcamento?"checked":""} title="Exibir no orçamento" onchange='toggleInvOrcamento("${_esc(r.cod)}",this.checked,this)' style="width:17px;height:17px;accent-color:var(--a);cursor:pointer;vertical-align:middle;">${(comPreco&&r.exibir_orcamento&&!comPreco.has(String(r.cod)))?`<span data-inv-warn title="Sem preço em nenhuma tabela de preço — o item não aparece na lista do orçamento. Cadastre o valor em Tabelas de Preço." style="margin-left:5px;cursor:help;vertical-align:middle;">⚠️</span>`:""}</td>
         <td style="color:var(--dl);font-size:11px;">${r.obs||""}</td>
         <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openCrud("inventario",JSON.parse(this.dataset.r),()=>{_inventario=null;renderInventario()})' data-r="${rj}">✏️</button></div></td>
       </tr>`}).join("")}</tbody>
@@ -4815,7 +4840,18 @@ async function toggleInvOrcamento(cod, val, el){
     await sbFetch(`inventario?cod=eq.${encodeURIComponent(cod)}`,{method:"PATCH",body:{exibir_orcamento:val}});
     const it=(_inventario||[]).find(x=>x.cod===cod);
     if(it) it.exibir_orcamento=val;
-    if(typeof toast==="function") toast(val?"✓ Item exibido no orçamento":"Item removido do orçamento");
+    const comPreco = val ? await _invCodsComPreco() : null;
+    const semPreco = !!(comPreco && !comPreco.has(String(cod)));
+    if(typeof toast==="function") toast(
+      !val ? "Item removido do orçamento" :
+      semPreco ? "⚠️ Marcado, mas sem preço: cadastre o item em Tabelas de Preço para ele aparecer no orçamento."
+              : "✓ Item exibido no orçamento");
+    // Atualiza só o marcador da linha (re-render completo pisca a tabela)
+    if(el && el.parentElement){
+      const mk = el.parentElement.querySelector("span[data-inv-warn]");
+      if(mk) mk.remove();
+      if(semPreco) el.insertAdjacentHTML("afterend", `<span data-inv-warn title="Sem preço em nenhuma tabela de preço — o item não aparece na lista do orçamento. Cadastre o valor em Tabelas de Preço." style="margin-left:5px;cursor:help;vertical-align:middle;">⚠️</span>`);
+    }
   }catch(e){
     if(el) el.checked=!val;
     if(typeof toast==="function") toast("Erro ao salvar: "+(e.message||e));
