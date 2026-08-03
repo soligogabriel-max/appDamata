@@ -4132,11 +4132,14 @@ async function renderVisitas() {
       if(m===mesAtual){totalMes++;uniqMes.add(r.session_id);}
       else if(m===mesPrev){totalMesAnt++;uniqMesAnt.add(r.session_id);}
     });
-    let orcMes=0, orcMesAnt=0;
-    orcRows.forEach(r=>{
+    // Mesma régua da coluna "Orç.": clientes distintos, não linhas.
+    const orcMesSet=new Set(), orcMesAntSet=new Set();
+    orcRows.forEach((r,i)=>{
       const m=utcToLocalDate(r.created_at).slice(0,7);
-      if(m===mesAtual) orcMes++; else if(m===mesPrev) orcMesAnt++;
+      const v=r.visitor_id||("__anon__"+i);
+      if(m===mesAtual) orcMesSet.add(v); else if(m===mesPrev) orcMesAntSet.add(v);
     });
+    const orcMes=orcMesSet.size, orcMesAnt=orcMesAntSet.size;
     let vcMes=0, vcMesAnt=0;
     vcRows.forEach(r=>{
       const m=utcToLocalDate(r.created_at).slice(0,7);
@@ -4153,9 +4156,11 @@ async function renderVisitas() {
 
     const th = t=>`<th style="text-align:center;padding:6px 4px;border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;">${t}</th>`;
     const td = (v,color,title)=>`<td${title?' title="'+title+'"':''} style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--br);font-weight:600;font-size:12px;color:${color||"var(--dk)"};">${v}</td>`;
-    // A coluna conta orçamentos (igual ao card e à lista de Orçamentos Realizados).
-    // Quando o mesmo navegador pediu mais de um, o tooltip mostra quantos visitantes distintos foram.
-    const orcVisTitle = (n,vis)=> (n>1 && vis>0 && vis<n) ? n+" orçamentos de "+vis+" visitante"+(vis!==1?"s":"") : "";
+    // A coluna mede CLIENTES que pediram orçamento, não linhas da tabela: o wizard
+    // grava uma linha nova a cada passagem (o _dbId só vive na memória da página),
+    // então um mesmo casal refazendo o orçamento viraria 4 sem o dedup por visitor_id.
+    // O total de linhas não se perde — vira tooltip quando difere.
+    const orcVisTitle = (vis,n)=> (n>vis) ? vis+" cliente"+(vis!==1?"s":"")+" · "+n+" orçamento"+(n!==1?"s":"") : "";
 
     if(isMes) {
       // ── Agrupamento mensal ──
@@ -4185,14 +4190,14 @@ async function renderVisitas() {
           ${th("Únicos")}${th("Visitas")}${th("Orç.")}${th("Marcadas")}
         </tr></thead>
         <tbody>${months.map((m,i)=>{
-          const orcCount=byMonth[m].orcs||0;
-          const orcVis=byMonth[m].orcVis?byMonth[m].orcVis.size:0;
+          const orcLinhas=byMonth[m].orcs||0;
+          const orcCount=byMonth[m].orcVis?byMonth[m].orcVis.size:0;
           const vcCount=byMonth[m].vcs||0;
           return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
             <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;white-space:nowrap;">${fmtMes(m)}${m===mesAtual?' <span style="background:var(--a);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px;margin-left:3px;">atual</span>':''}</td>
             ${td(byMonth[m].uniq.size,"var(--a)")}
             ${td(byMonth[m].total)}
-            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)",orcVisTitle(orcCount,orcVis))}
+            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)",orcVisTitle(orcCount,orcLinhas))}
             ${td(vcCount||"—",vcCount>0?"#1565C0":"var(--dl)")}
           </tr>`;}).join("")}</tbody>
       </table>`;
@@ -4223,14 +4228,14 @@ async function renderVisitas() {
           ${th("Únicos")}${th("Visitas")}${th("Orç.")}${th("Marcadas")}
         </tr></thead>
         <tbody>${days.map((d,i)=>{
-          const orcCount=byDay[d].orcs||0;
-          const orcVis=byDay[d].orcVis?byDay[d].orcVis.size:0;
+          const orcLinhas=byDay[d].orcs||0;
+          const orcCount=byDay[d].orcVis?byDay[d].orcVis.size:0;
           const vcCount=byDay[d].vcs||0;
           return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
             <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;white-space:nowrap;">${fmtDate(d)}${d===hoje?' <span style="background:var(--a);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px;margin-left:3px;">hoje</span>':''}</td>
             ${td(byDay[d].uniq.size,"var(--a)")}
             ${td(byDay[d].total)}
-            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)",orcVisTitle(orcCount,orcVis))}
+            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)",orcVisTitle(orcCount,orcLinhas))}
             ${td(vcCount||"—",vcCount>0?"#1565C0":"var(--dl)")}
           </tr>`;}).join("")}</tbody>
       </table>`;
