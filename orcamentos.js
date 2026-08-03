@@ -668,7 +668,7 @@ function _orcBuildUnified(){
 
 function _orcHTML2(){
   _orcBuildUnified();
-  if(!_orc._uItems.length) return `<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Nenhum item habilitado para orçamento. Marque itens em Inventário → "Exibir no Orçamento".</div></div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button></div>`;
+  if(!_orc._uItems.length) return `<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Nenhum item habilitado para orçamento. É preciso marcar o item em Inventário → "Exibir no Orçamento" <b>e</b> cadastrar o valor dele em Tabelas de Preço.</div></div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button></div>`;
   // Package shortcut buttons
   const pkgBtns=_orc._uPkgs.map(pk=>{
     const active=_orc._activePkg===pk.id;
