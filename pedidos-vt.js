@@ -19,7 +19,7 @@ async function renderPedidos() {
     const busca    = (document.getElementById("ped-busca").value||"").toLowerCase().trim();
     const evFil    = document.getElementById("ped-fil-evento").value;
     const filDiverg = document.getElementById("ped-fil-diverg")?.checked;
-    const hojeStr  = new Date().toISOString().slice(0,10);
+    const hojeStr  = localDate();
 
     const [pedRows, evtRows] = await Promise.all([
       dbGet("pedidos","order=created_at.desc&limit=1000&select=*"),
@@ -330,7 +330,7 @@ async function renderVT() {
   wr.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   try {
     const evFil = document.getElementById("vt-fil-evento").value;
-    const hojeStr = new Date().toISOString().slice(0,10);
+    const hojeStr = localDate();
     const [vtRows, evtRows] = await Promise.all([
       dbGet("visitas_tecnicas","order=data_vt.desc&limit=500&select=*"),
       dbGet("agenda","select=cod,nome_evento,data_evento&order=data_evento.desc&limit=500")
@@ -520,7 +520,7 @@ async function openVTModal(vt) {
     sel.innerHTML='<option value="">— Selecione o evento —</option>';
     // Abre o modal imediatamente, carrega dados em seguida
     document.getElementById("m-vt").classList.add("open");
-    const hojeVT = new Date().toISOString().slice(0,10);
+    const hojeVT = localDate();
     const evts = await dbGet("agenda","select=cod,nome_evento&data_evento=gte."+hojeVT+"&order=data_evento.asc&limit=500");
     evts.forEach(e=>{ const o=document.createElement("option"); o.value=e.cod; o.textContent=(e.nome_evento||e.cod); if(vt&&e.cod===vt.cod_evento)o.selected=true; sel.appendChild(o); });
     try {

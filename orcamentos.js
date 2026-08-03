@@ -6,9 +6,9 @@ async function renderOrcamentos(){
   const busca=(document.getElementById("orc-fil-busca")?.value||"").toLowerCase();
   const filDe=document.getElementById("orc-fil-de")?.value||"";
   const filAte=document.getElementById("orc-fil-ate")?.value||"";
-  let q="orcamentos?order=created_at.desc&limit=200";
+  let q="order=created_at.desc";
   if(status) q+=`&status=eq.${status}`;
-  const rows=await sbFetch(q)||[];
+  const rows=await dbGetAll("orcamentos",q)||[];
   _orcRowsCache=rows;
   const list=document.getElementById("orc-list");
   let filtered=rows.filter(r=>{
@@ -33,12 +33,12 @@ async function renderOrcamentos(){
       <th style="padding:10px 12px;"></th>
     </tr></thead>
     <tbody>${filtered.map(r=>{
-      const hoje=new Date().toISOString().slice(0,10);
+      const hoje=localDate();
       const exp=r.validade&&r.validade<hoje&&r.status==="pendente";
       const statusReal=exp?"expirado":r.status||"pendente";
       const nomes=[r.nome_noiva,r.nome_noivo].filter(Boolean).join(" e ")||r.nome_contratante||"—";
       return `<tr style="border-bottom:1px solid var(--br);">
-        <td style="padding:10px 12px;">${r.created_at?r.created_at.slice(0,10).split("-").reverse().join("/"):"—"}</td>
+        <td style="padding:10px 12px;">${r.created_at?utcToLocalDate(r.created_at).split("-").reverse().join("/"):"—"}</td>
         <td style="padding:10px 12px;">${r.data_evento?r.data_evento.split("-").reverse().join("/"):"—"}</td>
         <td style="padding:10px 12px;font-weight:600;cursor:pointer;" onclick="verOrcamento(${r.id})">${nomes}</td>
         <td style="padding:10px 12px;">${r.tipo_evento||"—"}</td>
@@ -65,7 +65,7 @@ function verOrcamento(id){
   const row=(_orcRowsCache||[]).find(r=>r.id===id);
   if(!row) return;
   _orcDetId=id;
-  const hoje=new Date().toISOString().slice(0,10);
+  const hoje=localDate();
   const exp=row.validade&&row.validade<hoje&&row.status==="pendente";
   const statusReal=exp?"expirado":row.status||"pendente";
   const nomes=[row.nome_noiva,row.nome_noivo].filter(Boolean).join(" e ")||row.nome_contratante||"—";
@@ -85,7 +85,7 @@ function verOrcamento(id){
       <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Contratante</div><div style="font-weight:600;">${_esc(row.nome_contratante||"—")}</div></div>
       <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">WhatsApp</div><div style="font-weight:600;">${_esc(row.whatsapp||"—")}</div></div>
       ${row.email?`<div style="grid-column:span 2"><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">E-mail</div><div style="font-weight:600;">${_esc(row.email)}</div></div>`:""}
-      <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Solicitado em</div><div>${row.created_at?row.created_at.slice(0,10).split("-").reverse().join("/"):"—"}</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Solicitado em</div><div>${row.created_at?utcToLocalDate(row.created_at).split("-").reverse().join("/"):"—"}</div></div>
       <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Válido até</div><div>${row.validade?row.validade.split("-").reverse().join("/"):"—"}</div></div>
     </div>
     <div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Itens orçados</div>
@@ -386,7 +386,7 @@ async function _orcUpsertLead(){
     pacote_cod:_orc.pacote_cod||null,
     itens:(_orc._selectedItems||[]).map(i=>({cod:i.cod_item,descricao:i.descricao,qty:i.qty,valor_unitario:i.valor_unitario,subtotal:i.subtotal})),
     valor_total:_orc.valor_total||null,
-    validade:validade.toISOString().slice(0,10),
+    validade:localDate(validade),
     whatsapp:_orc.whatsapp||null,
     email:_orc.email||null,
     status:_orc._stage||"lead",
@@ -551,7 +551,7 @@ function _orcHTML1(){
     <label class="lbl">Tipo de evento *</label>
     <select id="orc-tipo" class="inp" onchange="_orcRenderNames()">${tipos}</select>
     <label class="lbl">Data do evento *</label>
-    <input type="date" id="orc-data" class="inp" value="${_orc.data_evento}" min="${new Date().toISOString().slice(0,10)}" onchange="_orcCheckDataConflito()"/>
+    <input type="date" id="orc-data" class="inp" value="${_orc.data_evento}" min="${localDate()}" onchange="_orcCheckDataConflito()"/>
     <div id="orc-warn-data" style="display:none;color:#b45309;font-size:12px;margin:-10px 0 14px;"></div>
     <label class="lbl">Número de convidados *</label>
     <input type="number" id="orc-conv" class="inp" value="${_orc.num_convidados}" placeholder="ex: 80" min="1" max="450"/>

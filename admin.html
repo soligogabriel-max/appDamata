@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.03b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.03c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -2876,8 +2876,7 @@ async function openGCalSync() {
   document.getElementById("gcal-ev-items").innerHTML = '<div style="padding:12px;color:var(--dl);font-size:13px;">Carregando eventos...</div>';
 
   // Carrega eventos futuros em paralelo com abertura
-  const hoje = new Date(); hoje.setHours(0,0,0,0);
-  const hojeStr = hoje.toISOString().slice(0,10);
+  const hojeStr = localDate();
   dbGet("agenda","select=*&data_evento=gte."+hojeStr+"&order=data_evento.asc&limit=500").then(rows => {
     _gcalFutEvts = rows.filter(r => r.data_evento && parseInt(r.data_evento.slice(0,4)) <= 2100);
     _gcalRenderEvList();
@@ -3514,7 +3513,7 @@ async function vcSalvarEdicao() {
     if (["visitado_alta","visitado_baixa"].includes(status)) {
       const d7 = new Date(); d7.setDate(d7.getDate() + 7);
       patch.followup_ativo    = true;
-      patch.proximo_followup  = d7.toISOString().slice(0,10);
+      patch.proximo_followup  = localDate(d7);
       patch.followup_count    = 0;
     } else {
       patch.followup_ativo = false;
@@ -3996,7 +3995,7 @@ async function renderDashboard() {
       dbGet("agenda", "data_evento=gte."+hojStr+"&select=cod,nome_evento,data_evento,tipo_evento,status,valor_locacao&order=data_evento.asc&limit=2000"),
       dbGetAll("contas_a_receber", "select=valor,vencimento,status&order=vencimento.asc"),
       dbGet("site_visits", "visited_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=visited_at,session_id&limit=10000"),
-      dbGet("orcamentos", "created_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=created_at,valor_total,status,visitor_id&limit=2000")
+      dbGetAll("orcamentos", "created_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=created_at,valor_total,status,visitor_id")
     ]);
 
     // — Eventos futuros (exclui placeholders com ano > 2100, igual à view Futuros)
@@ -4119,9 +4118,12 @@ async function renderVisitas() {
     const since = tableSince < cardSince ? tableSince : cardSince; // o mais antigo entre os dois
     const [rows, orcRows, vcRows] = await Promise.all([
       dbGetAll("site_visits", "visited_at=gte."+since.toISOString()+"&select=visited_at,session_id,referrer,device,utm_source&order=visited_at.desc"),
-      dbGet("orcamentos", "created_at=gte."+since.toISOString()+"&select=created_at,visitor_id&limit=5000"),
-      dbGet("visitas_comerciais", "status=neq.cancelada&select=created_at&limit=2000")
+      dbGetAll("orcamentos", "created_at=gte."+since.toISOString()+"&select=created_at,visitor_id"),
+      dbGetAll("visitas_comerciais", "created_at=gte."+since.toISOString()+"&status=neq.cancelada&select=created_at")
     ]);
+    // Janela da tabela: sem isso, uma linha com data fora do período abriria um
+    // dia/mês a mais — a tabela "Últimos 30 dias" mostrava datas mais antigas.
+    const desdeDia = localDate(tableSince), desdeMes = desdeDia.slice(0,7);
 
     // ── Cards: este mês vs mês passado ──
     let totalMes=0, uniqMes=new Set(), totalMesAnt=0, uniqMesAnt=new Set();
@@ -4130,11 +4132,14 @@ async function renderVisitas() {
       if(m===mesAtual){totalMes++;uniqMes.add(r.session_id);}
       else if(m===mesPrev){totalMesAnt++;uniqMesAnt.add(r.session_id);}
     });
-    let orcMes=0, orcMesAnt=0;
-    orcRows.forEach(r=>{
+    // Mesma régua da coluna "Orç.": clientes distintos, não linhas.
+    const orcMesSet=new Set(), orcMesAntSet=new Set();
+    orcRows.forEach((r,i)=>{
       const m=utcToLocalDate(r.created_at).slice(0,7);
-      if(m===mesAtual) orcMes++; else if(m===mesPrev) orcMesAnt++;
+      const v=r.visitor_id||("__anon__"+i);
+      if(m===mesAtual) orcMesSet.add(v); else if(m===mesPrev) orcMesAntSet.add(v);
     });
+    const orcMes=orcMesSet.size, orcMesAnt=orcMesAntSet.size;
     let vcMes=0, vcMesAnt=0;
     vcRows.forEach(r=>{
       const m=utcToLocalDate(r.created_at).slice(0,7);
@@ -4150,29 +4155,34 @@ async function renderVisitas() {
     document.getElementById("vis-vc-mes-ant").textContent = "mês passado: "+vcMesAnt;
 
     const th = t=>`<th style="text-align:center;padding:6px 4px;border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;">${t}</th>`;
-    const td = (v,color)=>`<td style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--br);font-weight:600;font-size:12px;color:${color||"var(--dk)"};">${v}</td>`;
+    const td = (v,color,title)=>`<td${title?' title="'+title+'"':''} style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--br);font-weight:600;font-size:12px;color:${color||"var(--dk)"};">${v}</td>`;
+    // A coluna mede CLIENTES que pediram orçamento, não linhas da tabela: o wizard
+    // grava uma linha nova a cada passagem (o _dbId só vive na memória da página),
+    // então um mesmo casal refazendo o orçamento viraria 4 sem o dedup por visitor_id.
+    // O total de linhas não se perde — vira tooltip quando difere.
+    const orcVisTitle = (vis,n)=> (n>vis) ? vis+" cliente"+(vis!==1?"s":"")+" · "+n+" orçamento"+(n!==1?"s":"") : "";
 
     if(isMes) {
       // ── Agrupamento mensal ──
       const byMonth = {};
       rows.forEach(r=>{
         const m=utcToLocalDate(r.visited_at).slice(0,7);
-        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:0,orcVis:new Set(),vcs:0};
         byMonth[m].total++; byMonth[m].uniq.add(r.session_id);
       });
       orcRows.forEach((r,i)=>{
         const m=utcToLocalDate(r.created_at).slice(0,7);
-        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
-        byMonth[m].orcs.add(r.visitor_id||("__idx__"+i));
+        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:0,orcVis:new Set(),vcs:0};
+        byMonth[m].orcs++; byMonth[m].orcVis.add(r.visitor_id||("__anon__"+i));
       });
       vcRows.forEach(r=>{
         const m=utcToLocalDate(r.created_at).slice(0,7);
-        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:0,orcVis:new Set(),vcs:0};
         byMonth[m].vcs=(byMonth[m].vcs||0)+1;
       });
       const MESES=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
       const fmtMes=m=>{const[y,mo]=m.split("-");return MESES[parseInt(mo)-1]+"/"+y.slice(2);};
-      const months=Object.keys(byMonth).sort((a,b)=>b.localeCompare(a));
+      const months=Object.keys(byMonth).filter(m=>m>=desdeMes).sort((a,b)=>b.localeCompare(a));
       if(!months.length){tabela.innerHTML='<div class="empty"><div class="eicon">📊</div>Nenhuma visita registrada ainda.</div>';return;}
       tabela.innerHTML=`<table style="width:100%;border-collapse:collapse;">
         <thead><tr style="background:var(--bg2);color:var(--dl);">
@@ -4180,13 +4190,14 @@ async function renderVisitas() {
           ${th("Únicos")}${th("Visitas")}${th("Orç.")}${th("Marcadas")}
         </tr></thead>
         <tbody>${months.map((m,i)=>{
-          const orcCount=byMonth[m].orcs?byMonth[m].orcs.size:0;
+          const orcLinhas=byMonth[m].orcs||0;
+          const orcCount=byMonth[m].orcVis?byMonth[m].orcVis.size:0;
           const vcCount=byMonth[m].vcs||0;
           return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
             <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;white-space:nowrap;">${fmtMes(m)}${m===mesAtual?' <span style="background:var(--a);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px;margin-left:3px;">atual</span>':''}</td>
             ${td(byMonth[m].uniq.size,"var(--a)")}
             ${td(byMonth[m].total)}
-            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)")}
+            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)",orcVisTitle(orcCount,orcLinhas))}
             ${td(vcCount||"—",vcCount>0?"#1565C0":"var(--dl)")}
           </tr>`;}).join("")}</tbody>
       </table>`;
@@ -4195,20 +4206,20 @@ async function renderVisitas() {
       const byDay={};
       rows.forEach(r=>{
         const day=utcToLocalDate(r.visited_at);
-        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:new Set()};
+        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:0,orcVis:new Set(),vcs:0};
         byDay[day].total++; byDay[day].uniq.add(r.session_id);
       });
       orcRows.forEach((r,i)=>{
         const day=utcToLocalDate(r.created_at);
-        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
-        byDay[day].orcs.add(r.visitor_id||("__idx__"+i));
+        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:0,orcVis:new Set(),vcs:0};
+        byDay[day].orcs++; byDay[day].orcVis.add(r.visitor_id||("__anon__"+i));
       });
       vcRows.forEach(r=>{
         const day=utcToLocalDate(r.created_at);
-        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:0,orcVis:new Set(),vcs:0};
         byDay[day].vcs=(byDay[day].vcs||0)+1;
       });
-      const days=Object.keys(byDay).sort((a,b)=>b.localeCompare(a));
+      const days=Object.keys(byDay).filter(d=>d>=desdeDia).sort((a,b)=>b.localeCompare(a));
       if(!days.length){tabela.innerHTML='<div class="empty"><div class="eicon">📊</div>Nenhuma visita registrada ainda.</div>';return;}
       const fmtDate=d=>{const[,m,dd]=d.split("-");return dd+"/"+m;};
       tabela.innerHTML=`<table style="width:100%;border-collapse:collapse;">
@@ -4217,13 +4228,14 @@ async function renderVisitas() {
           ${th("Únicos")}${th("Visitas")}${th("Orç.")}${th("Marcadas")}
         </tr></thead>
         <tbody>${days.map((d,i)=>{
-          const orcCount=byDay[d].orcs?byDay[d].orcs.size:0;
+          const orcLinhas=byDay[d].orcs||0;
+          const orcCount=byDay[d].orcVis?byDay[d].orcVis.size:0;
           const vcCount=byDay[d].vcs||0;
           return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
             <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;white-space:nowrap;">${fmtDate(d)}${d===hoje?' <span style="background:var(--a);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px;margin-left:3px;">hoje</span>':''}</td>
             ${td(byDay[d].uniq.size,"var(--a)")}
             ${td(byDay[d].total)}
-            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)")}
+            ${td(orcCount||"—",orcCount>0?"#2E7D52":"var(--dl)",orcVisTitle(orcCount,orcLinhas))}
             ${td(vcCount||"—",vcCount>0?"#1565C0":"var(--dl)")}
           </tr>`;}).join("")}</tbody>
       </table>`;
@@ -5321,8 +5333,7 @@ async function renderFuturos() {
   const wr = document.getElementById("fut-grid");
   wr.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   try {
-    const hoje = new Date(); hoje.setHours(0,0,0,0);
-    const hojeStr = hoje.toISOString().slice(0,10);
+    const hojeStr = localDate();
     const [rows, _futAssRows] = await Promise.all([
       dbGet("agenda","select=*&data_evento=gte."+hojeStr+"&order=data_evento.asc&limit=500"),
       dbGet("assessorias","select=cod,nome&limit=500")
@@ -5382,7 +5393,7 @@ async function renderFuturos() {
 let _agendaTabelaCache = null;
 
 async function exportAgendaFuturaPDF() {
-  const hoje = new Date().toISOString().slice(0,10);
+  const hoje = localDate();
   let evts = _agendaTabelaCache ? _agendaTabelaCache.filter(e => e.data_evento && e.data_evento >= hoje) : [];
   if(!evts.length) {
     const rows = await dbGet("agenda","select=cod,nome_evento,data_evento,data_fim,local_evento,assessoria_cod&data_evento=gte."+hoje+"&order=data_evento.asc&limit=500");
@@ -5662,7 +5673,7 @@ async function renderRelOrcamentos() {
   totWr.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   tblWr.innerHTML = "";
   try {
-    const rows = await dbGet("orcamentos","select=id,created_at,data_evento,tipo_evento,nome_noiva,nome_noivo,nome_contratante,num_convidados,valor_total,salao,status&order=created_at.desc&limit=2000");
+    const rows = await dbGetAll("orcamentos","select=id,created_at,data_evento,tipo_evento,nome_noiva,nome_noivo,nome_contratante,num_convidados,valor_total,salao,status&order=created_at.desc");
 
     const tipo = tipoSel?.value || "";
     const de   = document.getElementById("relorc-de")?.value  || "";
@@ -5672,7 +5683,7 @@ async function renderRelOrcamentos() {
 
     const filtrado = rows.filter(r => {
       if(tipo && r.tipo_evento !== tipo) return false;
-      const ref = (r.created_at || "").slice(0,7);
+      const ref = r.created_at ? utcToLocalDate(r.created_at).slice(0,7) : "";
       if(de  && ref < de)  return false;
       if(ate && ref > ate) return false;
       if((fBromelias || fTumbergia)) {
@@ -5703,7 +5714,7 @@ async function renderRelOrcamentos() {
       <tbody>${filtrado.map(r => {
         const nomes = [r.nome_noiva,r.nome_noivo].filter(Boolean).join(" e ") || r.nome_contratante || "—";
         return `<tr>
-          <td>${r.created_at ? r.created_at.slice(0,10).split("-").reverse().join("/") : "—"}</td>
+          <td>${r.created_at ? utcToLocalDate(r.created_at).split("-").reverse().join("/") : "—"}</td>
           <td style="font-weight:600;">${_esc(nomes)}</td>
           <td>${_esc(r.tipo_evento||"—")}</td>
           <td>${_esc(r.salao||"—")}</td>
