@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.03b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.04a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -4119,7 +4119,7 @@ async function renderVisitas() {
     const since = tableSince < cardSince ? tableSince : cardSince; // o mais antigo entre os dois
     const [rows, orcRows, vcRows] = await Promise.all([
       dbGetAll("site_visits", "visited_at=gte."+since.toISOString()+"&select=visited_at,session_id,referrer,device,utm_source&order=visited_at.desc"),
-      dbGet("orcamentos", "created_at=gte."+since.toISOString()+"&select=created_at,visitor_id&limit=5000"),
+      dbGet("orcamentos", "created_at=gte."+since.toISOString()+"&select=created_at&limit=5000"),
       dbGet("visitas_comerciais", "status=neq.cancelada&select=created_at&limit=2000")
     ]);
 
@@ -4157,17 +4157,17 @@ async function renderVisitas() {
       const byMonth = {};
       rows.forEach(r=>{
         const m=utcToLocalDate(r.visited_at).slice(0,7);
-        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:0,vcs:0};
         byMonth[m].total++; byMonth[m].uniq.add(r.session_id);
       });
-      orcRows.forEach((r,i)=>{
+      orcRows.forEach(r=>{
         const m=utcToLocalDate(r.created_at).slice(0,7);
-        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
-        byMonth[m].orcs.add(r.visitor_id||("__idx__"+i));
+        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:0,vcs:0};
+        byMonth[m].orcs++;
       });
       vcRows.forEach(r=>{
         const m=utcToLocalDate(r.created_at).slice(0,7);
-        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        if(!byMonth[m]) byMonth[m]={total:0,uniq:new Set(),orcs:0,vcs:0};
         byMonth[m].vcs=(byMonth[m].vcs||0)+1;
       });
       const MESES=["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -4180,7 +4180,7 @@ async function renderVisitas() {
           ${th("Únicos")}${th("Visitas")}${th("Orç.")}${th("Marcadas")}
         </tr></thead>
         <tbody>${months.map((m,i)=>{
-          const orcCount=byMonth[m].orcs?byMonth[m].orcs.size:0;
+          const orcCount=byMonth[m].orcs||0;
           const vcCount=byMonth[m].vcs||0;
           return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
             <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;white-space:nowrap;">${fmtMes(m)}${m===mesAtual?' <span style="background:var(--a);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px;margin-left:3px;">atual</span>':''}</td>
@@ -4195,17 +4195,17 @@ async function renderVisitas() {
       const byDay={};
       rows.forEach(r=>{
         const day=utcToLocalDate(r.visited_at);
-        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:new Set()};
+        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:0,vcs:0};
         byDay[day].total++; byDay[day].uniq.add(r.session_id);
       });
-      orcRows.forEach((r,i)=>{
+      orcRows.forEach(r=>{
         const day=utcToLocalDate(r.created_at);
-        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
-        byDay[day].orcs.add(r.visitor_id||("__idx__"+i));
+        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:0,vcs:0};
+        byDay[day].orcs++;
       });
       vcRows.forEach(r=>{
         const day=utcToLocalDate(r.created_at);
-        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:new Set(),vcs:0};
+        if(!byDay[day]) byDay[day]={total:0,uniq:new Set(),orcs:0,vcs:0};
         byDay[day].vcs=(byDay[day].vcs||0)+1;
       });
       const days=Object.keys(byDay).sort((a,b)=>b.localeCompare(a));
@@ -4217,7 +4217,7 @@ async function renderVisitas() {
           ${th("Únicos")}${th("Visitas")}${th("Orç.")}${th("Marcadas")}
         </tr></thead>
         <tbody>${days.map((d,i)=>{
-          const orcCount=byDay[d].orcs?byDay[d].orcs.size:0;
+          const orcCount=byDay[d].orcs||0;
           const vcCount=byDay[d].vcs||0;
           return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
             <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;white-space:nowrap;">${fmtDate(d)}${d===hoje?' <span style="background:var(--a);color:#fff;font-size:9px;border-radius:3px;padding:1px 4px;margin-left:3px;">hoje</span>':''}</td>
@@ -5672,7 +5672,7 @@ async function renderRelOrcamentos() {
 
     const filtrado = rows.filter(r => {
       if(tipo && r.tipo_evento !== tipo) return false;
-      const ref = (r.created_at || "").slice(0,7);
+      const ref = r.created_at ? utcToLocalDate(r.created_at).slice(0,7) : "";
       if(de  && ref < de)  return false;
       if(ate && ref > ate) return false;
       if((fBromelias || fTumbergia)) {
@@ -5703,7 +5703,7 @@ async function renderRelOrcamentos() {
       <tbody>${filtrado.map(r => {
         const nomes = [r.nome_noiva,r.nome_noivo].filter(Boolean).join(" e ") || r.nome_contratante || "—";
         return `<tr>
-          <td>${r.created_at ? r.created_at.slice(0,10).split("-").reverse().join("/") : "—"}</td>
+          <td>${r.created_at ? utcToLocalDate(r.created_at).split("-").reverse().join("/") : "—"}</td>
           <td style="font-weight:600;">${_esc(nomes)}</td>
           <td>${_esc(r.tipo_evento||"—")}</td>
           <td>${_esc(r.salao||"—")}</td>
