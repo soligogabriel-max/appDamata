@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.04b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.04c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -4009,7 +4009,10 @@ async function renderDashboard() {
     const [agendaRows, receberRows, visitasRows, orcRows] = await Promise.all([
       dbGet("agenda", "data_evento=gte."+hojStr+"&select=cod,nome_evento,data_evento,tipo_evento,status,valor_locacao&order=data_evento.asc&limit=2000"),
       dbGetAll("contas_a_receber", "select=valor,vencimento,status&order=vencimento.asc"),
-      dbGet("site_visits", "visited_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=visited_at,session_id&limit=10000"),
+      // dbGetAll, não dbGet: o PostgREST corta em 1000 linhas e ignora um limit
+      // maior. Com ~250 visitas/dia, as 1000 primeiras de uma janela de 4 meses não
+      // alcançam o mês corrente — o card mostrava 0 visitantes e queda de 100%.
+      dbGetAll("site_visits", "visited_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=visited_at,session_id&order=visited_at.desc"),
       dbGet("orcamentos", "created_at=gte."+localDate(new Date(hoje.getFullYear(), hoje.getMonth()-3, 1))+"&select=id,created_at,valor_total,status,visitor_id,whatsapp&limit=2000")
     ]);
 
