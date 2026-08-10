@@ -330,6 +330,7 @@ async function renderVT() {
   wr.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   try {
     const evFil = document.getElementById("vt-fil-evento").value;
+    const busca = (document.getElementById("vt-busca")?.value||"").toLowerCase().trim();
     const hojeStr = new Date().toISOString().slice(0,10);
     const [vtRows, evtRows] = await Promise.all([
       dbGet("visitas_tecnicas","order=data_vt.desc&limit=500&select=*"),
@@ -348,6 +349,7 @@ async function renderVT() {
     if(_vtPer==="futuros")  rows = rows.filter(r=> r.data_vt && r.data_vt >= hojeStr);
     if(_vtPer==="passados") rows = rows.filter(r=>!r.data_vt || r.data_vt < hojeStr);
     if(evFil) rows = rows.filter(r=>r.cod_evento===evFil);
+    if(busca) rows = rows.filter(r=>(evMap[r.cod_evento]||"").toLowerCase().includes(busca)||(r.cod_evento||"").toLowerCase().includes(busca));
     if(!rows.length){ wr.innerHTML='<div class="empty"><div class="eicon">🔍</div>Nenhuma visita técnica encontrada.</div>'; return; }
     wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
       <thead><tr><th>Data VT</th><th>Evento</th><th>Data Evento</th><th></th></tr></thead>
@@ -355,11 +357,12 @@ async function renderVT() {
         const rj=_esc(JSON.stringify(r));
         const dataEv = evDateMap[r.cod_evento];
         const isFut = r.data_vt && r.data_vt >= hojeStr;
+        const nomeEv = evMap[r.cod_evento]||r.cod_evento||"—";
         return`<tr>
           <td style="font-weight:700;color:${isFut?"#2A6644":"var(--dl)"};">${r.data_vt?fmtDate(r.data_vt):"—"}</td>
-          <td>${evMap[r.cod_evento]||r.cod_evento||"—"}</td>
+          <td>${nomeEv}</td>
           <td style="color:var(--dl);">${dataEv?fmtDate(dataEv):"—"}</td>
-          <td><div class="row-acts"><button class="act-btn" onclick='openVTModal(JSON.parse(this.dataset.r))' data-r="${rj}">✏️</button></div></td>
+          <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openVTModal(JSON.parse(this.dataset.r))' data-r="${rj}">✏️</button>${effIsAdmin()?`<button class="act-btn" title="Apagar visita técnica" onclick='_vtDeleteById(JSON.parse(this.dataset.r),this.dataset.nome)' data-r="${rj}" data-nome="${_esc(nomeEv)}">🗑</button>`:""}</div></td>
         </tr>`;
       }).join("")}</tbody>
     </table></div>`;
@@ -367,6 +370,18 @@ async function renderVT() {
 }
 
 function closeVTModal() { document.getElementById("m-vt").classList.remove("open"); }
+
+async function _vtDeleteById(vt, nomeEv) {
+  if(!effIsAdmin()) return;
+  if(!confirm("Apagar a visita técnica de "+(nomeEv||vt.cod_evento||"—")+"?\n\nAs observações dos fornecedores dessa VT vão junto.")) return;
+  try {
+    // Soft-delete: vt_linhas e visitas_tecnicas estão em SOFT_DELETE_TABLES, então
+    // dbDelete marca deleted_at e o dbGet já filtra — as linhas não voltam sozinhas.
+    await dbDelete("vt_linhas","vt_id=eq."+vt.id);
+    await dbDelete("visitas_tecnicas","id=eq."+vt.id);
+    renderVT(); toast("Visita técnica apagada.");
+  } catch(e){ toast("Erro ao apagar: "+e.message); }
+}
 
 async function _vtLoadFornec() {
   // Fornecedores de evento já carregados no openVTModal; sem ação adicional aqui
