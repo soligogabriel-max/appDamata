@@ -522,6 +522,20 @@ async function openVTModal(vt) {
     document.getElementById("m-vt").classList.add("open");
     const hojeVT = new Date().toISOString().slice(0,10);
     const evts = await dbGet("agenda","select=cod,nome_evento&data_evento=gte."+hojeVT+"&order=data_evento.asc&limit=500");
+    // O filtro acima traz só eventos futuros. Numa VT de evento já realizado — a aba
+    // "Passados" lista justamente essas — o evento salvo não vinha na lista, o select
+    // ficava em "" e saveVT abortava em "Selecione um evento": não dava para editar
+    // observação nenhuma. Busca o evento à parte para ele aparecer selecionado.
+    if(vt?.cod_evento && !evts.some(e=>e.cod===vt.cod_evento)) {
+      let ant = null;
+      try {
+        const r = await dbGet("agenda","select=cod,nome_evento&cod=eq."+encodeURIComponent(vt.cod_evento)+"&limit=1");
+        ant = r[0]||null;
+      } catch(ee){ ant = null; }
+      // Evento apagado (dbGet filtra deleted_at) cai no fallback: mantém o vínculo
+      // em vez de deixar o select vazio e travar o salvamento.
+      evts.unshift(ant || {cod:vt.cod_evento, nome_evento:vt.cod_evento});
+    }
     evts.forEach(e=>{ const o=document.createElement("option"); o.value=e.cod; o.textContent=(e.nome_evento||e.cod); if(vt&&e.cod===vt.cod_evento)o.selected=true; sel.appendChild(o); });
     try {
       _vtFornecList = await dbGet("fornecedores","select=codigo,nome,tipo_servico&order=nome.asc&limit=500");
