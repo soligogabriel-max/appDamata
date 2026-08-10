@@ -313,7 +313,7 @@ async function savePedido() {
 // VISITA TÉCNICA
 // ══════════════════════════════════════════
 const VT_TIPOS = ["Buffet","Bar","Som/Iluminação","Som","Iluminação","Decoração","Assessoria","Locação de móveis"];
-let _vtId = null, _vtFornecList = [], _vtPer = "todos", _vtLinhaOrigIds = new Set();
+let _vtId = null, _vtFornecList = [], _vtPer = "todos", _vtLinhaOrigIds = new Set(), _vtRelAtual = null;
 const _VT_TIPOS_BASE = ["Assessoria","Buffet","Cerimonialista","Decoração","DJ","Filmagem","Floricultura","Fotografia","Iluminação","Som/Iluminação","Segurança","Outros"];
 
 function _vtSetPer(p) {
@@ -362,7 +362,7 @@ async function renderVT() {
           <td style="font-weight:700;color:${isFut?"#2A6644":"var(--dl)"};">${r.data_vt?fmtDate(r.data_vt):"—"}${r.hora?` <span style="font-weight:400;font-size:11px;">${r.hora.slice(0,5)}</span>`:""}</td>
           <td>${nomeEv}</td>
           <td style="color:var(--dl);">${dataEv?fmtDate(dataEv):"—"}</td>
-          <td><div class="row-acts"><button class="act-btn" title="Imprimir ficha" onclick='_vtPrint(JSON.parse(this.dataset.r),this.dataset.nome,this.dataset.dev)' data-r="${rj}" data-nome="${_esc(nomeEv)}" data-dev="${dataEv||""}">🖨</button><button class="act-btn" title="Editar" onclick='openVTModal(JSON.parse(this.dataset.r))' data-r="${rj}">✏️</button>${effIsAdmin()?`<button class="act-btn" title="Apagar visita técnica" onclick='_vtDeleteById(JSON.parse(this.dataset.r),this.dataset.nome)' data-r="${rj}" data-nome="${_esc(nomeEv)}">🗑</button>`:""}</div></td>
+          <td><div class="row-acts"><button class="act-btn" title="Ver relatório" onclick='_vtVerRelatorio(JSON.parse(this.dataset.r),this.dataset.nome,this.dataset.dev)' data-r="${rj}" data-nome="${_esc(nomeEv)}" data-dev="${dataEv||""}">🔍</button><button class="act-btn" title="Imprimir ficha" onclick='_vtPrint(JSON.parse(this.dataset.r),this.dataset.nome,this.dataset.dev)' data-r="${rj}" data-nome="${_esc(nomeEv)}" data-dev="${dataEv||""}">🖨</button><button class="act-btn" title="Editar" onclick='openVTModal(JSON.parse(this.dataset.r))' data-r="${rj}">✏️</button>${effIsAdmin()?`<button class="act-btn" title="Apagar visita técnica" onclick='_vtDeleteById(JSON.parse(this.dataset.r),this.dataset.nome)' data-r="${rj}" data-nome="${_esc(nomeEv)}">🗑</button>`:""}</div></td>
         </tr>`;
       }).join("")}</tbody>
     </table></div>`;
@@ -371,58 +371,95 @@ async function renderVT() {
 
 function closeVTModal() { document.getElementById("m-vt").classList.remove("open"); }
 
-// Ficha da VT para levar impressa à visita ou mandar para os fornecedores.
 // As linhas não estão na lista (renderVT só carrega visitas_tecnicas), então busca aqui.
+async function _vtFichaDados(vt) {
+  const linhas = await dbGet("vt_linhas","vt_id=eq."+vt.id+"&order=id.asc&limit=100");
+  let fornMap = {};
+  try {
+    const fs = await dbGet("fornecedores","select=codigo,nome&limit=500");
+    fs.forEach(f=>{ fornMap[f.codigo]=f.nome; });
+  } catch(fe){ fornMap = {}; }
+  return {linhas, fornMap};
+}
+
+// Corpo do relatório, usado tanto na visualização em tela quanto na impressão —
+// os dois mostram exatamente a mesma coisa. Estilo vai junto, escopado em
+// .vt-ficha, para funcionar dentro do admin e na janela de impressão sem depender
+// do admin.css.
+function _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap) {
+  const rows = linhas.length ? linhas.map(ln=>{
+    const nome = fornMap[ln.fornecedor_cod] || ln.nome_fornecedor || ln.fornecedor_cod || "—";
+    // espaço para anotar à mão quando não há observação registrada
+    const obs = (ln.obs||"").trim();
+    return `<tr><td>${_esc(ln.tipo_fornecedor||"—")}</td><td><b>${_esc(nome)}</b></td>
+      <td class="obs">${obs?_esc(obs).replace(/\n/g,"<br>"):'<span class="vazio">&nbsp;</span>'}</td></tr>`;
+  }).join("") : `<tr><td colspan="3" style="text-align:center;color:#9ca3af;padding:18px;">Nenhum fornecedor registrado nesta VT.</td></tr>`;
+  const quando = (vt.data_vt?fmtDate(vt.data_vt):"—") + (vt.hora?" às "+vt.hora.slice(0,5):"");
+  return `<style>
+    .vt-ficha{font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;color:#1f2937;}
+    .vt-ficha h1{font-size:18px;font-weight:800;color:#2E3C44;margin:0 0 2px;}
+    .vt-ficha .sub{font-size:11px;color:#6b7280;margin-bottom:16px;}
+    .vt-ficha .cab{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;}
+    .vt-ficha .c{display:flex;flex-direction:column;gap:2px;}
+    .vt-ficha .c-l{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#6b7280;}
+    .vt-ficha .c-v{font-size:15px;font-weight:800;}
+    .vt-ficha table{width:100%;border-collapse:collapse;}
+    .vt-ficha th{background:#2E3C44;color:#fff;padding:7px 8px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.3px;}
+    .vt-ficha td{padding:6px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;}
+    .vt-ficha tbody tr:nth-child(even) td{background:#f9fafb;}
+    .vt-ficha .obs{white-space:pre-wrap;}
+    .vt-ficha .vazio{display:block;min-height:34px;}
+    .vt-ficha .footer{margin-top:16px;font-size:10px;color:#9ca3af;text-align:right;}
+  </style>
+  <div class="vt-ficha">
+    <h1>Visita Técnica</h1>
+    <div class="sub">Gerado em ${new Date().toLocaleString("pt-BR")}</div>
+    <div class="cab">
+      <div class="c"><span class="c-l">Evento</span><span class="c-v">${_esc(nomeEv||"—")}</span></div>
+      <div class="c"><span class="c-l">Data do evento</span><span class="c-v">${dataEv?fmtDate(dataEv):"—"}</span></div>
+      <div class="c"><span class="c-l">Data da visita</span><span class="c-v">${quando}</span></div>
+    </div>
+    <table>
+      <thead><tr><th style="width:22%">Tipo</th><th style="width:28%">Fornecedor</th><th>Observações</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="footer">Fazenda Damata · ${linhas.length} fornecedor(es)</div>
+  </div>`;
+}
+
+// Relatório da VT em tela, sem sair do admin.
+async function _vtVerRelatorio(vt, nomeEv, dataEv) {
+  const corpo = document.getElementById("vt-rel-corpo");
+  corpo.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  document.getElementById("m-vt-rel").classList.add("open");
+  try {
+    const {linhas, fornMap} = await _vtFichaDados(vt);
+    corpo.innerHTML = _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap);
+    // o botão de imprimir do modal reaproveita a mesma VT que está na tela
+    _vtRelAtual = {vt, nomeEv, dataEv};
+  } catch(e){ corpo.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro: '+_esc(e.message)+'</div>'; }
+}
+
+function closeVTRelModal() { document.getElementById("m-vt-rel").classList.remove("open"); }
+
+function _vtRelImprimir() {
+  if(_vtRelAtual) _vtPrint(_vtRelAtual.vt, _vtRelAtual.nomeEv, _vtRelAtual.dataEv);
+}
+
+// Ficha da VT para levar impressa à visita ou mandar para os fornecedores.
 async function _vtPrint(vt, nomeEv, dataEv) {
   try {
-    const linhas = await dbGet("vt_linhas","vt_id=eq."+vt.id+"&order=id.asc&limit=100");
-    let fornMap = {};
-    try {
-      const fs = await dbGet("fornecedores","select=codigo,nome&limit=500");
-      fs.forEach(f=>{ fornMap[f.codigo]=f.nome; });
-    } catch(fe){ fornMap = {}; }
-    const rows = linhas.length ? linhas.map(ln=>{
-      const nome = fornMap[ln.fornecedor_cod] || ln.nome_fornecedor || ln.fornecedor_cod || "—";
-      // espaço para anotar à mão quando não há observação registrada
-      const obs = (ln.obs||"").trim();
-      return `<tr><td>${_esc(ln.tipo_fornecedor||"—")}</td><td><b>${_esc(nome)}</b></td>
-        <td class="obs">${obs?_esc(obs).replace(/\n/g,"<br>"):'<span class="vazio">&nbsp;</span>'}</td></tr>`;
-    }).join("") : `<tr><td colspan="3" style="text-align:center;color:#9ca3af;padding:18px;">Nenhum fornecedor registrado nesta VT.</td></tr>`;
-    const quando = (vt.data_vt?fmtDate(vt.data_vt):"—") + (vt.hora?" às "+vt.hora.slice(0,5):"");
+    const {linhas, fornMap} = await _vtFichaDados(vt);
     const w = window.open("","_blank","width=900,height=700");
     if(!w){ toast("Libere os pop-ups para imprimir a ficha."); return; }
     w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
   <title>Visita Técnica — ${_esc(nomeEv||"")}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
-    body{font-family:'Segoe UI',system-ui,sans-serif;font-size:12px;color:#1f2937;padding:24px 32px;}
-    h1{font-size:18px;font-weight:800;color:#2E3C44;margin-bottom:2px;}
-    .sub{font-size:11px;color:#6b7280;margin-bottom:16px;}
-    .cab{display:flex;gap:24px;margin-bottom:16px;padding:12px 16px;background:#f9fafb;border-radius:8px;border:1px solid #e5e7eb;}
-    .c{display:flex;flex-direction:column;gap:2px;}
-    .c-l{font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#6b7280;}
-    .c-v{font-size:15px;font-weight:800;}
-    table{width:100%;border-collapse:collapse;}
-    th{background:#2E3C44;color:#fff;padding:7px 8px;text-align:left;font-size:11px;font-weight:700;letter-spacing:.3px;}
-    td{padding:6px 8px;border-bottom:1px solid #f3f4f6;vertical-align:top;}
-    tr:nth-child(even) td{background:#f9fafb;}
-    .obs{white-space:pre-wrap;}
-    .vazio{display:block;min-height:34px;}
-    .footer{margin-top:16px;font-size:10px;color:#9ca3af;text-align:right;}
+    body{padding:24px 32px;}
     @media print{body{padding:0;}@page{margin:16mm 12mm;size:A4;}}
   </style></head><body>
-  <h1>Visita Técnica</h1>
-  <div class="sub">Gerado em ${new Date().toLocaleString("pt-BR")}</div>
-  <div class="cab">
-    <div class="c"><span class="c-l">Evento</span><span class="c-v">${_esc(nomeEv||"—")}</span></div>
-    <div class="c"><span class="c-l">Data do evento</span><span class="c-v">${dataEv?fmtDate(dataEv):"—"}</span></div>
-    <div class="c"><span class="c-l">Data da visita</span><span class="c-v">${quando}</span></div>
-  </div>
-  <table>
-    <thead><tr><th style="width:22%">Tipo</th><th style="width:28%">Fornecedor</th><th>Observações</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <div class="footer">Fazenda Damata · ${linhas.length} fornecedor(es)</div>
+  ${_vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap)}
   <script>window.onload=()=>window.print();<\/script>
   </body></html>`);
     w.document.close();
