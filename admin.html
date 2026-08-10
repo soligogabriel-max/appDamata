@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.10b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.10c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1272,9 +1272,10 @@
 <div class="moverlay" id="m-vt" onclick="if(event.target===this)closeVTModal()">
   <div class="mbox" style="max-width:720px;">
     <div class="mtitle" id="vt-modal-title">Visita Técnica</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+    <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:12px;">
       <div><label class="lbl">Evento</label><select class="inp" id="vtm-evento" style="margin-bottom:0;" onchange="_vtLoadFornec()"></select></div>
       <div><label class="lbl">Data da VT</label><input class="inp" id="vtm-data" type="date" style="margin-bottom:0;"/></div>
+      <div><label class="lbl">Hora</label><input class="inp" id="vtm-hora" type="time" style="margin-bottom:0;"/></div>
     </div>
     <div style="font-weight:700;font-size:13px;color:var(--dk);margin-bottom:8px;">Fornecedores presentes</div>
     <div id="vtm-linhas" style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px;"></div>
