@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.10c</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.10d</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1283,6 +1283,17 @@
     <div class="macts" style="margin-top:16px;">
       <button class="btn-cancel" onclick="closeVTModal()">Cancelar</button>
       <button class="btn-confirm" id="vtm-btn-save" onclick="saveVT()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: RELATÓRIO DA VISITA TÉCNICA -->
+<div class="moverlay" id="m-vt-rel" onclick="if(event.target===this)closeVTRelModal()">
+  <div class="mbox" style="max-width:880px;">
+    <div id="vt-rel-corpo" style="max-height:70vh;overflow:auto;"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;">
+      <button class="btn" onclick="_vtRelImprimir()">🖨 Imprimir</button>
+      <button class="btn-confirm" onclick="closeVTRelModal()">Fechar</button>
     </div>
   </div>
 </div>
