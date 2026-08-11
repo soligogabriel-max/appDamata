@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.10d</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.12a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3457,12 +3457,22 @@ async function _vcLoadAgendadas() {
   el.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   try {
     const hoje = localDate();
-    const [visitas, slots] = await Promise.all([
+    let [visitas, slots] = await Promise.all([
       dbGet("visitas_comerciais", "order=created_at.desc&limit=200&select=*"),
       dbGet("slots_visita", "select=id,data,hora")
     ]);
     const slotMap = {}; slots.forEach(s => slotMap[s.id] = s);
     if(!visitas.length) { el.innerHTML = '<div class="empty"><div class="eicon">📅</div>Nenhuma visita agendada.</div>'; return; }
+    // ordem cronologica pela data do slot (nao pela de criacao):
+    // proximas em ordem crescente no topo, depois as passadas da mais recente para a mais antiga.
+    // visita sem slot vai para o fim, mantendo a ordem de criacao entre elas.
+    const _vcChave = v => { const s = slotMap[v.slot_id]; return s ? s.data + "T" + (s.hora || "00:00:00") : null; };
+    visitas = visitas.map((v, i) => ({ v, i, k: _vcChave(v) })).sort((a, b) => {
+      if (a.k === null || b.k === null) return a.k === b.k ? a.i - b.i : (a.k === null ? 1 : -1);
+      const fa = a.k.slice(0, 10) >= hoje, fb = b.k.slice(0, 10) >= hoje;
+      if (fa !== fb) return fa ? -1 : 1;
+      return fa ? a.k.localeCompare(b.k) : b.k.localeCompare(a.k);
+    }).map(x => x.v);
     const statusLabel = { agendada:"🟡 Agendada", realizada:"✅ Realizada", cancelada:"❌ Cancelada", nao_compareceu:"⚠️ Não compareceu", visitado_alta:"🌟 Visitado · Alta", visitado_baixa:"👍 Visitado · Baixa" };
     const fmtSlot = id => { const s=slotMap[id]; return s ? new Date(s.data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"})+" às "+s.hora.slice(0,5) : "—"; };
     el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
