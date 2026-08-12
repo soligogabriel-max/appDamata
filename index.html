@@ -542,7 +542,8 @@ function loadLandingVideos(urls) {
   for (let i = 0; i < 3; i++) {
     const cell = document.getElementById("ll-vid-" + i);
     if (!cell) continue;
-    const id = _ytId((urls || [])[i]);
+    const entry = (urls || [])[i];
+    const id = _ytId(typeof entry === "string" ? entry : (entry?.url || ""));
     if (id) {
       const thumb = document.createElement("div");
       thumb.className = "ll-vid-thumb";
