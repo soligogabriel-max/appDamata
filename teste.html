@@ -312,25 +312,16 @@ async function init() {
 
     const pcfg = partesCfg[p - 1] || {};
 
-    if (pcfg.mostrar_numero) {
-      const parteLbl = document.createElement("div");
-      parteLbl.className = "tp-parte-label";
-      parteLbl.style.color = isDark ? "rgba(255,255,255,.35)" : "#B8BEC2";
-      parteLbl.textContent = `PARTE ${p} DE ${numPartes}`;
-      section.appendChild(parteLbl);
-    }
-
     if (pcfg.titulo) {
       const tituloEl = document.createElement("div");
-      tituloEl.className = "tp-parte-title";
-      tituloEl.style.color = isDark ? "#F5D68A" : "#E8A52A";
+      tituloEl.style.cssText = "width:100%;max-width:900px;font-family:'DM Serif Display',serif;font-size:30px;font-weight:400;color:" + (isDark ? "#F5D68A" : "#E8A52A") + ";text-align:left;line-height:1.2;";
       tituloEl.textContent = pcfg.titulo;
       section.appendChild(tituloEl);
     }
 
     if (pcfg.descricao) {
       const descEl = document.createElement("div");
-      descEl.style.cssText = "font-size:14px;color:" + (isDark ? "rgba(255,255,255,.55)" : "#7A8F96") + ";text-align:center;max-width:600px;line-height:1.6";
+      descEl.style.cssText = "width:100%;max-width:900px;font-size:15px;color:" + (isDark ? "rgba(255,255,255,.65)" : "#7A8F96") + ";text-align:left;line-height:1.65;";
       descEl.textContent = pcfg.descricao;
       section.appendChild(descEl);
     }
