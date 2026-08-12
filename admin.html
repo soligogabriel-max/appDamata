@@ -5905,6 +5905,7 @@ async function saveSettings() {
 
 let _ltNumPartes = 3;
 let _ltSlug = "";
+let _ltCarrosseis = {};
 
 async function renderLandingTeste() {
   try {
@@ -6057,6 +6058,7 @@ function ltRenderPartesCfg(cfg) {
     const titulo = (p.titulo || "").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
     const descricao = (p.descricao || "").replace(/</g,"&lt;").replace(/>/g,"&gt;");
     const mostrar = p.mostrar_numero ? "checked" : "";
+    _ltCarrosseis[i] = Array.isArray(p.carrossel) ? p.carrossel : (_ltCarrosseis[i] || []);
     rows += `<div style="background:var(--bg);border:1px solid var(--br);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
       <div style="font-size:12px;font-weight:700;color:#E8A52A;letter-spacing:.05em">Parte ${i+1}</div>
       <div>
@@ -6071,9 +6073,21 @@ function ltRenderPartesCfg(cfg) {
         <input type="checkbox" id="lt-p${i}-num" ${mostrar} style="width:16px;height:16px;accent-color:var(--a);cursor:pointer">
         Mostrar "Parte ${i+1} de ${_ltNumPartes}" na landing
       </label>
+      <div>
+        <div style="font-size:11px;color:var(--dl);font-weight:600;margin-bottom:6px">Carrossel de fotos</div>
+        <div id="lt-c${i}-lista" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <label style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;color:var(--dl)">
+            <input type="file" id="lt-c${i}-input" accept="image/*" style="display:none" onchange="ltCarrosselUpload(${i})">
+            + Adicionar foto
+          </label>
+          <span id="lt-c${i}-status" style="font-size:12px;color:var(--dl)"></span>
+        </div>
+      </div>
     </div>`;
   }
   el.innerHTML = rows;
+  for (let i = 0; i < _ltNumPartes; i++) ltCarrosselRenderParte(i);
 }
 
 function ltLerPartesCfgAtual() {
@@ -6082,7 +6096,8 @@ function ltLerPartesCfgAtual() {
     arr.push({
       titulo: document.getElementById("lt-p" + i + "-titulo")?.value || "",
       descricao: document.getElementById("lt-p" + i + "-desc")?.value || "",
-      mostrar_numero: document.getElementById("lt-p" + i + "-num")?.checked || false
+      mostrar_numero: document.getElementById("lt-p" + i + "-num")?.checked || false,
+      carrossel: _ltCarrosseis[i] || []
     });
   }
   return arr;
@@ -6105,6 +6120,58 @@ async function ltSalvarPartesCfg() {
     statusEl.textContent = "Erro ao salvar.";
     console.error(e);
   }
+}
+
+
+function ltCarrosselRenderParte(idx) {
+  const el = document.getElementById("lt-c" + idx + "-lista");
+  if (!el) return;
+  const fotos = _ltCarrosseis[idx] || [];
+  if (!fotos.length) {
+    el.innerHTML = '<span style="font-size:12px;color:var(--dl)">Nenhuma foto adicionada.</span>';
+    return;
+  }
+  el.innerHTML = fotos.map((f, fi) => {
+    const url = (typeof f === "string" ? f : (f.url || "")).replace(/"/g, "&quot;");
+    return `<div style="position:relative;width:64px;height:48px;border-radius:6px;overflow:hidden;border:1px solid var(--br)">
+      <img src="${url}" style="width:100%;height:100%;object-fit:cover;display:block">
+      <button onclick="ltCarrosselRemover(${idx},${fi})" style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;border:none;cursor:pointer;font-size:10px;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>`;
+  }).join("");
+}
+
+function ltCarrosselRemover(idx, fi) {
+  if (!_ltCarrosseis[idx]) return;
+  _ltCarrosseis[idx].splice(fi, 1);
+  ltCarrosselRenderParte(idx);
+}
+
+async function ltCarrosselUpload(idx) {
+  const inp = document.getElementById("lt-c" + idx + "-input");
+  const file = inp && inp.files && inp.files[0];
+  if (!file) return;
+  const st = document.getElementById("lt-c" + idx + "-status");
+  st.textContent = "⏳ Enviando…";
+  try {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("folder", "fotos-teste");
+    const res = await fetch(SB_URL + "/functions/v1/upload-landing-pdf", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + _authToken },
+      body: fd
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.detail || data.error || "Erro no upload");
+    if (!_ltCarrosseis[idx]) _ltCarrosseis[idx] = [];
+    _ltCarrosseis[idx].push({ url: data.url, name: file.name });
+    ltCarrosselRenderParte(idx);
+    st.textContent = "✓ " + file.name;
+    setTimeout(() => { st.textContent = ""; }, 3000);
+  } catch(e) {
+    st.textContent = "❌ " + e.message;
+  }
+  inp.value = "";
 }
 
 // ── FIM LANDING DE TESTE ─────────────────────────────────────────────────────
