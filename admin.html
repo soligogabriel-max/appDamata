@@ -925,6 +925,35 @@
           <p style="color:var(--dl);font-size:11px;margin-top:8px;margin-bottom:0">⚠️ Requer bucket <strong>landing-pdfs</strong> público no Supabase Storage.</p>
         </div>
 
+
+        <!-- Landing de Teste -->
+        <div style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px">
+          <div class="sec-t">🧪 Landing de Teste (por partes)</div>
+          <p style="color:var(--dl);font-size:13px;margin-bottom:16px">Landing acessível somente por link direto, dividida em N seções. Configure o número de partes e atribua cada PDF/vídeo a uma parte.</p>
+
+          <div style="background:var(--bg);border:1px solid var(--br);border-radius:14px;padding:20px 22px;margin-bottom:16px">
+            <div style="font-size:12px;font-weight:700;color:var(--dl);margin-bottom:8px;letter-spacing:.03em">Número de partes</div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;border:1.5px solid var(--br);border-radius:10px;overflow:hidden">
+                <button onclick="ltAjustarPartes(-1)" style="padding:9px 15px;font-size:15px;color:var(--dl);cursor:pointer;border:none;background:var(--bg)">–</button>
+                <span id="lt-num-partes" style="padding:9px 18px;font-size:15px;font-weight:700;min-width:30px;text-align:center">3</span>
+                <button onclick="ltAjustarPartes(1)" style="padding:9px 15px;font-size:15px;color:var(--dl);cursor:pointer;border:none;background:var(--bg)">+</button>
+              </div>
+              <button onclick="ltSalvarPartes()" style="padding:10px 20px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">Salvar</button>
+              <span id="lt-partes-status" style="font-size:13px;color:var(--dl)"></span>
+            </div>
+          </div>
+
+          <div style="font-size:12px;color:var(--dl);line-height:1.7;margin-bottom:8px">Link único — compartilhe manualmente, não aparece no site.</div>
+          <div style="background:var(--bg);border:1px solid var(--br);border-radius:10px;padding:12px 16px;font-size:13px;font-family:monospace;color:var(--t);display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px">
+            <span id="lt-link-text" style="word-break:break-all">—</span>
+            <button onclick="ltCopiarLink()" style="font-size:12px;font-weight:700;color:#E8A52A;background:none;border:none;cursor:pointer;flex-shrink:0">Copiar</button>
+          </div>
+
+          <div style="font-size:13px;font-weight:700;color:var(--t);margin-bottom:12px">PDFs e vídeos cadastrados</div>
+          <div id="lt-lista" style="display:flex;flex-direction:column;gap:10px"></div>
+        </div>
+
         <!-- Certificado Digital NFS-e -->
         <div style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px">
           <div class="sec-t">🔐 Certificado Digital e-CNPJ A1 (NFS-e)</div>
@@ -2125,7 +2154,7 @@ function setTab(t) {
   if(t==="tabelaspreco") renderTabelasPreco();
   if(t==="pend") renderPend();
   if(t==="users") renderUsers();
-  if(t==="fotoslanding"){ renderFotosLanding(); loadCertNfseInfo(); }
+  if(t==="fotoslanding"){ renderFotosLanding(); loadCertNfseInfo(); renderLandingTeste(); }
   if(t==="orcamentos") renderOrcamentos();
   if(t==="contratos") renderContratos();
   if(t==="naturezas") renderNaturezas();
@@ -5854,6 +5883,142 @@ async function saveSettings() {
     </div>
   </div>
 </div>
-<script>if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");</script>
+<script>if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
+// ── LANDING DE TESTE (partes) ────────────────────────────────────────────────
+
+let _ltNumPartes = 3;
+let _ltSlug = "";
+
+async function renderLandingTeste() {
+  try {
+    const [cfgRes, pdfsRes, videosRes] = await Promise.all([
+      sbFetch("app_config?chave=in.(landing_teste_slug,landing_teste_num_partes)&select=chave,valor"),
+      sbFetch("app_config?chave=eq.landing_pdfs&select=valor"),
+      sbFetch("app_config?chave=eq.videos_landing&select=valor")
+    ]);
+    const cfg = {};
+    (cfgRes || []).forEach(r => { cfg[r.chave] = r.valor; });
+    _ltSlug = cfg.landing_teste_slug || "";
+    _ltNumPartes = parseInt(cfg.landing_teste_num_partes) || 3;
+    document.getElementById("lt-num-partes").textContent = _ltNumPartes;
+    document.getElementById("lt-link-text").textContent = _ltSlug
+      ? "fazendadamata.com/teste?id=" + _ltSlug
+      : "— salve para gerar o link —";
+    const pdfs   = Array.isArray(pdfsRes?.[0]?.valor)   ? pdfsRes[0].valor   : [];
+    const videos = Array.isArray(videosRes?.[0]?.valor) ? videosRes[0].valor : [];
+    ltRenderLista(pdfs, videos);
+  } catch(e) {
+    console.error("renderLandingTeste:", e);
+  }
+}
+
+function ltRenderLista(pdfs, videos) {
+  const el = document.getElementById("lt-lista");
+  if (!el) return;
+  const opts = Array.from({ length: _ltNumPartes }, (_, i) =>
+    `<option value="${i+1}">Parte ${i+1}</option>`
+  ).join("");
+  const selOpts = `<option value="0">— Não incluir —</option>` + opts;
+
+  const rows = [
+    ...pdfs.map((item, i) => {
+      const url  = typeof item === "string" ? item : (item.url || "");
+      const nome = url.split("/").pop().split("?")[0] || "PDF " + (i+1);
+      const parte = (typeof item === "object" && item.parte_teste) || 0;
+      const sel  = `<select onchange="ltSetParte('pdf',${i},+this.value)" style="border:1.5px solid var(--br);border-radius:8px;padding:7px 10px;font-size:13px;font-weight:600;color:var(--t);background:var(--bg)">${selOpts}</select>`;
+      return { icon:"PDF", nome, parte, sel };
+    }),
+    ...videos.map((item, i) => {
+      const url  = typeof item === "string" ? item : (item.url || "");
+      const nome = url || "Vídeo " + (i+1);
+      const parte = (typeof item === "object" && item.parte_teste) || 0;
+      const sel  = `<select onchange="ltSetParte('video',${i},+this.value)" style="border:1.5px solid var(--br);border-radius:8px;padding:7px 10px;font-size:13px;font-weight:600;color:var(--t);background:var(--bg)">${selOpts}</select>`;
+      return { icon:"▶", nome, parte, sel };
+    })
+  ];
+
+  if (!rows.length) {
+    el.innerHTML = '<p style="font-size:13px;color:var(--dl)">Nenhum PDF ou vídeo cadastrado ainda.</p>';
+    return;
+  }
+
+  el.innerHTML = rows.map((r, rowIdx) => {
+    const selHtml = r.sel.replace(
+      `value="${r.parte}"`,
+      `value="${r.parte}" selected`
+    );
+    return `<div style="background:var(--bg);border:1px solid var(--br);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:14px">
+      <div style="width:36px;height:36px;border-radius:8px;background:var(--bg2,#f5f5f5);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#E8A52A;flex-shrink:0">${r.icon}</div>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.nome}</div></div>
+      ${selHtml}
+    </div>`;
+  }).join("");
+}
+
+function ltAjustarPartes(delta) {
+  _ltNumPartes = Math.max(1, Math.min(10, _ltNumPartes + delta));
+  document.getElementById("lt-num-partes").textContent = _ltNumPartes;
+}
+
+async function ltSalvarPartes() {
+  const statusEl = document.getElementById("lt-partes-status");
+  statusEl.textContent = "Salvando…";
+  try {
+    // Gera slug se não existir
+    if (!_ltSlug) {
+      _ltSlug = Math.random().toString(36).substring(2, 8);
+      const ex = await sbFetch("app_config?chave=eq.landing_teste_slug&select=chave");
+      if (ex && ex.length) {
+        await sbFetch("app_config?chave=eq.landing_teste_slug", { method:"PATCH", body:{ valor:_ltSlug } });
+      } else {
+        await sbFetch("app_config", { method:"POST", body:{ chave:"landing_teste_slug", valor:_ltSlug } });
+      }
+      document.getElementById("lt-link-text").textContent = "fazendadamata.com/teste?id=" + _ltSlug;
+    }
+    // Salva num_partes
+    const ex2 = await sbFetch("app_config?chave=eq.landing_teste_num_partes&select=chave");
+    if (ex2 && ex2.length) {
+      await sbFetch("app_config?chave=eq.landing_teste_num_partes", { method:"PATCH", body:{ valor:_ltNumPartes } });
+    } else {
+      await sbFetch("app_config", { method:"POST", body:{ chave:"landing_teste_num_partes", valor:_ltNumPartes } });
+    }
+    statusEl.textContent = "Salvo!";
+    setTimeout(() => { statusEl.textContent = ""; }, 2000);
+    await renderLandingTeste();
+  } catch(e) {
+    statusEl.textContent = "Erro ao salvar.";
+    console.error(e);
+  }
+}
+
+function ltCopiarLink() {
+  if (!_ltSlug) { alert("Salve a configuração primeiro para gerar o link."); return; }
+  const url = "https://fazendadamata.com/teste?id=" + _ltSlug;
+  navigator.clipboard.writeText(url).then(() => {
+    const el = document.getElementById("lt-link-text");
+    const prev = el.textContent;
+    el.textContent = "✅ Copiado!";
+    setTimeout(() => { el.textContent = prev; }, 1500);
+  }).catch(() => alert("Copie manualmente: " + url));
+}
+
+async function ltSetParte(tipo, idx, parte) {
+  const chave = tipo === "pdf" ? "landing_pdfs" : "videos_landing";
+  try {
+    const res = await sbFetch("app_config?chave=eq." + chave + "&select=valor");
+    let arr = Array.isArray(res?.[0]?.valor) ? res[0].valor : [];
+    if (idx >= arr.length) return;
+    let item = arr[idx];
+    if (typeof item === "string") item = { url: item };
+    if (parte === 0) { delete item.parte_teste; } else { item.parte_teste = parte; }
+    arr[idx] = item;
+    await sbFetch("app_config?chave=eq." + chave, { method:"PATCH", body:{ valor: arr } });
+  } catch(e) {
+    console.error("ltSetParte:", e);
+  }
+}
+// ── FIM LANDING DE TESTE ─────────────────────────────────────────────────────
+
+</script>
 </body>
 </html>
