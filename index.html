@@ -426,6 +426,15 @@ function loadScript(src) {
 }
 
 async function renderPdfNow(url, wrapper) {
+  if (/\.(jpg|jpeg|png|webp|gif|avif)(\?|$)/i.test(url)) {
+    const img = document.createElement("img");
+    img.src = url;
+    img.style.cssText = "width:100%;display:block;";
+    img.loading = "lazy";
+    wrapper.style.minHeight = "";
+    wrapper.appendChild(img);
+    return;
+  }
   try {
     const loadingTask = pdfjsLib.getDocument({ url, withCredentials: false });
     const pdf = await loadingTask.promise;
