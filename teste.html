@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&display=swap" rel="stylesheet">
+  <title>Fazenda Damata — Apresentação</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'DM Sans',sans-serif;background:#F5F4F0;color:#2E3C44;}
+
+    #sticky-top{position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.3);}
+
+    #header{
+      width:100%;height:76px;background:#2E3C44;overflow:hidden;
+      display:flex;align-items:center;justify-content:center;padding:0 32px;
+    }
+    #header-wordmark{display:flex;flex-direction:column;line-height:1;}
+    #header-wordmark .name{font-size:26px;font-weight:800;letter-spacing:6px;color:#fff;}
+
+    #btn-orc{
+      display:flex;align-items:center;justify-content:center;gap:10px;
+      width:100%;padding:17px;border-radius:0;background:#E8A52A;color:#2E3C44;
+      font-size:15px;font-weight:800;letter-spacing:.3px;text-decoration:none;cursor:pointer;
+      transition:background .18s;border:none;font-family:inherit;
+    }
+    #btn-orc:hover{background:#f0b83a;}
+
+    #wpp-float{
+      position:fixed;bottom:24px;right:24px;z-index:999;
+      width:60px;height:60px;border-radius:50%;background:#25D366;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 4px 20px rgba(37,211,102,.45),0 2px 8px rgba(0,0,0,.25);
+      text-decoration:none;transition:transform .18s,box-shadow .18s;
+    }
+    #wpp-float:hover{transform:scale(1.1);box-shadow:0 6px 28px rgba(37,211,102,.6),0 3px 12px rgba(0,0,0,.3);}
+    #wpp-float svg{width:34px;height:34px;fill:#fff;}
+
+    .tp-section{width:100%;display:flex;flex-direction:column;align-items:center;padding:56px 24px;gap:28px;}
+    .tp-parte-label{font-size:11px;font-weight:700;letter-spacing:.15em;}
+    .tp-parte-title{font-size:12px;font-weight:700;letter-spacing:.28em;text-transform:uppercase;}
+
+    .pdf-doc{width:100%;max-width:900px;display:flex;flex-direction:column;align-items:center;}
+    .pdf-doc canvas{width:100%;display:block;}
+    .pdf-frame{
+      width:100%;max-width:900px;
+      border:1px solid #EDE8DF;border-radius:16px;overflow:hidden;
+      box-shadow:0 8px 40px rgba(46,60,68,.06);
+    }
+    .pdf-frame-dark{border-color:rgba(255,255,255,.08);box-shadow:0 8px 40px rgba(0,0,0,.2);}
+
+    .vid-wrap{width:100%;max-width:900px;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#1a252d;}
+    .vid-wrap iframe{width:100%;height:100%;border:none;display:block;}
+    .ll-vid-thumb{width:100%;height:100%;position:relative;cursor:pointer;background:#000;}
+    .ll-vid-thumb img{width:100%;height:100%;object-fit:cover;display:block;opacity:.85;}
+    .ll-vid-thumb .yt-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+    .ll-vid-thumb .yt-play svg{width:64px;height:64px;transition:transform .18s;filter:drop-shadow(0 2px 8px rgba(0,0,0,.5));}
+    .ll-vid-thumb:hover .yt-play svg{transform:scale(1.1);}
+
+    #footer{
+      width:100%;background:#1A252D;padding:44px 24px 36px;
+      display:flex;flex-direction:column;align-items:center;gap:14px;
+    }
+    #footer-copy{font-size:10px;color:rgba(255,255,255,.2);letter-spacing:1px;}
+    #footer-test-badge{font-size:10px;color:rgba(255,255,255,.15);letter-spacing:.5px;}
+
+    #error-screen{
+      display:none;min-height:60vh;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:40px;
+    }
+    #error-screen p{font-size:15px;color:#7A8F96;text-align:center;}
+  </style>
+</head>
+<body>
+
+<div id="sticky-top">
+  <div id="header">
+    <div id="header-wordmark">
+      <span class="name">DAMATA</span>
+    </div>
+  </div>
+  <a id="btn-orc" href="https://fazendadamata.com/admin.html?orcamento" target="_blank">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+    Fazer Orçamento
+  </a>
+</div>
+
+<div id="main-content"></div>
+<div id="error-screen" style="display:none;min-height:60vh;display:none;align-items:center;justify-content:center;flex-direction:column;gap:16px;padding:40px;">
+  <div style="font-size:40px">🔒</div>
+  <p id="error-msg" style="font-size:15px;color:#7A8F96;text-align:center;">Link inválido ou expirado.</p>
+</div>
+
+<footer id="footer">
+  <div id="footer-copy">FAZENDA DAMATA · Mogi Mirim · SP</div>
+  <div id="footer-test-badge">Página de apresentação — não indexada</div>
+</footer>
+
+<a id="wpp-float" href="https://wa.me/5519993232395" target="_blank" rel="noopener" aria-label="WhatsApp">
+  <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg"><path d="M16 0C7.163 0 0 7.163 0 16c0 2.822.736 5.469 2.027 7.773L0 32l8.418-2.01A15.938 15.938 0 0 0 16 32c8.837 0 16-7.163 16-16S24.837 0 16 0zm8.07 22.43c-.334.94-1.64 1.72-2.707 1.947-.724.152-1.668.274-4.847-1.041-4.068-1.664-6.687-5.794-6.888-6.062-.194-.268-1.627-2.165-1.627-4.129s1.03-2.934 1.395-3.338c.334-.37.727-.462.97-.462.242 0 .484.002.696.013.223.011.523-.085.818.624.306.728 1.04 2.522 1.132 2.706.093.184.155.4.031.647-.124.247-.186.4-.368.616-.183.215-.384.481-.548.645-.183.183-.374.38-.16.746.214.365.95 1.565 2.04 2.534 1.4 1.249 2.58 1.634 2.946 1.817.365.183.578.153.791-.092.214-.246.916-1.07 1.16-1.436.243-.365.486-.304.818-.183.334.122 2.12 1.001 2.486 1.183.365.183.607.275.697.427.09.152.09.88-.244 1.818z"/></svg>
+</a>
+
+<script>
+const SB_URL = "https://wwnndsprpofmgbklqdgg.supabase.co";
+const SB_KEY = "sb_publishable__RQxBa8P-lryd0LtWgTJPw_-aSWERWK";
+const PDFJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+const PDFJS_WORKER = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const YT_PLAY_SVG = `<svg viewBox="0 0 68 48" xmlns="http://www.w3.org/2000/svg">
+  <rect width="68" height="48" rx="10" fill="rgba(0,0,0,.75)"/>
+  <polygon points="27,14 27,34 47,24" fill="#fff"/>
+</svg>`;
+
+const HEADERS = { "apikey": SB_KEY, "Authorization": "Bearer " + SB_KEY };
+const BG_CYCLE = ["#2E3C44", "#fff", "#F5F4F0"];
+
+function showError(msg) {
+  document.getElementById("main-content").style.display = "none";
+  const err = document.getElementById("error-screen");
+  err.style.display = "flex";
+  document.getElementById("error-msg").textContent = msg;
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src; s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+async function renderPdfNow(url, wrapper) {
+  try {
+    const pdf = await pdfjsLib.getDocument({ url, withCredentials: false }).promise;
+    const containerWidth = Math.min(wrapper.parentElement?.clientWidth || 900, 900);
+    for (let n = 1; n <= pdf.numPages; n++) {
+      const page = await pdf.getPage(n);
+      const vp = page.getViewport({ scale: 1 });
+      const scale = containerWidth / vp.width;
+      const viewport = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      canvas.style.width = "100%";
+      wrapper.appendChild(canvas);
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    }
+    wrapper.style.minHeight = "";
+  } catch(e) {
+    const p = document.createElement("p");
+    p.style.cssText = "color:#e74c3c;font-size:13px;padding:16px;text-align:center";
+    p.textContent = "Erro ao carregar PDF.";
+    wrapper.appendChild(p);
+  }
+}
+
+function renderPdf(url, frameEl, dark) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "pdf-doc";
+  wrapper.style.minHeight = "400px";
+  frameEl.appendChild(wrapper);
+  let rendered = false;
+  const obs = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting && !rendered) {
+      rendered = true; obs.disconnect();
+      renderPdfNow(url, wrapper);
+    }
+  }, { rootMargin: "200px" });
+  obs.observe(wrapper);
+}
+
+function _ytId(url) {
+  if (!url) return null;
+  const m = String(url).match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/))([\w-]{11})/);
+  if (m) return m[1];
+  const m2 = String(url).match(/[?&]v=([\w-]{11})/);
+  return m2 ? m2[1] : null;
+}
+
+function renderVideo(url, section) {
+  const id = _ytId(url);
+  if (!id) return;
+  const wrap = document.createElement("div");
+  wrap.className = "vid-wrap";
+  const thumb = document.createElement("div");
+  thumb.className = "ll-vid-thumb";
+  thumb.style.height = "100%";
+  thumb.innerHTML = `<img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="Vídeo" loading="lazy">
+    <div class="yt-play">${YT_PLAY_SVG}</div>`;
+  thumb.onclick = () => {
+    wrap.innerHTML = `<iframe src="https://www.youtube.com/embed/${id}?autoplay=1" title="Vídeo" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+  };
+  wrap.appendChild(thumb);
+  section.appendChild(wrap);
+}
+
+async function init() {
+  const slug = new URLSearchParams(location.search).get("id");
+  if (!slug) { showError("Link inválido. Solicite o link correto."); return; }
+
+  let cfgRows, pdfsRow, videosRow;
+  try {
+    const [r1, r2, r3] = await Promise.all([
+      fetch(SB_URL + "/rest/v1/app_config?chave=in.(landing_teste_slug,landing_teste_num_partes)&select=chave,valor", { headers: HEADERS }),
+      fetch(SB_URL + "/rest/v1/app_config?chave=eq.landing_pdfs&select=valor", { headers: HEADERS }),
+      fetch(SB_URL + "/rest/v1/app_config?chave=eq.videos_landing&select=valor", { headers: HEADERS })
+    ]);
+    cfgRows  = await r1.json();
+    pdfsRow  = await r2.json();
+    videosRow = await r3.json();
+  } catch(_) {
+    showError("Erro de conexão. Tente novamente."); return;
+  }
+
+  const cfg = {};
+  (cfgRows || []).forEach(r => { cfg[r.chave] = r.valor; });
+
+  if (!cfg.landing_teste_slug || cfg.landing_teste_slug !== slug) {
+    showError("Link inválido ou expirado."); return;
+  }
+
+  const numPartes = parseInt(cfg.landing_teste_num_partes) || 3;
+  const allPdfs   = Array.isArray(pdfsRow?.[0]?.valor)   ? pdfsRow[0].valor   : [];
+  const allVideos = Array.isArray(videosRow?.[0]?.valor) ? videosRow[0].valor : [];
+
+  // Group content by parte_teste
+  const byParte = {};
+  allPdfs.forEach(item => {
+    const p = typeof item === "object" && item.parte_teste ? item.parte_teste : null;
+    if (!p) return;
+    if (!byParte[p]) byParte[p] = { pdfs: [], videos: [] };
+    byParte[p].pdfs.push(typeof item === "string" ? item : item.url);
+  });
+  allVideos.forEach(item => {
+    const p = typeof item === "object" && item.parte_teste ? item.parte_teste : null;
+    if (!p) return;
+    if (!byParte[p]) byParte[p] = { pdfs: [], videos: [] };
+    byParte[p].videos.push(typeof item === "string" ? item : item.url);
+  });
+
+  const hasAny = Object.keys(byParte).length > 0;
+  if (!hasAny) {
+    showError("Nenhum conteúdo configurado para esta apresentação."); return;
+  }
+
+  // Load PDF.js in background (only if there are PDFs)
+  const hasPdfs = Object.values(byParte).some(p => p.pdfs.length > 0);
+  if (hasPdfs) {
+    loadScript(PDFJS_URL).then(() => {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
+    });
+  }
+
+  const main = document.getElementById("main-content");
+
+  for (let p = 1; p <= numPartes; p++) {
+    const data = byParte[p];
+    if (!data || (!data.pdfs.length && !data.videos.length)) continue;
+
+    const bg = BG_CYCLE[(p - 1) % BG_CYCLE.length];
+    const isDark = bg === "#2E3C44";
+
+    const section = document.createElement("div");
+    section.className = "tp-section";
+    section.style.background = bg;
+
+    const parteLbl = document.createElement("div");
+    parteLbl.className = "tp-parte-label";
+    parteLbl.style.color = isDark ? "rgba(255,255,255,.35)" : "#B8BEC2";
+    parteLbl.textContent = `PARTE ${p} DE ${numPartes}`;
+    section.appendChild(parteLbl);
+
+    // PDFs
+    if (data.pdfs.length) {
+      const frame = document.createElement("div");
+      frame.className = "pdf-frame" + (isDark ? " pdf-frame-dark" : "");
+      frame.style.cssText = "width:100%;max-width:900px";
+      data.pdfs.forEach(url => {
+        if (url) renderPdf(url, frame, isDark);
+      });
+      section.appendChild(frame);
+    }
+
+    // Videos
+    data.videos.forEach(url => renderVideo(url, section));
+
+    main.appendChild(section);
+  }
+}
+
+init();
+</script>
+</body>
+</html>
