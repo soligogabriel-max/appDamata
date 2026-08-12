@@ -950,6 +950,13 @@
             <button onclick="ltCopiarLink()" style="font-size:12px;font-weight:700;color:#E8A52A;background:none;border:none;cursor:pointer;flex-shrink:0">Copiar</button>
           </div>
 
+          <div style="font-size:13px;font-weight:700;color:var(--t);margin-bottom:12px">Configuração das partes</div>
+          <div id="lt-partes-cfg" style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px"></div>
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+            <button onclick="ltSalvarPartesCfg()" style="padding:10px 20px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">Salvar configuração das partes</button>
+            <span id="lt-partes-cfg-status" style="font-size:13px;color:var(--dl)"></span>
+          </div>
+
           <div style="font-size:13px;font-weight:700;color:var(--t);margin-bottom:12px">PDFs e vídeos cadastrados</div>
           <div id="lt-lista" style="display:flex;flex-direction:column;gap:10px"></div>
         </div>
@@ -5902,7 +5909,7 @@ let _ltSlug = "";
 async function renderLandingTeste() {
   try {
     const [cfgRes, pdfsRes, videosRes] = await Promise.all([
-      sbFetch("app_config?chave=in.(landing_teste_slug,landing_teste_num_partes)&select=chave,valor"),
+      sbFetch("app_config?chave=in.(landing_teste_slug,landing_teste_num_partes,landing_teste_partes_config)&select=chave,valor"),
       sbFetch("app_config?chave=eq.landing_pdfs&select=valor"),
       sbFetch("app_config?chave=eq.videos_landing&select=valor")
     ]);
@@ -5914,6 +5921,8 @@ async function renderLandingTeste() {
     document.getElementById("lt-link-text").textContent = _ltSlug
       ? "fazendadamata.com/teste?id=" + _ltSlug
       : "— salve para gerar o link —";
+    const partesCfg = Array.isArray(cfg.landing_teste_partes_config) ? cfg.landing_teste_partes_config : [];
+    ltRenderPartesCfg(partesCfg);
     const pdfs   = Array.isArray(pdfsRes?.[0]?.valor)   ? pdfsRes[0].valor   : [];
     const videos = Array.isArray(videosRes?.[0]?.valor) ? videosRes[0].valor : [];
     ltRenderLista(pdfs, videos);
@@ -5966,8 +5975,10 @@ function ltRenderLista(pdfs, videos) {
 }
 
 function ltAjustarPartes(delta) {
+  const atualCfg = ltLerPartesCfgAtual();
   _ltNumPartes = Math.max(1, Math.min(10, _ltNumPartes + delta));
   document.getElementById("lt-num-partes").textContent = _ltNumPartes;
+  ltRenderPartesCfg(atualCfg);
 }
 
 async function ltSalvarPartes() {
@@ -5991,6 +6002,14 @@ async function ltSalvarPartes() {
       await sbFetch("app_config?chave=eq.landing_teste_num_partes", { method:"PATCH", body:{ valor:_ltNumPartes } });
     } else {
       await sbFetch("app_config", { method:"POST", body:{ chave:"landing_teste_num_partes", valor:_ltNumPartes } });
+    }
+    // Salva partes_config ajustado ao novo num_partes
+    const partesCfg = ltLerPartesCfgAtual();
+    const ex3 = await sbFetch("app_config?chave=eq.landing_teste_partes_config&select=chave");
+    if (ex3 && ex3.length) {
+      await sbFetch("app_config?chave=eq.landing_teste_partes_config", { method:"PATCH", body:{ valor: partesCfg } });
+    } else {
+      await sbFetch("app_config", { method:"POST", body:{ chave:"landing_teste_partes_config", valor: partesCfg } });
     }
     statusEl.textContent = "Salvo!";
     setTimeout(() => { statusEl.textContent = ""; }, 2000);
@@ -6027,6 +6046,67 @@ async function ltSetParte(tipo, idx, parte) {
     console.error("ltSetParte:", e);
   }
 }
+
+function ltRenderPartesCfg(cfg) {
+  const el = document.getElementById("lt-partes-cfg");
+  if (!el) return;
+  if (!_ltNumPartes) { el.innerHTML = ""; return; }
+  let rows = "";
+  for (let i = 0; i < _ltNumPartes; i++) {
+    const p = (cfg && cfg[i]) ? cfg[i] : {};
+    const titulo = (p.titulo || "").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+    const descricao = (p.descricao || "").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    const mostrar = p.mostrar_numero ? "checked" : "";
+    rows += `<div style="background:var(--bg);border:1px solid var(--br);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:12px;font-weight:700;color:#E8A52A;letter-spacing:.05em">Parte ${i+1}</div>
+      <div>
+        <label style="font-size:11px;color:var(--dl);font-weight:600;display:block;margin-bottom:4px">Título</label>
+        <input id="lt-p${i}-titulo" type="text" value="${titulo}" placeholder="Ex: Cerimônia" style="width:100%;padding:8px 12px;border:1.5px solid var(--br);border-radius:8px;font-size:13px;color:var(--t);background:var(--bg)">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--dl);font-weight:600;display:block;margin-bottom:4px">Descrição</label>
+        <textarea id="lt-p${i}-desc" rows="2" placeholder="Descrição opcional desta parte…" style="width:100%;padding:8px 12px;border:1.5px solid var(--br);border-radius:8px;font-size:13px;color:var(--t);background:var(--bg);resize:vertical;font-family:inherit">${descricao}</textarea>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dl);cursor:pointer">
+        <input type="checkbox" id="lt-p${i}-num" ${mostrar} style="width:16px;height:16px;accent-color:var(--a);cursor:pointer">
+        Mostrar "Parte ${i+1} de ${_ltNumPartes}" na landing
+      </label>
+    </div>`;
+  }
+  el.innerHTML = rows;
+}
+
+function ltLerPartesCfgAtual() {
+  const arr = [];
+  for (let i = 0; i < _ltNumPartes; i++) {
+    arr.push({
+      titulo: document.getElementById("lt-p" + i + "-titulo")?.value || "",
+      descricao: document.getElementById("lt-p" + i + "-desc")?.value || "",
+      mostrar_numero: document.getElementById("lt-p" + i + "-num")?.checked || false
+    });
+  }
+  return arr;
+}
+
+async function ltSalvarPartesCfg() {
+  const statusEl = document.getElementById("lt-partes-cfg-status");
+  statusEl.textContent = "Salvando…";
+  try {
+    const partesCfg = ltLerPartesCfgAtual();
+    const ex = await sbFetch("app_config?chave=eq.landing_teste_partes_config&select=chave");
+    if (ex && ex.length) {
+      await sbFetch("app_config?chave=eq.landing_teste_partes_config", { method:"PATCH", body:{ valor: partesCfg } });
+    } else {
+      await sbFetch("app_config", { method:"POST", body:{ chave:"landing_teste_partes_config", valor: partesCfg } });
+    }
+    statusEl.textContent = "Salvo!";
+    setTimeout(() => { statusEl.textContent = ""; }, 2000);
+  } catch(e) {
+    statusEl.textContent = "Erro ao salvar.";
+    console.error(e);
+  }
+}
+
 // ── FIM LANDING DE TESTE ─────────────────────────────────────────────────────
 
 </script>

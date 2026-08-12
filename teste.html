@@ -203,7 +203,7 @@ async function init() {
   let cfgRows, pdfsRow, videosRow;
   try {
     const [r1, r2, r3] = await Promise.all([
-      fetch(SB_URL + "/rest/v1/app_config?chave=in.(landing_teste_slug,landing_teste_num_partes)&select=chave,valor", { headers: HEADERS }),
+      fetch(SB_URL + "/rest/v1/app_config?chave=in.(landing_teste_slug,landing_teste_num_partes,landing_teste_partes_config)&select=chave,valor", { headers: HEADERS }),
       fetch(SB_URL + "/rest/v1/app_config?chave=eq.landing_pdfs&select=valor", { headers: HEADERS }),
       fetch(SB_URL + "/rest/v1/app_config?chave=eq.videos_landing&select=valor", { headers: HEADERS })
     ]);
@@ -222,6 +222,7 @@ async function init() {
   }
 
   const numPartes = parseInt(cfg.landing_teste_num_partes) || 3;
+  const partesCfg = Array.isArray(cfg.landing_teste_partes_config) ? cfg.landing_teste_partes_config : [];
   const allPdfs   = Array.isArray(pdfsRow?.[0]?.valor)   ? pdfsRow[0].valor   : [];
   const allVideos = Array.isArray(videosRow?.[0]?.valor) ? videosRow[0].valor : [];
 
@@ -268,11 +269,30 @@ async function init() {
     section.className = "tp-section";
     section.style.background = bg;
 
-    const parteLbl = document.createElement("div");
-    parteLbl.className = "tp-parte-label";
-    parteLbl.style.color = isDark ? "rgba(255,255,255,.35)" : "#B8BEC2";
-    parteLbl.textContent = `PARTE ${p} DE ${numPartes}`;
-    section.appendChild(parteLbl);
+    const pcfg = partesCfg[p - 1] || {};
+
+    if (pcfg.mostrar_numero) {
+      const parteLbl = document.createElement("div");
+      parteLbl.className = "tp-parte-label";
+      parteLbl.style.color = isDark ? "rgba(255,255,255,.35)" : "#B8BEC2";
+      parteLbl.textContent = `PARTE ${p} DE ${numPartes}`;
+      section.appendChild(parteLbl);
+    }
+
+    if (pcfg.titulo) {
+      const tituloEl = document.createElement("div");
+      tituloEl.className = "tp-parte-title";
+      tituloEl.style.color = isDark ? "#F5D68A" : "#E8A52A";
+      tituloEl.textContent = pcfg.titulo;
+      section.appendChild(tituloEl);
+    }
+
+    if (pcfg.descricao) {
+      const descEl = document.createElement("div");
+      descEl.style.cssText = "font-size:14px;color:" + (isDark ? "rgba(255,255,255,.55)" : "#7A8F96") + ";text-align:center;max-width:600px;line-height:1.6";
+      descEl.textContent = pcfg.descricao;
+      section.appendChild(descEl);
+    }
 
     // PDFs
     if (data.pdfs.length) {
