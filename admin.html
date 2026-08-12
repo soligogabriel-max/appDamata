@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.12c</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.12d</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -2291,7 +2291,7 @@ async function flUploadFoto(){
     fd.append("folder","fotos");
     const res=await fetch(SB_URL+"/functions/v1/upload-landing-pdf",{
       method:"POST",
-      headers:{"Authorization":"Bearer "+_authToken},
+      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken},
       body:fd
     });
     const data=await res.json();
@@ -2403,7 +2403,7 @@ async function flpUpload(){
     try {
       res=await fetch(SB_URL+"/functions/v1/upload-landing-pdf",{
         method:"POST",
-        headers:{"Authorization":"Bearer "+_authToken},
+        headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken},
         body:fd
       });
     } catch(fetchErr) {
@@ -6174,7 +6174,7 @@ async function ltCarrosselUpload(idx) {
     fd.append("folder", "fotos-teste");
     const res = await fetch(SB_URL + "/functions/v1/upload-landing-pdf", {
       method: "POST",
-      headers: { "Authorization": "Bearer " + _authToken },
+      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + _authToken },
       body: fd
     });
     const data = await res.json();
