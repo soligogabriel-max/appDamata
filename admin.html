@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.12b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.12c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -2398,11 +2398,20 @@ async function flpUpload(){
     const fd=new FormData();
     fd.append("file",file);
     if(file.type.startsWith("image/")) fd.append("folder","fotos");
-    const res=await fetch(SB_URL+"/functions/v1/upload-landing-pdf",{
-      method:"POST",
-      headers:{"Authorization":"Bearer "+_authToken},
-      body:fd
-    });
+    st.textContent="⏳ Enviando arquivo…";
+    let res;
+    try {
+      res=await fetch(SB_URL+"/functions/v1/upload-landing-pdf",{
+        method:"POST",
+        headers:{"Authorization":"Bearer "+_authToken},
+        body:fd
+      });
+    } catch(fetchErr) {
+      st.textContent="❌ Fetch falhou: "+fetchErr.name+": "+fetchErr.message+" | token="+((_authToken||"").slice(0,12))+" | url="+SB_URL;
+      inp.value="";
+      return;
+    }
+    st.textContent="⏳ Processando resposta (HTTP "+res.status+")…";
     const data=await res.json();
     if(!data.ok) throw new Error(data.detail||data.error||"Erro desconhecido");
     _flpList.push({url:data.url,name:data.name||file.name});
