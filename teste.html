@@ -244,12 +244,14 @@ async function init() {
     showError("Nenhum conteúdo configurado para esta apresentação."); return;
   }
 
-  // Load PDF.js in background (only if there are PDFs)
+  // Carrega PDF.js ANTES de montar as seções — evita race condition
+  // nos primeiros PDFs que estão no viewport imediatamente
   const hasPdfs = Object.values(byParte).some(p => p.pdfs.length > 0);
   if (hasPdfs) {
-    loadScript(PDFJS_URL).then(() => {
+    try {
+      await loadScript(PDFJS_URL);
       pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
-    });
+    } catch(_) {}
   }
 
   const main = document.getElementById("main-content");
