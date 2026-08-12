@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.12a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.12b</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -913,12 +913,12 @@
         </div>
         <div style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px">
           <div class="sec-t">📄 PDFs de Informações (Landing Page)</div>
-          <p style="color:var(--dl);font-size:13px;margin-bottom:16px">Faça upload dos PDFs exibidos como pano contínuo na landing page. A ordem aqui define a ordem de exibição.</p>
+          <p style="color:var(--dl);font-size:13px;margin-bottom:16px">Faça upload dos PDFs ou imagens exibidos na landing page. A ordem aqui define a ordem de exibição.</p>
           <div id="flp-lista" style="margin-bottom:12px"></div>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <label style="display:inline-flex;align-items:center;gap:8px;padding:9px 18px;background:var(--a);color:#fff;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px">
-              <input type="file" id="flp-file-input" accept="application/pdf" style="display:none" onchange="flpUpload()">
-              + Upload PDF
+              <input type="file" id="flp-file-input" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif,image/avif" style="display:none" onchange="flpUpload()">
+              + Upload PDF / Imagem
             </label>
             <span id="flp-upload-status" style="font-size:13px;color:var(--dl)"></span>
           </div>
@@ -2355,18 +2355,24 @@ async function _flpSave(){
     await sbFetch("app_config",{method:"POST",body:{chave:"landing_pdfs",valor:_flpList}});
   }
 }
+function _flpIsImg(url){return /\.(jpg|jpeg|png|webp|gif|avif)(\?|$)/i.test(url||'');}
 function _flpRender(){
   const c=document.getElementById("flp-lista");
   if(!c) return;
-  if(!_flpList.length){c.innerHTML='<p style="color:var(--dl);font-size:13px">Nenhum PDF cadastrado.</p>';return;}
-  c.innerHTML=_flpList.map((p,i)=>`
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:8px 10px;background:#faf9f6;border:1px solid var(--br);border-radius:8px">
-      <span style="font-size:18px">📄</span>
-      <span style="flex:1;font-size:13px;color:var(--dm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(p.url||'').replace(/"/g,'&quot;')}">${p.name||p.url}</span>
+  if(!_flpList.length){c.innerHTML='<p style="color:var(--dl);font-size:13px">Nenhum arquivo cadastrado.</p>';return;}
+  c.innerHTML=_flpList.map((p,i)=>{
+    const url=(p.url||'').replace(/"/g,'&quot;');
+    const thumb=_flpIsImg(p.url)
+      ?`<img src="${url}" style="width:40px;height:32px;object-fit:cover;border-radius:5px;flex-shrink:0;background:#eee">`
+      :`<span style="font-size:18px;flex-shrink:0">📄</span>`;
+    return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:8px 10px;background:#faf9f6;border:1px solid var(--br);border-radius:8px">
+      ${thumb}
+      <span style="flex:1;font-size:13px;color:var(--dm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${url}">${p.name||p.url}</span>
       <button onclick="flpMove(${i},-1)" ${i===0?"disabled":""} style="padding:3px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff">↑</button>
       <button onclick="flpMove(${i},1)" ${i===_flpList.length-1?"disabled":""} style="padding:3px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff">↓</button>
       <button onclick="flpRemove(${i})" style="padding:3px 8px;border:1px solid var(--br);border-radius:6px;cursor:pointer;background:#fff;color:#e74c3c">✕</button>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 async function flpRemove(i){
   _flpList.splice(i,1);
@@ -2391,6 +2397,7 @@ async function flpUpload(){
   try{
     const fd=new FormData();
     fd.append("file",file);
+    if(file.type.startsWith("image/")) fd.append("folder","fotos");
     const res=await fetch(SB_URL+"/functions/v1/upload-landing-pdf",{
       method:"POST",
       headers:{"Authorization":"Bearer "+_authToken},
