@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.12d</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.12e</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -2286,15 +2286,7 @@ async function flUploadFoto(){
   const st=document.getElementById("fl-status");
   st.textContent="⏳ Enviando…";
   try{
-    const fd=new FormData();
-    fd.append("file",file);
-    fd.append("folder","fotos");
-    const res=await fetch(SB_URL+"/functions/v1/upload-landing-pdf",{
-      method:"POST",
-      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken},
-      body:fd
-    });
-    const data=await res.json();
+    const data=await _uploadToLanding(file,"fotos");
     if(!data.ok) throw new Error(data.detail||data.error||"Erro desconhecido");
     _flUrls.push({url:data.url,name:file.name});
     await _flSaveUrls();
@@ -2388,6 +2380,25 @@ async function flpMove(i,dir){
   _flpRender();
   await _flpSave();
 }
+async function _fileToB64(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=e=>res(e.target.result.split(",")[1]);
+    r.onerror=rej;
+    r.readAsDataURL(file);
+  });
+}
+
+async function _uploadToLanding(file, folder){
+  const b64 = await _fileToB64(file);
+  const res = await fetch(SB_URL+"/functions/v1/upload-landing-pdf",{
+    method:"POST",
+    headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken,"Content-Type":"application/json"},
+    body:JSON.stringify({file_b64:b64, name:file.name, type:file.type||"application/pdf", folder:folder||""})
+  });
+  return res.json();
+}
+
 async function flpUpload(){
   const inp=document.getElementById("flp-file-input");
   const file=inp&&inp.files&&inp.files[0];
@@ -2395,24 +2406,9 @@ async function flpUpload(){
   const st=document.getElementById("flp-upload-status");
   st.textContent="⏳ Enviando…";
   try{
-    const fd=new FormData();
-    fd.append("file",file);
-    if(file.type.startsWith("image/")) fd.append("folder","fotos");
-    st.textContent="⏳ Enviando arquivo…";
-    let res;
-    try {
-      res=await fetch(SB_URL+"/functions/v1/upload-landing-pdf",{
-        method:"POST",
-        headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken},
-        body:fd
-      });
-    } catch(fetchErr) {
-      st.textContent="❌ Fetch falhou: "+fetchErr.name+": "+fetchErr.message+" | token="+((_authToken||"").slice(0,12))+" | url="+SB_URL;
-      inp.value="";
-      return;
-    }
-    st.textContent="⏳ Processando resposta (HTTP "+res.status+")…";
-    const data=await res.json();
+    st.textContent="⏳ Enviando…";
+    const folder=file.type.startsWith("image/")?"fotos":"";
+    const data=await _uploadToLanding(file, folder);
     if(!data.ok) throw new Error(data.detail||data.error||"Erro desconhecido");
     _flpList.push({url:data.url,name:data.name||file.name});
     await _flpSave();
@@ -6169,15 +6165,7 @@ async function ltCarrosselUpload(idx) {
   const st = document.getElementById("lt-c" + idx + "-status");
   st.textContent = "⏳ Enviando…";
   try {
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("folder", "fotos-teste");
-    const res = await fetch(SB_URL + "/functions/v1/upload-landing-pdf", {
-      method: "POST",
-      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + _authToken },
-      body: fd
-    });
-    const data = await res.json();
+    const data = await _uploadToLanding(file, "fotos-teste");
     if (!data.ok) throw new Error(data.detail || data.error || "Erro no upload");
     if (!_ltCarrosseis[idx]) _ltCarrosseis[idx] = [];
     _ltCarrosseis[idx].push({ url: data.url, name: file.name });
