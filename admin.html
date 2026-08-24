@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.24a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.24b</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -2853,6 +2853,75 @@ function renderPmts(){
   });
 }
 
+// Reflete o parcelamento do contrato (payments_json) em contas_a_receber.
+//
+// Antes disto so o gerador sincronizava: editar as parcelas pelo modal "Editar
+// Evento" gravava payments_json na agenda e o financeiro ficava com o
+// parcelamento antigo. O 202632 acabou com 17 parcelas no contrato e uma unica
+// linha a receber, sem valor; o 202608, com 3 parcelas e nenhuma linha.
+//
+// Reconcilia pelo numero da parcela em vez de apagar tudo e reinserir: parcela
+// ja recebida (status != "NP") nao e mais contrato, e caixa — sobrescrever o
+// valor ou duplicar a linha quebraria o extrato. Dessas, so o num_parcela
+// acompanha o novo total, para o "3/17" da tela nao mentir.
+async function sincronizarParcelasReceber(cod, payments) {
+  const lista = Array.isArray(payments) ? payments : [];
+  // Lista vazia nao e "apague o parcelamento": todo evento sem contrato salva
+  // assim, e apagar levaria junto lancamentos feitos na mao no financeiro.
+  if(!cod || !lista.length) return null;
+
+  const existentes = await dbGet("contas_a_receber",
+    "cod_evento=eq."+encodeURIComponent(cod)+"&select=id,parcela,status&order=id.asc");
+  const porParcela = new Map();
+  existentes.forEach(r => {
+    const n = parseInt(r.parcela, 10);
+    if(!isNaN(n) && !porParcela.has(n)) porParcela.set(n, r);
+  });
+
+  const total = String(lista.length);
+  const novas = [], patches = [];
+  let recebidas = 0;
+
+  lista.forEach((p, i) => {
+    const linha = {
+      cod_evento: cod,
+      parcela: String(i+1),
+      num_parcela: total,
+      valor: (p.value === "" || p.value == null) ? null : parseFloat(p.value),
+      vencimento: p.date || null,
+      mes_ano: p.date ? p.date.slice(0,7).replace("-","") : null,
+      obs: p.desc || null,
+    };
+    const atual = porParcela.get(i+1);
+    if(!atual) { novas.push({...linha, status:"NP"}); return; }
+    if(atual.status !== "NP") { recebidas++; patches.push({id: atual.id, body:{num_parcela: total}}); return; }
+    patches.push({id: atual.id, body: linha});
+  });
+
+  // Sobra do parcelamento anterior (parcelamento encurtou, ou linha com
+  // parcela nao numerica). So o que esta em aberto sai.
+  const sobra = existentes.filter(r => {
+    const n = parseInt(r.parcela, 10);
+    return r.status === "NP" && (isNaN(n) || n > lista.length);
+  });
+
+  await Promise.all(patches.map(u =>
+    sbFetch("contas_a_receber?id=eq."+u.id, {method:"PATCH", body:u.body, prefer:"return=minimal"})));
+
+  let inseridas = [];
+  if(novas.length) {
+    const res = await sbFetch("contas_a_receber", {method:"POST", body:novas, prefer:"return=representation"});
+    inseridas = (Array.isArray(res) ? res : []).map(r => r.id).filter(id => id != null);
+  }
+  if(sobra.length) {
+    await sbFetch("contas_a_receber?id=in.("+sobra.map(r=>r.id).join(",")+")",
+      {method:"PATCH", body:{deleted_at: new Date().toISOString()}, prefer:"return=minimal"});
+  }
+
+  return { total: lista.length, criadas: novas.length, atualizadas: patches.length - recebidas,
+           removidas: sobra.length, recebidas, inseridasIds: inseridas };
+}
+
 async function saveEvent(){
   const d1=document.getElementById("mef-d1").value;
   const d2=document.getElementById("mef-d2").value;
@@ -2913,11 +2982,26 @@ async function saveEvent(){
       const existing = await dbGet("agenda","cod=eq."+existCod+"&select=google_cal_id");
       googleCalId = existing[0]?.google_cal_id || null;
       await dbUpdate("agenda","cod=eq."+existCod, evData);
-      toast("✅ Evento atualizado — "+code);
     } else {
       await dbInsert("agenda", evData);
-      toast("✅ Evento criado — "+code);
     }
+    // O parcelamento salvo aqui e o mesmo do contrato: precisa chegar ao
+    // financeiro. Sem isto, mudar as parcelas de um evento ja gerado deixava
+    // contas_a_receber preso no parcelamento antigo.
+    //
+    // O evento ja esta gravado neste ponto, entao falha aqui nao derruba o
+    // salvamento — mas aparece na tela. Foi justamente a sincronia silenciosa
+    // que deixou contrato e financeiro divergirem sem ninguem notar.
+    let sync = null, syncErr = null;
+    try { sync = await sincronizarParcelasReceber(code, pmts); }
+    catch(err) { syncErr = err; console.error("[parcelas]", err); }
+    let msg = (existCod ? "✅ Evento atualizado — " : "✅ Evento criado — ") + code;
+    if(syncErr) msg += " · ⚠️ parcelas NÃO foram para o Contas a Receber: " + syncErr.message;
+    else if(sync) {
+      msg += ` · ${sync.total} parcela(s) no Contas a Receber`;
+      if(sync.recebidas) msg += ` (${sync.recebidas} já recebida(s), mantida(s))`;
+    }
+    toast(msg);
     closeMEF(); renderCal(null);
     // Salva celular na ficha_do_evento em background (upsert)
     const celular = document.getElementById("mef-celular").value.trim();
@@ -4947,7 +5031,7 @@ async function toggleInvOrcamento(cod, val, el){
 async function salvarContrato(preset) {
   // preset vem do gerador via postMessage
   let cod, nomeEvento;
-  let _parcelasInseridas = false, _pedidoCriadoId = null, _despesaCriada = false;
+  let _parcelasInseridas = [], _pedidoCriadoId = null, _despesaCriada = false;
   try {
     const d1 = preset.date1;
     const d2 = preset.date2;
@@ -5044,26 +5128,9 @@ async function salvarContrato(preset) {
       }
     }
 
-    // 4. Parcelas em contas_a_receber
-    const _parcelasBody = preset.payments && preset.payments.length ? preset.payments.map((p,i)=>({
-      cod_evento: cod,
-      parcela: String(i+1),
-      num_parcela: String(preset.payments.length),
-      valor: p.value ? parseFloat(p.value) : null,
-      vencimento: p.date||null,
-      mes_ano: p.date ? p.date.slice(0,7).replace("-","") : null,
-      status: "NP",
-      obs: p.desc||null,
-    })) : [];
-    if(isEdit && _parcelasBody.length) {
-      // Edição: soft-delete parcelas NP antigas e insere novas
-      await sbFetch(`contas_a_receber?cod_evento=eq.${encodeURIComponent(cod)}&status=eq.NP`, {method:"PATCH", body:{deleted_at: new Date().toISOString()}, prefer:"return=minimal"});
-      await sbFetch("contas_a_receber", {method:"POST", body: _parcelasBody, prefer:"return=minimal"});
-      _parcelasInseridas = true;
-    } else if(!isEdit && _parcelasBody.length) {
-      await sbFetch("contas_a_receber", {method:"POST", body: _parcelasBody, prefer:"return=minimal"});
-      _parcelasInseridas = true;
-    }
+    // 4. Parcelas em contas_a_receber — mesma sincronizacao do modal de evento
+    const _sync = await sincronizarParcelasReceber(cod, preset.payments);
+    if(_sync) _parcelasInseridas = _sync.inseridasIds;
 
     // 5. Pedido de locação
     const _itensBody = preset.itens && preset.itens.length ? preset.itens.map(it=>({
@@ -5142,7 +5209,9 @@ async function salvarContrato(preset) {
         await sbFetch(`itens_pedido?pedido_id=eq.${_pedidoCriadoId}`, {method:"DELETE"});
         await sbFetch(`pedidos?id=eq.${_pedidoCriadoId}`, {method:"DELETE"});
       }
-      if(_parcelasInseridas && cod) await sbFetch(`contas_a_receber?cod_evento=eq.${encodeURIComponent(cod)}`, {method:"DELETE"});
+      // Só as linhas que esta chamada inseriu. Apagar por cod_evento levava
+      // junto parcelas já recebidas e lançamentos feitos na mão no financeiro.
+      if(_parcelasInseridas.length) await sbFetch(`contas_a_receber?id=in.(${_parcelasInseridas.join(",")})`, {method:"DELETE"});
     } catch(_) {}
     alert("❌ Erro ao salvar contrato:\n" + e.message);
   }
