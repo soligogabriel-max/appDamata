@@ -115,9 +115,15 @@ function editarOrcamento(id){
     _pacotes:[],_invItems:[],valor_total:row.valor_total||0,
     _selectedItems:(row.itens||[]).map(i=>({cod_item:i.cod,descricao:i.descricao,qty:i.qty||1,valor_unitario:i.valor_unitario||0,subtotal:i.subtotal||0})),
     _subtotal:row.valor_total||0,_discount:0,_discountPkg:null,
-    _saved:true,_activePkg:null,_uSel:{},_dbId:row.id,_stage:row.status||"lead"
+    _saved:true,_activePkg:null,_activePkgs:[],_uSel:{},_priceOv:{},_freeItems:[],_freeSeq:0,
+    _discountAuto:0,_discountPkgAuto:null,_discountManual:null,_dbId:row.id,_stage:row.status||"lead"
   };
-  (row.itens||[]).forEach(i=>{if(i.cod)_orc._uSel[i.cod]={qty:i.qty||1,vun:i.valor_unitario||0};});
+  // Item sem cod veio de uma linha livre: volta como linha livre, senão sumiria na reedição
+  (row.itens||[]).forEach(i=>{
+    if(i.cod){_orc._uSel[i.cod]={qty:i.qty||1,vun:i.valor_unitario||0};return;}
+    _orc._freeSeq++;
+    _orc._freeItems.push({id:"__free"+_orc._freeSeq,descricao:i.descricao||"",valor_unitario:i.valor_unitario||0,qty:i.qty||1});
+  });
   _orc._admin=effIsAdmin();
   _orc._valorAjustado=true;
   showSc("orcamento");
@@ -300,7 +306,89 @@ function _orcGroupSync(changedId, checked){
   });
 }
 
-let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_saved:false,_activePkg:null,_uSel:{},_dbId:null,_stage:"lead"};
+/* ── Modo demonstração (admin) ───────────────────────────────────────────────
+   O wizard aberto de dentro do app (abrirOrcamentoAdmin/editarOrcamento) serve
+   o admin demonstrando para o cliente: ali a seleção deixa de ser tutelada
+   (grupo físico, pacote exclusivo e capacidade viram escolha/aviso) e preço,
+   desconto e total podem ser negociados na hora. Nada disso vale no fluxo
+   público — a chave é sempre _orc._admin, que só liga em effIsAdmin(). */
+function _orcAdmin(){ return !!_orc._admin; }
+function _orcAdminBanner(){
+  if(!_orcAdmin()) return '';
+  return `<div style="background:#FFF7E6;border:1.5px solid #F0C674;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#8A5A00;font-weight:600;">🎬 Modo demonstração (admin) — seleção item a item, preços e desconto editáveis</div>`;
+}
+// Mensagem do passo 2: erro (bloqueia o público) ou aviso âmbar (admin segue)
+function _orcErr2(msg,warn){
+  const e=document.getElementById("orc-err2");
+  if(!e) return;
+  if(!msg){e.style.display="none";e.textContent="";return;}
+  e.style.display="block";
+  e.style.color=warn?"#B45309":"";
+  e.textContent=(warn?"⚠ ":"")+msg;
+}
+function _orcEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// Texto digitado pelo admin vai para o resumo, o PDF e o banco sem escape —
+// tira o que viraria marcação na hora da captura.
+function _orcCleanTxt(s){return String(s==null?'':s).replace(/<[^>]*>/g,'').replace(/[<>]/g,'').replace(/\s+/g,' ').trim();}
+
+// Valor unitário em vigor: sobrescrita do admin > valor já gravado no orçamento > tabela de preço
+function _orcVun(cod){
+  if(_orc._priceOv&&_orc._priceOv[cod]!=null) return _orc._priceOv[cod];
+  const sel=(_orc._uSel||{})[cod];
+  if(sel&&sel.vun!=null&&sel.vun!=='') return parseFloat(sel.vun)||0;
+  const u=(_orc._uByCod||{})[cod];
+  return u?(u.vun||0):0;
+}
+function _orcSetVun(cod){
+  const el=document.getElementById("orc-vun-"+cod);
+  if(!el) return;
+  if(!_orc._priceOv) _orc._priceOv={};
+  const v=parseFloat(el.value);
+  if(isNaN(v)||v<0){delete _orc._priceOv[cod];return;}
+  _orc._priceOv[cod]=v;
+}
+
+/* Item livre (admin): linha fora da tabela de preço, para montar na hora algo
+   que ainda não está cadastrado. Vive só no DOM até o passo 2 fechar. */
+function _orcFreeRowHTML(f){
+  return `<div id="orc-free-row-${f.id}" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--br);">
+    <input type="checkbox" id="orc-ck-${f.id}" data-cod="${f.id}" data-free="1" checked style="width:16px;height:16px;accent-color:var(--a);flex-shrink:0">
+    <input type="text" id="orc-fd-${f.id}" value="${_orcEsc(f.descricao||'')}" placeholder="Descrição do item" style="flex:1;min-width:0;padding:6px 8px;border:1px solid var(--br);border-radius:6px;font-size:12px;">
+    <input type="number" id="orc-vun-${f.id}" value="${f.valor_unitario||0}" step="0.01" min="0" title="Valor unitário" style="width:92px;padding:6px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:right;">
+    <input type="number" id="orc-qt-${f.id}" value="${f.qty||1}" min="1" title="Quantidade" style="width:44px;padding:6px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:center;">
+    <button type="button" onclick="_orcRemoveFree('${f.id}')" title="Remover" style="border:none;background:transparent;color:#e74c3c;font-size:18px;cursor:pointer;line-height:1;padding:0 4px;">×</button>
+  </div>`;
+}
+function _orcAddFree(){
+  if(!_orcAdmin()) return;
+  _orc._freeSeq=(_orc._freeSeq||0)+1;
+  const f={id:"__free"+_orc._freeSeq,descricao:"",valor_unitario:0,qty:1};
+  const list=document.getElementById("orc-free-list");
+  if(!list) return;
+  list.insertAdjacentHTML("beforeend",_orcFreeRowHTML(f));
+  const el=document.getElementById("orc-fd-"+f.id); if(el) el.focus();
+}
+function _orcRemoveFree(id){
+  const row=document.getElementById("orc-free-row-"+id);
+  if(row) row.remove();
+  _orc._freeItems=(_orc._freeItems||[]).filter(f=>f.id!==id);
+}
+
+/* Linha de desconto do resumo e do PDF. Com o total ajustado na mão, o que o
+   cliente vê é a diferença real até o subtotal — antes o PDF continuava
+   imprimindo o desconto do pacote, que não fechava com o total impresso. */
+function _orcDiscLine(){
+  const sub=_orc._subtotal||0, tot=_orc.valor_total||0;
+  if(_orc._valorAjustado){
+    const d=sub-tot;
+    if(Math.abs(d)<0.005) return null;
+    return {label:d>0?"Desconto":"Acréscimo",valor:Math.abs(d),sinal:d>0?"−":"+",neg:d<0};
+  }
+  if(!(_orc._discount>0)) return null;
+  return {label:"Desconto"+(_orc._discountPkg?" — "+_orc._discountPkg:""),valor:_orc._discount,sinal:"−",neg:false};
+}
+
+let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_discountAuto:0,_discountPkgAuto:null,_discountManual:null,_saved:false,_activePkg:null,_activePkgs:[],_uSel:{},_priceOv:{},_freeItems:[],_freeSeq:0,_dbId:null,_stage:"lead"};
 
 function abrirVisitaDirecta(){
   // Abre o modal de orçamento já no step 4 (agendamento de visita) sem exigir dados
@@ -315,7 +403,7 @@ function abrirVisitaDirecta(){
 }
 
 function abrirOrcamento(){
-  _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_saved:false,_activePkg:null,_uSel:{},_dbId:null,_stage:"lead"};
+  _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_discountAuto:0,_discountPkgAuto:null,_discountManual:null,_saved:false,_activePkg:null,_activePkgs:[],_uSel:{},_priceOv:{},_freeItems:[],_freeSeq:0,_dbId:null,_stage:"lead"};
   _orc._admin=false;
   showSc("orcamento");
   _orcStep();
@@ -327,17 +415,51 @@ function abrirOrcamentoAdmin(){
 }
 // Botão voltar do wizard: admin retorna ao app; público vai ao login
 function _orcVoltar(){ showSc(_orc._admin?"app":"login"); }
-// Admin: alterar valor total no resumo
-function _orcToggleEdit(){
-  const box=document.getElementById("orc-edit-box");
-  if(box) box.style.display = box.style.display==="none" ? "block" : "none";
+/* Admin: negociar na hora — desconto e total do resumo.
+   _discountManual guarda a decisão (inclusive "0" = sem desconto) e sobrevive
+   a uma volta ao passo 2; _valorAjustado marca o total escrito na mão. */
+function _orcRerenderResumo(){
+  const b=document.getElementById("orc-wizard-body");
+  if(b) b.innerHTML=_orcHTML4();
+}
+function _orcRecalcTotal(){
+  _orc.pacote_valor=(_orc._subtotal||0)-(_orc._discount||0);
+  _orc.valor_total=_orc.pacote_valor;
+}
+function _orcAplicarDesconto(){
+  const v=parseFloat(document.getElementById("orc-edit-desc")?.value);
+  if(isNaN(v)||v<0) return;
+  _orc._discountManual=v;
+  _orc._discount=v;
+  _orc._discountPkg=null;
+  _orc._valorAjustado=false;
+  _orcRecalcTotal();
+  _orcRerenderResumo();
+}
+function _orcRemoverDesconto(){
+  const el=document.getElementById("orc-edit-desc");
+  if(el) el.value="0";
+  _orcAplicarDesconto();
+}
+function _orcDescontoAuto(){
+  _orc._discountManual=null;
+  _orc._discount=_orc._discountAuto||0;
+  _orc._discountPkg=_orc._discountPkgAuto||null;
+  _orc._valorAjustado=false;
+  _orcRecalcTotal();
+  _orcRerenderResumo();
 }
 function _orcAplicarValor(){
-  const v=parseFloat(document.getElementById("orc-edit-total").value);
+  const v=parseFloat(document.getElementById("orc-edit-total")?.value);
   if(isNaN(v)||v<0) return;
   _orc.valor_total=v;
   _orc._valorAjustado=true;
-  document.getElementById("orc-wizard-body").innerHTML=_orcHTML4();
+  _orcRerenderResumo();
+}
+function _orcResetValor(){
+  _orc._valorAjustado=false;
+  _orc.valor_total=_orc.pacote_valor;
+  _orcRerenderResumo();
 }
 
 function _orcStep(){
@@ -536,7 +658,7 @@ async function _orcCarregarExistente(id){
 function _orcHTML1(){
   const curTipo=_orc.tipo_evento||ORC_TIPOS[0];
   const tipos=ORC_TIPOS.map(t=>`<option value="${t}" ${curTipo===t?"selected":""}>${t}</option>`).join("");
-  return `<div class="orc-card" style="background:#f0f7f0;border:1.5px solid #c8e6c9;margin-bottom:12px;">
+  return `${_orcAdminBanner()}<div class="orc-card" style="background:#f0f7f0;border:1.5px solid #c8e6c9;margin-bottom:12px;">
     <div style="font-size:14px;font-weight:700;color:#2A6644;margin-bottom:8px;">🔍 Já fez um orçamento conosco?</div>
     <div style="font-size:13px;color:#555;margin-bottom:12px;">Coloque seu WhatsApp cadastrado e veja seus orçamentos.</div>
     <div style="display:flex;gap:8px;align-items:flex-start;">
@@ -668,10 +790,10 @@ function _orcBuildUnified(){
 
 function _orcHTML2(){
   _orcBuildUnified();
-  if(!_orc._uItems.length) return `<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Nenhum item habilitado para orçamento. É preciso marcar o item em Inventário → "Exibir no Orçamento" <b>e</b> cadastrar o valor dele em Tabelas de Preço.</div></div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button></div>`;
+  if(!_orc._uItems.length&&!_orcAdmin()) return `<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--dl)">Nenhum item habilitado para orçamento. É preciso marcar o item em Inventário → "Exibir no Orçamento" <b>e</b> cadastrar o valor dele em Tabelas de Preço.</div></div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button></div>`;
   // Package shortcut buttons
   const pkgBtns=_orc._uPkgs.map(pk=>{
-    const active=_orc._activePkg===pk.id;
+    const active=_orcAdmin()?(_orc._activePkgs||[]).some(x=>String(x)===String(pk.id)):_orc._activePkg===pk.id;
     const descTxt=pk.desconto>0?` · -R$${pk.desconto.toLocaleString("pt-BR",{minimumFractionDigits:2})}`:'';
     return `<button type="button" id="orc-pkgbtn-${pk.id}" onclick="_orcTogglePkg(${pk.id})" style="text-align:left;padding:10px 14px;border-radius:10px;border:2px solid ${active?'var(--a)':'var(--br)'};background:${active?'var(--a)':'#fff'};color:${active?'#fff':'var(--dk)'};cursor:pointer;font-size:13px;font-weight:700;transition:all .15s;">${pk.nome}<span style="font-weight:500;opacity:.85">${descTxt}</span></button>`;
   }).join("");
@@ -684,23 +806,27 @@ function _orcHTML2(){
     const prev=_orc._uSel[u.cod];
     const ck=prev?'checked':'';
     const qty=(prev&&prev.qty)||1;
+    const vun=_orcVun(u.cod);
+    const vunInput=_orcAdmin()?`<input type="number" id="orc-vun-${u.cod}" value="${vun}" step="0.01" min="0" title="Valor unitário (admin)" onchange="_orcSetVun('${u.cod}')" style="width:92px;padding:4px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:right;background:var(--bg);flex-shrink:0;margin-top:3px">`:'';
     return `<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--br);cursor:pointer;">
-      <input type="checkbox" id="orc-ck-${u.cod}" data-cod="${u.cod}" data-vun="${u.vun}" ${ck} style="width:16px;height:16px;accent-color:var(--a);flex-shrink:0;margin-top:3px" onchange="_orcItemToggle('${u.cod}')">
+      <input type="checkbox" id="orc-ck-${u.cod}" data-cod="${u.cod}" data-vun="${vun}" ${ck} style="width:16px;height:16px;accent-color:var(--a);flex-shrink:0;margin-top:3px" onchange="_orcItemToggle('${u.cod}')">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--dk)">${label}</div>
         ${sub?`<div style="font-size:11px;color:var(--dl);margin-top:2px;line-height:1.4">${sub}</div>`:''}
       </div>
-      ${imgUrl?`<div style="position:relative;flex-shrink:0;width:80px;height:60px;" class="orc-img-wrap"><img src="${imgUrl}" onerror="this.parentElement.style.display='none'" style="width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-in;transition:transform .2s;display:block;" onmouseenter="this.style.cssText='width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-out;display:block;position:absolute;width:240px;height:180px;z-index:99;box-shadow:0 8px 32px rgba(0,0,0,.3);border-radius:10px;top:0;right:0;'" onmouseleave="this.style.cssText='width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-in;display:block;'"></div>`:''}<input type="number" id="orc-qt-${u.cod}" value="${qty}" min="1" style="width:44px;padding:4px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:center;background:var(--bg);flex-shrink:0;margin-top:3px">
+      ${imgUrl?`<div style="position:relative;flex-shrink:0;width:80px;height:60px;" class="orc-img-wrap"><img src="${imgUrl}" onerror="this.parentElement.style.display='none'" style="width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-in;transition:transform .2s;display:block;" onmouseenter="this.style.cssText='width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-out;display:block;position:absolute;width:240px;height:180px;z-index:99;box-shadow:0 8px 32px rgba(0,0,0,.3);border-radius:10px;top:0;right:0;'" onmouseleave="this.style.cssText='width:80px;height:60px;object-fit:cover;border-radius:6px;cursor:zoom-in;display:block;'"></div>`:''}${vunInput}<input type="number" id="orc-qt-${u.cod}" value="${qty}" min="1" style="width:44px;padding:4px;border:1px solid var(--br);border-radius:6px;font-size:12px;text-align:center;background:var(--bg);flex-shrink:0;margin-top:3px">
     </label>`;
   };
   const itemsHtml=_orc._uItems.map(itemRowU).join("");
-  return `<div class="orc-card">
+  return `${_orcAdminBanner()}<div class="orc-card">
     <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:4px;">Monte seu orçamento</div>
     <div style="font-size:13px;color:var(--dl);margin-bottom:14px;">Salão: <strong>${_orc.salao}</strong> · ${_orc.num_convidados} convidados</div>
     ${_orc._uPkgs.length?`<div style="font-size:12px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Selecione seu pacote para obter os descontos indicados</div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">${pkgBtns}</div>`:''}
     <div style="font-size:12px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin:16px 0 0">Itens</div>
     ${itemsHtml}
+    ${_orcAdmin()?`<div id="orc-free-list">${(_orc._freeItems||[]).map(f=>_orcFreeRowHTML(f)).join("")}</div>
+    <button type="button" onclick="_orcAddFree()" style="margin-top:10px;padding:7px 12px;background:transparent;color:var(--a);border:1.5px dashed var(--a);border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">+ Item livre</button>`:''}
     <div id="orc-err2" class="err" style="margin-top:10px"></div>
   </div>
   <div class="orc-nav">
@@ -713,36 +839,59 @@ function _orcHTML2(){
 function _orcTogglePkg(id){
   const pk=(_orc._uPkgs||[]).find(p=>p.id===id);
   if(!pk) return;
-  const turnOn=_orc._activePkg!==id;
+  const admin=_orcAdmin();
+  if(!_orc._activePkgs) _orc._activePkgs=[];
+  const turnOn = admin ? !_orc._activePkgs.some(x=>String(x)===String(id)) : _orc._activePkg!==id;
   // Capacidade: salão Bromélias comporta até 100 convidados
   if(turnOn && /brom[eé]/i.test(_orcNorm(pk.nome)) && (parseInt(_orc.num_convidados)||0)>100){
-    const e=document.getElementById("orc-err2");
-    if(e){e.style.display="block";e.textContent="Número de convidados excede o limite do salão Bromélias (máx. 100).";}
-    return;
+    if(!admin){ _orcErr2("Número de convidados excede o limite do salão Bromélias (máx. 100)."); return; }
+    _orcErr2("Número de convidados acima do limite do salão Bromélias (máx. 100).",true);
+  }else{
+    _orcErr2("");
   }
-  // Clear any previously active package's items first
-  if(_orc._activePkg!=null){
+  // No público um pacote substitui o outro; o admin soma quantos quiser
+  if(!admin && _orc._activePkg!=null){
     const prev=(_orc._uPkgs||[]).find(p=>p.id===_orc._activePkg);
     if(prev) prev.cods.forEach(c=>{const ck=document.getElementById('orc-ck-'+c);if(ck)ck.checked=false;});
   }
-  const e0=document.getElementById("orc-err2"); if(e0) e0.style.display="none";
-  _orc._activePkg=turnOn?id:null;
+  if(admin){
+    _orc._activePkgs = turnOn ? _orc._activePkgs.concat([id]) : _orc._activePkgs.filter(x=>String(x)!==String(id));
+    _orc._activePkg = _orc._activePkgs.length===1 ? _orc._activePkgs[0] : null;
+  }else{
+    _orc._activePkg = turnOn?id:null;
+    _orc._activePkgs = turnOn?[id]:[];
+  }
   pk.cods.forEach(c=>{const ck=document.getElementById('orc-ck-'+c);if(ck)ck.checked=turnOn;});
-  document.querySelectorAll('[id^="orc-pkgbtn-"]').forEach(b=>{b.style.background='#fff';b.style.color='var(--dk)';b.style.borderColor='var(--br)';});
-  if(turnOn){const b=document.getElementById('orc-pkgbtn-'+id);if(b){b.style.background='var(--a)';b.style.color='#fff';b.style.borderColor='var(--a)';}}
+  _orcPaintPkgBtns();
+}
+// Pinta os botões de pacote a partir do estado (um ativo no público, N no admin)
+function _orcPaintPkgBtns(){
+  const on=_orcAdmin()?(_orc._activePkgs||[]):(_orc._activePkg!=null?[_orc._activePkg]:[]);
+  document.querySelectorAll('[id^="orc-pkgbtn-"]').forEach(b=>{
+    const id=b.id.replace("orc-pkgbtn-","");
+    const act=on.some(x=>String(x)===id);
+    b.style.background=act?'var(--a)':'#fff';
+    b.style.color=act?'#fff':'var(--dk)';
+    b.style.borderColor=act?'var(--a)':'var(--br)';
+  });
 }
 
 // Manual item toggle: keep all-or-nothing physical groups (suites flamboyant / bromelias) in sync
 function _orcItemToggle(cod){
   const inv=_orc._invByCod[cod];
   if(!inv) return;
-  // Capacidade: não permite o salão Bromélias acima de 100 convidados
+  const admin=_orcAdmin();
+  // Capacidade: o público não passa do limite do salão; o admin só é avisado
   if(/espaco bromel/i.test(_orcNorm(inv.descricao||'')) && (parseInt(_orc.num_convidados)||0)>100){
-    const ck0=document.getElementById('orc-ck-'+cod); if(ck0) ck0.checked=false;
-    const e=document.getElementById("orc-err2");
-    if(e){e.style.display="block";e.textContent="Número de convidados excede o limite do salão Bromélias (máx. 100).";}
-    return;
+    if(!admin){
+      const ck0=document.getElementById('orc-ck-'+cod); if(ck0) ck0.checked=false;
+      _orcErr2("Número de convidados excede o limite do salão Bromélias (máx. 100).");
+      return;
+    }
+    _orcErr2("Número de convidados acima do limite do salão Bromélias (máx. 100).",true);
   }
+  // Admin monta a combinação que quiser: uma suíte solta não arrasta o grupo
+  if(admin) return;
   const grp=_orcGetGroup(inv.descricao||'');
   if(!grp) return;
   const checked=document.getElementById('orc-ck-'+cod)?.checked;
@@ -759,18 +908,33 @@ async function _orcNext2(){
   _orc._valorAjustado=false;
   const e=document.getElementById("orc-err2");
   const checked=Array.from(document.querySelectorAll('[id^="orc-ck-"]:checked'));
-  if(!checked.length){if(e){e.style.display="block";e.textContent="Selecione ao menos um item.";}return;}
-  const selectedItems=[];let subtotal=0;const selCods=new Set();
+  if(!checked.length){if(e){e.style.display="block";e.style.color="";e.textContent="Selecione ao menos um item.";}return;}
+  const selectedItems=[];let subtotal=0;const selCods=new Set();const freeItems=[];
   checked.forEach(ck=>{
     const cod=ck.dataset.cod;
+    const qty=parseFloat(document.getElementById("orc-qt-"+cod)?.value||1)||1;
+    // Item livre (admin): descrição e valor vêm da própria linha
+    if(ck.dataset.free){
+      const desc=_orcCleanTxt(document.getElementById("orc-fd-"+cod)?.value);
+      const vun=parseFloat(document.getElementById("orc-vun-"+cod)?.value)||0;
+      if(!desc&&!vun) return;                       // linha em branco: ignora
+      const s=vun*qty;
+      selectedItems.push({cod_item:null,descricao:desc||"Item avulso",valor_unitario:vun,qty,subtotal:s});
+      freeItems.push({id:cod,descricao:desc,valor_unitario:vun,qty});
+      subtotal+=s;
+      return;
+    }
     const u=_orc._uByCod[cod];
     if(!u) return;
-    const qty=parseFloat(document.getElementById("orc-qt-"+cod)?.value||1);
-    const s=(u.vun||0)*qty;
+    _orcSetVun(cod);
+    const vun=_orcVun(cod);
+    const s=vun*qty;
     const inv=_orc._invByCod[cod];
-    selectedItems.push({cod_item:cod,descricao:inv?inv.descricao:cod,valor_unitario:u.vun,qty,subtotal:s});
+    selectedItems.push({cod_item:cod,descricao:inv?inv.descricao:cod,valor_unitario:vun,qty,subtotal:s});
     subtotal+=s;selCods.add(cod);
   });
+  _orc._freeItems=freeItems;
+  if(!selectedItems.length){if(e){e.style.display="block";e.style.color="";e.textContent="Selecione ao menos um item.";}return;}
   // Best group discount: fully-selected package
   let bestDiscount=0,bestGrupoNome=null;
   (_orc._uPkgs||[]).forEach(pk=>{
@@ -778,15 +942,19 @@ async function _orcNext2(){
       if(pk.desconto>bestDiscount){bestDiscount=pk.desconto;bestGrupoNome=pk.nome;}
     }
   });
+  _orc._discountAuto=bestDiscount;
+  _orc._discountPkgAuto=bestGrupoNome;
+  // Desconto digitado pelo admin (inclusive zero) manda no automático até ele voltar atrás
+  const manual=_orcAdmin()?_orc._discountManual:null;
+  _orc._discount=(manual!=null)?manual:bestDiscount;
+  _orc._discountPkg=(manual!=null)?null:bestGrupoNome;
   // Persist selection (for restore when going back)
   _orc._uSel={};
-  selectedItems.forEach(i=>{_orc._uSel[i.cod_item]={qty:i.qty};});
+  selectedItems.forEach(i=>{if(i.cod_item)_orc._uSel[i.cod_item]={qty:i.qty,vun:i.valor_unitario};});
   _orc._selectedItems=selectedItems;
   _orc._subtotal=subtotal;
-  _orc._discount=bestDiscount;
-  _orc._discountPkg=bestGrupoNome;
-  _orc.pacote_nome=bestGrupoNome||'';
-  _orc.pacote_valor=subtotal-bestDiscount;
+  _orc.pacote_nome=_orc._discountPkg||'';
+  _orc.pacote_valor=subtotal-_orc._discount;
   _orc.valor_total=_orc.pacote_valor;
   _orc.pacote_itens_desc=selectedItems.map(i=>i.descricao+(i.qty>1?' × '+i.qty:'')).join(", ");
   // Atualiza a gravação com os itens/valor ao passar da fase 2 para a 3
@@ -922,12 +1090,14 @@ function _orcHTML4(){
     const it=_orc._invItems.find(x=>x.cod===cod);
     return it?`<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid var(--br)"><span style="color:var(--dk)">${it.descricao} × ${qty}</span><span style="color:var(--dl)">—</span></div>`:"";
   }).filter(Boolean).join("");
-  const discountLine=_orc._discount>0?`
+  const dl=_orcDiscLine();
+  const dlCor=dl&&dl.neg?"#b45309":"var(--ok)";
+  const discountLine=dl?`
     <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:13px;border-bottom:1px solid var(--br)">
-      <span style="color:var(--ok);font-weight:600">Desconto — ${_orc._discountPkg}</span>
-      <span style="color:var(--ok);font-weight:600">− ${fmt(_orc._discount)}</span>
+      <span style="color:${dlCor};font-weight:600">${dl.label}</span>
+      <span style="color:${dlCor};font-weight:600">${dl.sinal} ${fmt(dl.valor)}</span>
     </div>`:"";
-  const subtotalLine=_orc._discount>0?`
+  const subtotalLine=dl?`
     <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid var(--br)">
       <span style="color:var(--dl)">Subtotal</span>
       <span style="color:var(--dl)">${fmt(_orc._subtotal)}</span>
@@ -958,7 +1128,7 @@ function _orcHTML4(){
         <div style="font-size:11px;color:#2A6644;margin-top:4px;">${sim.discPct.toFixed(1)}% de desconto — economia de ${fmt(sim.desconto)}</div>
       </div>
     </div>` : '';
-  return `<div class="orc-card">
+  return `${_orcAdminBanner()}<div class="orc-card">
     <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--dk);margin-bottom:20px;">Resumo do orçamento</div>
     <div style="display:flex;flex-direction:column;gap:2px;font-size:14px;">
       <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--br)"><span style="color:var(--dl)">Evento</span><span style="font-weight:600">${_orc.tipo_evento}</span></div>
@@ -976,16 +1146,26 @@ function _orcHTML4(){
         <span style="font-size:22px;font-weight:700;color:var(--a)">${fmt(_orc.valor_total)}</span>
       </div>
       ${simHTML}
-      ${_orc._admin?`<div style="border-top:1px dashed var(--br);padding-top:12px;margin-top:4px;">
-        <button onclick="_orcToggleEdit()" id="orc-edit-btn" style="padding:7px 14px;background:transparent;color:var(--a);border:1.5px solid var(--a);border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">✏️ Alterar valor (admin)</button>
-        <div id="orc-edit-box" style="display:none;margin-top:10px;">
-          <label class="lbl">Valor total ajustado (R$)</label>
-          <div style="display:flex;gap:8px;align-items:center;">
-            <input type="number" id="orc-edit-total" class="inp inp-inline" step="0.01" value="${_orc.valor_total}" style="max-width:160px;margin-bottom:0;">
-            <button onclick="_orcAplicarValor()" style="padding:8px 14px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;">Aplicar</button>
+      ${_orcAdmin()?`<div style="border-top:1px dashed var(--br);padding-top:12px;margin-top:4px;">
+        <div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Ajustes (admin)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
+          <div>
+            <label class="lbl" style="margin-bottom:2px">Desconto (R$)</label>
+            <input type="number" id="orc-edit-desc" class="inp inp-inline" step="0.01" min="0" value="${(_orc._discount||0).toFixed(2)}" style="max-width:140px;margin-bottom:0;">
           </div>
-          <div style="font-size:11px;color:var(--dl);margin-top:4px;">Sobrescreve o valor calculado. Use para negociações.</div>
+          <button onclick="_orcAplicarDesconto()" style="padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;background:var(--a);color:#fff;border:none;">Aplicar</button>
+          <button onclick="_orcRemoverDesconto()" style="padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;background:transparent;color:#e74c3c;border:1.5px solid #e74c3c;">Remover desconto</button>
+          ${_orc._discountManual!=null&&(_orc._discountAuto||0)>0?`<button onclick="_orcDescontoAuto()" style="padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;background:transparent;color:var(--a);border:1.5px solid var(--a);">Voltar ao do pacote (${fmt(_orc._discountAuto)})</button>`:''}
         </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-top:10px;">
+          <div>
+            <label class="lbl" style="margin-bottom:2px">Total (R$)</label>
+            <input type="number" id="orc-edit-total" class="inp inp-inline" step="0.01" min="0" value="${_orc.valor_total}" style="max-width:140px;margin-bottom:0;">
+          </div>
+          <button onclick="_orcAplicarValor()" style="padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;background:var(--a);color:#fff;border:none;">Aplicar</button>
+          ${_orc._valorAjustado?`<button onclick="_orcResetValor()" style="padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;background:transparent;color:var(--a);border:1.5px solid var(--a);">Voltar ao calculado</button>`:''}
+        </div>
+        <div style="font-size:11px;color:var(--dl);margin-top:6px;">Subtotal dos itens: ${fmt(_orc._subtotal||0)}. O total sobrescreve o cálculo — a diferença até o subtotal aparece como desconto no resumo e no PDF do cliente.</div>
       </div>`:''}
     </div>
     <div style="background:#f5f6f7;border-radius:10px;padding:12px 16px;font-size:12px;color:var(--dl);margin-top:8px;">
@@ -1048,8 +1228,9 @@ function _orcAbrirPDF(){
     const det=info?info.d:null;
     return `<tr><td><div style="font-weight:600">${_orcDesc(i)}${i.qty>1?' × '+i.qty:''}</div>${det?`<div style="font-size:11px;color:#777;margin-top:3px">${det}</div>`:''}</td><td style="text-align:right;vertical-align:top;white-space:nowrap;padding-left:16px">${fmt(i.subtotal)}</td></tr>`;
   }).join("");
-  const subtotalRow=_orc._discount>0?`<tr style="color:#888"><td>Subtotal</td><td style="text-align:right">${fmt(_orc._subtotal)}</td></tr>`:"";
-  const discRow=_orc._discount>0?`<tr style="color:#2a7a2a;font-weight:600"><td>Desconto — ${_orc._discountPkg}</td><td style="text-align:right">− ${fmt(_orc._discount)}</td></tr>`:"";
+  const dl=_orcDiscLine();
+  const subtotalRow=dl?`<tr style="color:#888"><td>Subtotal</td><td style="text-align:right">${fmt(_orc._subtotal)}</td></tr>`:"";
+  const discRow=dl?`<tr style="color:${dl.neg?'#a15c00':'#2a7a2a'};font-weight:600"><td>${dl.label}</td><td style="text-align:right">${dl.sinal} ${fmt(dl.valor)}</td></tr>`:"";
   const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
 <title>Orçamento – Fazenda Damata</title>
 <style>
