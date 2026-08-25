@@ -48,16 +48,26 @@ Deno.serve(async (req) => {
       if (pdfUrl) patch.assinatura_pdf_url = pdfUrl;
       if (assinado) patch.contrato_ok = true;
 
-      await fetch(`${SB_URL}/rest/v1/agenda?assinatura_doc_id=eq.${encodeURIComponent(docId)}`, {
-        method: "PATCH",
-        headers: {
-          apikey: SB_SR!,
-          Authorization: "Bearer " + SB_SR,
-          "Content-Type": "application/json",
-          Prefer: "return=minimal",
-        },
-        body: JSON.stringify(patch),
-      });
+      const sbH = {
+        apikey: SB_SR!,
+        Authorization: "Bearer " + SB_SR,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      };
+
+      // O doc_id pertence a um contrato (agenda) ou a um termo aditivo
+      // (aditivos) — sao documentos independentes no Autentique. Manda para
+      // os dois: o filtro por assinatura_doc_id faz a linha certa responder e
+      // a outra tabela nao tem o que casar, entao afeta 0 linhas.
+      await Promise.all([
+        fetch(`${SB_URL}/rest/v1/agenda?assinatura_doc_id=eq.${encodeURIComponent(docId)}`, {
+          method: "PATCH", headers: sbH, body: JSON.stringify(patch),
+        }),
+        fetch(`${SB_URL}/rest/v1/aditivos?assinatura_doc_id=eq.${encodeURIComponent(docId)}`, {
+          method: "PATCH", headers: sbH,
+          body: JSON.stringify({ ...patch, updated_at: new Date().toISOString() }),
+        }),
+      ]);
     } catch (_) {
       /* ignora */
     }

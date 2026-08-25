@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.24c</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.24d</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1400,6 +1400,71 @@
   </div>
 </div>
 
+<!-- MODAL: TERMO ADITIVO -->
+<div class="moverlay" id="m-aditivo" onclick="if(event.target===this)closeAditivo()">
+  <div class="mbox" style="max-width:640px;">
+    <div class="mtitle">📑 Termo Aditivo</div>
+    <div style="font-size:13px;color:var(--dm);margin-bottom:6px;">Contrato <b id="ad-cod"></b> — <span id="ad-nome"></span></div>
+    <div style="font-size:12px;color:var(--dl);margin-bottom:14px;">Aditivo nº <b id="ad-num">—</b> · valor atual do contrato: <b id="ad-valor-atual">—</b></div>
+
+    <div id="ad-existentes" style="display:none;margin-bottom:14px;"></div>
+
+    <div class="fsec" style="margin-bottom:10px;">
+      <div class="fsec-title">📝 Motivo</div>
+      <textarea class="inp" id="ad-just" rows="2" placeholder="Por que este aditivo está sendo feito (aparece no termo)"></textarea>
+    </div>
+
+    <div class="fsec" style="margin-bottom:10px;">
+      <div class="fsec-title">📋 Itens incluídos</div>
+      <select class="inp" id="ad-item-sel" style="margin-bottom:8px;" onchange="adAddItemTabela(this.value);this.value='';">
+        <option value="">— Adicionar item da tabela de preços —</option>
+      </select>
+      <div id="ad-itens-list"></div>
+      <button onclick="adAddItem()" style="background:var(--al);color:var(--dk);border:1px solid var(--br);padding:5px 14px;border-radius:99px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;margin-top:6px;">+ Item avulso</button>
+    </div>
+
+    <div class="fsec" style="margin-bottom:10px;">
+      <div class="fsec-title">🔄 Alterações no contrato</div>
+      <div style="font-size:11px;color:var(--dl);margin-bottom:8px;">Só entra no termo o que você mudar aqui. Em branco = permanece como está.</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+        <div><label class="lbl">Data final</label><input class="inp inp-inline" type="date" id="ad-d2"/></div>
+        <div><label class="lbl">Data do evento</label><input class="inp inp-inline" type="date" id="ad-d1"/></div>
+        <div><label class="lbl">Check-in</label><input class="inp inp-inline" type="time" id="ad-cin"/></div>
+        <div><label class="lbl">Check-out</label><input class="inp inp-inline" type="time" id="ad-cout"/></div>
+      </div>
+      <label class="lbl" style="margin-bottom:6px;">Espaços e acomodações</label>
+      <div id="ad-espacos" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;"></div>
+    </div>
+
+    <div class="fsec" style="margin-bottom:10px;">
+      <div class="fsec-title">💰 Valor e parcelas do aditivo</div>
+      <div style="background:var(--al);border:1px solid var(--am);border-radius:10px;padding:12px;margin-bottom:10px;font-size:13px;">
+        <div style="display:flex;justify-content:space-between;"><span>Valor do aditivo</span><b id="ad-valor">R$ 0,00</b></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px;color:var(--dm);"><span>Novo total do contrato</span><b id="ad-novo-total">R$ 0,00</b></div>
+      </div>
+      <div style="background:var(--s2);border:1px solid var(--br);border-radius:10px;padding:12px;margin-bottom:10px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+          <div><label class="lbl">Nº parcelas</label><input class="inp inp-inline" type="number" id="ad-gnum" placeholder="1" min="1" max="24"/></div>
+          <div><label class="lbl">Dia venc.</label><input class="inp inp-inline" type="number" id="ad-gday" placeholder="15" min="1" max="28"/></div>
+          <div><label class="lbl">Mês inicial</label><input class="inp inp-inline" type="month" id="ad-gmonth"/></div>
+        </div>
+        <button onclick="adAutoGenPmts()" style="width:100%;background:var(--dk);color:#fff;border:none;padding:8px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">Gerar parcelas</button>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span class="lbl" style="margin:0;">Parcelas</span>
+        <button onclick="adAddPmt()" style="background:var(--al);color:var(--dk);border:1px solid var(--br);padding:5px 14px;border-radius:99px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;">+ Adicionar</button>
+      </div>
+      <div id="ad-pmts-list"></div>
+      <div id="ad-pmts-aviso" style="font-size:11px;margin-top:6px;"></div>
+    </div>
+
+    <div class="macts" style="margin-top:8px;">
+      <button class="btn-cancel" onclick="closeAditivo()">Cancelar</button>
+      <button class="btn-confirm" id="ad-btn-ok" onclick="salvarAditivo()">Gerar aditivo e copiar link</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: GERAR CONTRATO -->
 <div class="moverlay" id="m-gerar-contrato" onclick="if(event.target===this)closeGerarContrato()">
   <div class="mbox" style="max-width:520px;">
@@ -1665,7 +1730,7 @@ async function proximoCod(ano) {
 }
 
 // ── Helpers ──
-const SOFT_DELETE_TABLES = new Set(["agenda","contas_a_receber","contas_a_pagar","pedidos","itens_pedido","inventario","visitas_tecnicas","vt_linhas","tabelas_preco"]);
+const SOFT_DELETE_TABLES = new Set(["agenda","aditivos","contas_a_receber","contas_a_pagar","pedidos","itens_pedido","inventario","visitas_tecnicas","vt_linhas","tabelas_preco"]);
 function _addSoftFilter(table, query) {
   if(!SOFT_DELETE_TABLES.has(table)) return query;
   return query ? query + "&deleted_at=is.null" : "deleted_at=is.null";
@@ -2871,8 +2936,12 @@ async function sincronizarParcelasReceber(cod, payments) {
   // assim, e apagar levaria junto lancamentos feitos na mao no financeiro.
   if(!cod || !lista.length) return null;
 
+  // aditivo_id=is.null: parcela nascida de termo aditivo tem vida propria e
+  // nao entra nesta reconciliacao. Sem o filtro ela cairia na "sobra" (numero
+  // maior que o fim da lista do contrato) e sumiria na primeira edicao do
+  // evento — o aditivo ja assinado deixaria de ser cobrado.
   const existentes = await dbGet("contas_a_receber",
-    "cod_evento=eq."+encodeURIComponent(cod)+"&select=id,parcela,status&order=id.asc");
+    "cod_evento=eq."+encodeURIComponent(cod)+"&aditivo_id=is.null&select=id,parcela,status&order=id.asc");
   const porParcela = new Map();
   existentes.forEach(r => {
     const n = parseInt(r.parcela, 10);
@@ -2894,7 +2963,7 @@ async function sincronizarParcelasReceber(cod, payments) {
       obs: p.desc || null,
     };
     const atual = porParcela.get(i+1);
-    if(!atual) { novas.push({...linha, status:"NP"}); return; }
+    if(!atual) { novas.push({...linha, status:"NP", aditivo_id:null}); return; }
     if(atual.status !== "NP") { recebidas++; patches.push({id: atual.id, body:{num_parcela: total}}); return; }
     patches.push({id: atual.id, body: linha});
   });
@@ -3353,6 +3422,371 @@ async function copiarLinkContrato(evId){
       prompt("Copie o link do contrato:", link);
     }
   } catch(e){ toast("Erro: "+e.message); console.error(e); }
+}
+
+// ══════════════════════════════════════════
+// TERMO ADITIVO
+// ══════════════════════════════════════════
+// Um aditivo e um segundo documento pendurado no evento. Existe porque o
+// contrato original, uma vez enviado, nao pode mais ser reaberto: o link do
+// cliente morre (contrato-publico so serve null/gerado/dados_preenchidos) e o
+// PDF que esta no Autentique nao muda. O que se inclui depois vive aqui.
+
+let _adEv = null, _adItens = [], _adPmts = [], _adTabelaItens = [];
+
+// Campos de spaces_json que viram linha de "de → para" no termo. O rotulo e o
+// que o cliente le no documento, entao vale o nome do espaco, nao a chave.
+const AD_ESPACOS = [
+  ["spTumb","Salão Tumbérgia"], ["spPeroba","Peroba Rosa"], ["spBrom","Salão Bromélias"],
+  ["acLoft","Loft Flamboyant"], ["acCasa","Casa Flamboyant"], ["acSuiteAss","Suíte Assessoria"],
+  ["acSf1","Suíte Flamboyant 1"], ["acSf2","Suíte Flamboyant 2"], ["acSf3","Suíte Flamboyant 3"],
+  ["acSf4","Suíte Flamboyant 4"], ["acSf5","Suíte Flamboyant 5"],
+  ["acSb1","Suíte Bromélias 1"], ["acSb2","Suíte Bromélias 2"], ["acSb3","Suíte Bromélias 3"],
+  ["fuBal","Balcão Hexagonal"],
+];
+
+function _adFmt(v){ return "R$ " + (parseFloat(v||0)).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function _adEsc(v){ return String(v==null?"":v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+async function abrirAditivo(cod){
+  try{
+    const rows = await dbGet("agenda","cod=eq."+encodeURIComponent(cod)+"&select=*&limit=1");
+    if(!rows.length){ toast("Evento não encontrado."); return; }
+    _adEv = rows[0];
+    _adItens = []; _adPmts = [];
+
+    document.getElementById("ad-cod").textContent = _adEv.cod;
+    document.getElementById("ad-nome").textContent = _adEv.nome_evento || "";
+    document.getElementById("ad-valor-atual").textContent = _adFmt(_adEv.valor_locacao);
+    document.getElementById("ad-just").value = "";
+
+    // Datas e horarios comecam com o valor atual: o admin muda o que quiser e
+    // o de-para sai da diferenca.
+    document.getElementById("ad-d1").value = _adEv.data_evento || "";
+    document.getElementById("ad-d2").value = _adEv.data_fim || _adEv.data_evento || "";
+    document.getElementById("ad-cin").value = _adEv.cin || "";
+    document.getElementById("ad-cout").value = _adEv.cout || "";
+
+    let extras = {};
+    try { extras = _adEv.spaces_json ? JSON.parse(_adEv.spaces_json) : {}; } catch(_){ extras = {}; }
+    _adEv._extras = extras;
+    document.getElementById("ad-espacos").innerHTML = AD_ESPACOS.map(([k,lbl])=>
+      `<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:3px 0;cursor:pointer;">
+         <input type="checkbox" id="ad-e-${k}" ${extras[k]?"checked":""} onchange="adRecalc()"> ${_adEsc(lbl)}</label>`
+    ).join("");
+
+    const numero = await sbFetch("rpc/proximo_num_aditivo",{method:"POST",body:{p_cod:cod}});
+    document.getElementById("ad-num").textContent = numero;
+    _adEv._numero = numero;
+
+    await _adCarregarExistentes(cod);
+    await _adCarregarTabela();
+
+    adRenderItens(); adRenderPmts(); adRecalc();
+    document.getElementById("m-aditivo").classList.add("open");
+  } catch(e){ toast("Erro: "+e.message); console.error(e); }
+}
+
+function closeAditivo(){ document.getElementById("m-aditivo").classList.remove("open"); }
+
+async function _adCarregarExistentes(cod){
+  const wrap = document.getElementById("ad-existentes");
+  try{
+    const rows = await dbGet("aditivos","cod_evento=eq."+encodeURIComponent(cod)+"&select=id,numero,valor,assinatura_status,token&order=numero.asc");
+    if(!rows.length){ wrap.style.display="none"; wrap.innerHTML=""; return; }
+    wrap.style.display="block";
+    wrap.innerHTML = `<div style="background:var(--s2);border:1px solid var(--br);border-radius:10px;padding:10px 12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Aditivos já emitidos</div>
+      ${rows.map(r=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;padding:3px 0;">
+        <span>${r.numero}º — ${_adFmt(r.valor)}</span>
+        <span style="display:flex;align-items:center;gap:6px;">${contratoStatusBadge(r.assinatura_status||null)}
+        <button onclick="copiarLinkAditivo('${r.token}','${r.assinatura_status||""}')" title="Copiar link" style="border:1px solid var(--a);background:#fff;color:var(--a);border-radius:6px;padding:2px 7px;font-size:11px;cursor:pointer;">🔗</button></span>
+      </div>`).join("")}
+    </div>`;
+  } catch(e){ wrap.style.display="none"; }
+}
+
+async function _adCarregarTabela(){
+  const sel = document.getElementById("ad-item-sel");
+  sel.innerHTML = '<option value="">— Adicionar item da tabela de preços —</option>';
+  try{
+    const tabs = await dbGet("tabelas_preco","select=id,nome&order=id.desc&limit=1");
+    if(!tabs.length) return;
+    const itens = await dbGet("tabelas_preco_itens","tabela_id=eq."+tabs[0].id+"&select=id,cod_item,descricao,valor_unitario&order=descricao.asc&limit=1000");
+    // A descricao do inventario e a fonte da verdade, como no gerador.
+    let invMap = {};
+    try{
+      const inv = await dbGet("inventario","select=cod,descricao&limit=1000");
+      inv.forEach(i=>{ invMap[i.cod]=i.descricao; });
+    }catch(_){}
+    const vistos = new Set();
+    _adTabelaItens = itens.filter(it=>{
+      const k = it.cod_item || ("d:"+it.descricao);
+      if(vistos.has(k)) return false; vistos.add(k); return true;
+    }).map(it=>({cod:it.cod_item, descricao: invMap[it.cod_item]||it.descricao, valor: Number(it.valor_unitario||0)}));
+    _adTabelaItens.forEach((it,i)=>{
+      const o=document.createElement("option");
+      o.value=String(i); o.textContent=it.descricao+" — "+_adFmt(it.valor);
+      sel.appendChild(o);
+    });
+  }catch(e){ /* segue: da para lancar item avulso na mao */ }
+}
+
+function adAddItemTabela(idx){
+  if(idx==="") return;
+  const it=_adTabelaItens[parseInt(idx,10)];
+  if(!it) return;
+  _adItens.push({cod:it.cod, descricao:it.descricao, quantidade:1, valor_unitario:it.valor});
+  adRenderItens(); adRecalc();
+}
+function adAddItem(){ _adItens.push({cod:null, descricao:"", quantidade:1, valor_unitario:0}); adRenderItens(); adRecalc(); }
+function adRemoveItem(i){ _adItens.splice(i,1); adRenderItens(); adRecalc(); }
+
+function adRenderItens(){
+  const c=document.getElementById("ad-itens-list"); c.innerHTML="";
+  if(!_adItens.length){
+    c.innerHTML='<div style="font-size:12px;color:var(--dl);padding:6px 0;">Nenhum item incluído.</div>';
+    return;
+  }
+  _adItens.forEach((it,i)=>{
+    const d=document.createElement("div");
+    d.style.cssText="border:1px solid var(--br);border-radius:10px;padding:10px;margin-bottom:6px;position:relative;background:var(--s1);";
+    d.innerHTML=`<button onclick="adRemoveItem(${i})" style="position:absolute;top:6px;right:9px;background:none;border:none;cursor:pointer;color:var(--dl);font-size:14px;">✕</button>
+      <input class="inp inp-inline" type="text" placeholder="Descrição do item" value="${_adEsc(it.descricao)}" oninput="_adItens[${i}].descricao=this.value" style="margin-bottom:6px;padding-right:26px;"/>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;align-items:end;">
+        <div><label class="lbl">Qtd.</label><input class="inp inp-inline" type="number" min="1" value="${it.quantidade}" oninput="_adItens[${i}].quantidade=parseFloat(this.value||0);adRecalc()"/></div>
+        <div><label class="lbl">Valor unit.</label><input class="inp inp-inline" type="number" step="0.01" value="${it.valor_unitario}" oninput="_adItens[${i}].valor_unitario=parseFloat(this.value||0);adRecalc()"/></div>
+        <div style="text-align:right;font-size:12px;font-weight:700;color:var(--dk);padding-bottom:9px;" id="ad-sub-${i}"></div>
+      </div>`;
+    c.appendChild(d);
+  });
+  _adItens.forEach((it,i)=>{
+    const el=document.getElementById("ad-sub-"+i);
+    if(el) el.textContent=_adFmt((it.quantidade||0)*(it.valor_unitario||0));
+  });
+}
+
+function adValorTotal(){ return _adItens.reduce((s,it)=>s+(it.quantidade||0)*(it.valor_unitario||0),0); }
+
+function adRecalc(){
+  const v=adValorTotal();
+  document.getElementById("ad-valor").textContent=_adFmt(v);
+  document.getElementById("ad-novo-total").textContent=_adFmt(Number(_adEv&&_adEv.valor_locacao||0)+v);
+  _adItens.forEach((it,i)=>{
+    const el=document.getElementById("ad-sub-"+i);
+    if(el) el.textContent=_adFmt((it.quantidade||0)*(it.valor_unitario||0));
+  });
+  // O termo diz que as parcelas somam o valor acrescido. Divergencia ali e
+  // um contrato que se contradiz, entao avisa antes de gerar.
+  const soma=_adPmts.reduce((s,p)=>s+parseFloat(p.value||0),0);
+  const av=document.getElementById("ad-pmts-aviso");
+  if(!av) return;
+  if(!_adPmts.length){ av.textContent=""; return; }
+  const dif=Math.round((soma-v)*100)/100;
+  if(Math.abs(dif)<0.01){ av.style.color="#166534"; av.textContent="✓ Parcelas somam o valor do aditivo."; }
+  else { av.style.color="#b45309"; av.textContent="⚠️ Parcelas somam "+_adFmt(soma)+" — "+(dif>0?"acima":"abaixo")+" do valor do aditivo em "+_adFmt(Math.abs(dif))+"."; }
+}
+
+function adAutoGenPmts(){
+  const tot=adValorTotal();
+  const num=parseInt(document.getElementById("ad-gnum").value||0);
+  const day=parseInt(document.getElementById("ad-gday").value||1);
+  const month=document.getElementById("ad-gmonth").value;
+  if(!tot){ toast("Inclua ao menos um item antes de gerar as parcelas."); return; }
+  if(!num||!month){ toast("Preencha nº de parcelas e mês inicial."); return; }
+  const vp=tot/num, parts=month.split("-"), yr=parseInt(parts[0]), mo=parseInt(parts[1])-1;
+  _adPmts=[];
+  for(let i=0;i<num;i++){
+    const dt=new Date(yr,mo+i,day);
+    const dk=dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+    _adPmts.push({desc:"Aditivo "+(_adEv._numero||1)+" — parcela "+(i+1), date:dk, value:vp.toFixed(2)});
+  }
+  adRenderPmts(); adRecalc();
+}
+function adAddPmt(){ _adPmts.push({desc:"Aditivo "+(_adEv&&_adEv._numero||1)+" — parcela "+(_adPmts.length+1), date:"", value:""}); adRenderPmts(); adRecalc(); }
+function adRemovePmt(i){ _adPmts.splice(i,1); adRenderPmts(); adRecalc(); }
+
+function adRenderPmts(){
+  const c=document.getElementById("ad-pmts-list"); c.innerHTML="";
+  if(!_adPmts.length){
+    c.innerHTML='<div style="font-size:12px;color:var(--dl);padding:6px 0;">Nenhuma parcela — o termo dirá que a forma de pagamento será ajustada entre as partes.</div>';
+    return;
+  }
+  _adPmts.forEach((p,i)=>{
+    const d=document.createElement("div"); d.className="pmt-row";
+    d.innerHTML=`<button onclick="adRemovePmt(${i})" style="position:absolute;top:7px;right:9px;background:none;border:none;cursor:pointer;color:#7A8F96;font-size:14px;">✕</button>
+      <input class="inp inp-inline" type="text" placeholder="Descrição" value="${_adEsc(p.desc)}" oninput="_adPmts[${i}].desc=this.value" style="margin-bottom:7px;padding-right:26px;"/>
+      <div class="fgrid2"><div><label class="lbl">Vencimento</label><input class="inp inp-inline" type="date" value="${p.date||""}" onchange="_adPmts[${i}].date=this.value"/></div>
+      <div><label class="lbl">Valor R$</label><input class="inp inp-inline" type="number" step="0.01" value="${p.value||""}" oninput="_adPmts[${i}].value=this.value;adRecalc()"/></div></div>`;
+    c.appendChild(d);
+  });
+}
+
+// Diferenca entre o contrato atual e o que o admin deixou no formulario. So o
+// que mudou vira linha no termo — campo intocado nao entra.
+function _adAlteracoes(){
+  const alt=[], ev=_adEv, extras=ev._extras||{};
+  const fdt=d=>d?String(d).split("-").reverse().join("/"):"—";
+  const cmp=(campo,de,para,fmt)=>{
+    const a=de||"", b=para||"";
+    if(String(a)===String(b)) return;
+    alt.push({campo, de: fmt?fmt(a):(a||"—"), para: fmt?fmt(b):(b||"—")});
+  };
+  cmp("Data do evento", ev.data_evento, document.getElementById("ad-d1").value, fdt);
+  cmp("Data final", ev.data_fim||ev.data_evento, document.getElementById("ad-d2").value, fdt);
+  cmp("Check-in", ev.cin, document.getElementById("ad-cin").value);
+  cmp("Check-out", ev.cout, document.getElementById("ad-cout").value);
+
+  const antes=[], depois=[];
+  AD_ESPACOS.forEach(([k,lbl])=>{
+    if(extras[k]) antes.push(lbl);
+    const cb=document.getElementById("ad-e-"+k);
+    if(cb&&cb.checked) depois.push(lbl);
+  });
+  if(antes.join(", ")!==depois.join(", ")){
+    alt.push({campo:"Espaços e acomodações", de: antes.join(", ")||"—", para: depois.join(", ")||"—"});
+  }
+  return alt;
+}
+
+function _adNovoSpacesJson(){
+  const extras={...( _adEv._extras||{} )};
+  AD_ESPACOS.forEach(([k])=>{
+    const cb=document.getElementById("ad-e-"+k);
+    if(cb) extras[k]=cb.checked;
+  });
+  return JSON.stringify(extras);
+}
+
+async function salvarAditivo(){
+  const btn=document.getElementById("ad-btn-ok");
+  const cod=_adEv.cod;
+  const itens=_adItens.filter(it=>(it.descricao||"").trim() || it.valor_unitario);
+  const alteracoes=_adAlteracoes();
+  const valor=adValorTotal();
+
+  if(!itens.length && !alteracoes.length){
+    toast("Inclua ao menos um item ou uma alteração.");
+    return;
+  }
+  if(itens.some(it=>!(it.descricao||"").trim())){
+    toast("Todo item precisa de descrição.");
+    return;
+  }
+  const pmts=_adPmts.filter(p=>p.date||p.value);
+  if(valor>0 && pmts.length){
+    const soma=pmts.reduce((s,p)=>s+parseFloat(p.value||0),0);
+    if(Math.abs(soma-valor)>=0.01 &&
+       !confirm("As parcelas somam "+_adFmt(soma)+", diferente do valor do aditivo ("+_adFmt(valor)+").\n\nGerar assim mesmo?")) return;
+  }
+
+  btn.disabled=true; btn.textContent="Gerando...";
+  let adId=null;
+  try{
+    // 1. O termo. Nasce em 'gerado', mesmo estado inicial do contrato.
+    const ins=await sbFetch("aditivos",{method:"POST",prefer:"return=representation",body:{
+      cod_evento: cod,
+      numero: _adEv._numero,
+      justificativa: (document.getElementById("ad-just").value||"").trim() || null,
+      itens_json: JSON.stringify(itens),
+      alteracoes_json: JSON.stringify(alteracoes),
+      payments_json: JSON.stringify(pmts),
+      valor: valor,
+      assinatura_status: "gerado",
+    }});
+    const ad=Array.isArray(ins)?ins[0]:ins;
+    adId=ad&&ad.id;
+    if(!adId) throw new Error("aditivo não retornou id");
+
+    // 2. Pedido do evento: os itens do aditivo passam a integrar o pedido,
+    //    senao a producao nao ve o que foi vendido depois.
+    if(itens.length){
+      let pedidoId=null;
+      const peds=await dbGet("pedidos","cod_evento=eq."+encodeURIComponent(cod)+"&select=id,total_pedido&limit=1");
+      if(peds.length) pedidoId=peds[0].id;
+      else {
+        const numPedido=String(Date.now()).slice(-10).padStart(10,"0");
+        const novo=await sbFetch("pedidos",{method:"POST",prefer:"return=representation",
+          body:{numero_pedido:numPedido, cod_evento:cod, total_pedido:0}});
+        pedidoId=(Array.isArray(novo)?novo[0]:novo)?.id;
+      }
+      if(pedidoId){
+        await sbFetch("itens_pedido",{method:"POST",prefer:"return=minimal",body:itens.map(it=>({
+          pedido_id: pedidoId,
+          cod_item: it.cod||null,
+          descricao: it.descricao,
+          quantidade: it.quantidade,
+          valor_unitario: it.valor_unitario,
+          valor_subtotal: (it.quantidade||0)*(it.valor_unitario||0),
+        }))});
+        const totAtual=Number(peds.length?peds[0].total_pedido:0)||0;
+        await sbFetch("pedidos?id=eq."+pedidoId,{method:"PATCH",prefer:"return=minimal",
+          body:{total_pedido: totAtual+valor}});
+      }
+    }
+
+    // 3. Agenda: valor e as alteracoes acordadas.
+    const patch={ valor_locacao: Number(_adEv.valor_locacao||0)+valor };
+    const d1=document.getElementById("ad-d1").value, d2=document.getElementById("ad-d2").value;
+    const cin=document.getElementById("ad-cin").value, cout=document.getElementById("ad-cout").value;
+    if(d1) patch.data_evento=d1;
+    if(d2) patch.data_fim=d2;
+    if(cin) patch.cin=cin;
+    if(cout) patch.cout=cout;
+    patch.spaces_json=_adNovoSpacesJson();
+    await sbFetch("agenda?cod=eq."+encodeURIComponent(cod),{method:"PATCH",prefer:"return=minimal",body:patch});
+
+    // 4. Parcelas. aditivo_id marca a origem: sincronizarParcelasReceber()
+    //    ignora estas linhas, senao a proxima edicao do evento as apagaria.
+    if(pmts.length){
+      await sbFetch("contas_a_receber",{method:"POST",prefer:"return=minimal",body:pmts.map((p,i)=>({
+        cod_evento: cod,
+        aditivo_id: adId,
+        parcela: String(i+1),
+        num_parcela: String(pmts.length),
+        valor: (p.value===""||p.value==null)?null:parseFloat(p.value),
+        vencimento: p.date||null,
+        mes_ano: p.date?p.date.slice(0,7).replace("-",""):null,
+        status: "NP",
+        obs: p.desc||null,
+      }))});
+    }
+
+    cachedEvts=null; _agendaMap=null; _contratosCache=null;
+    closeAditivo();
+    renderContratos();
+    await copiarLinkAditivo(ad.token,"gerado");
+    toast("✅ Aditivo "+_adEv._numero+" do contrato "+cod+" gerado.");
+  } catch(e){
+    // Rollback do que esta chamada criou. O aditivo e a ancora: sem ele o
+    // resto nao deveria existir — entao cada passo tenta por conta propria.
+    // Num try unico, falhar ao apagar as parcelas deixaria o aditivo orfao,
+    // que e justamente o registro que nao pode sobrar.
+    if(adId){
+      for(const alvo of ["contas_a_receber?aditivo_id=eq."+adId, "aditivos?id=eq."+adId]){
+        try{ await sbFetch(alvo,{method:"DELETE"}); }
+        catch(err){ console.error("[aditivo] rollback falhou em "+alvo, err); }
+      }
+    }
+    toast("❌ Erro ao gerar aditivo: "+e.message);
+    console.error(e);
+  } finally {
+    btn.disabled=false; btn.textContent="Gerar aditivo e copiar link";
+  }
+}
+
+async function copiarLinkAditivo(token, status){
+  if(status==="enviado"||status==="assinado"){
+    toast("⚠️ Aditivo já foi para assinatura — o link não abre mais.");
+    return;
+  }
+  const link="https://fazendadamata.com/aditivo.html?token="+token;
+  try{
+    await navigator.clipboard.writeText(link);
+    toast("🔗 Link do aditivo copiado! Envie ao cliente.");
+  }catch(_){
+    prompt("Copie o link do aditivo:", link);
+  }
 }
 
 // ══════════════════════════════════════════
@@ -5279,6 +5713,7 @@ function _renderContratosTabela(rows) {
           <button onclick="_contratoAbrir('${r.cod}')" title="Visualizar evento" style="padding:4px 8px;border:1px solid var(--br);border-radius:6px;background:#fff;color:var(--dm);font-size:12px;cursor:pointer;">👁</button>
           ${adm?`<button onclick="_contratoEditar('${r.cod}')" title="Editar evento" style="padding:4px 8px;border:1px solid #3b82f6;border-radius:6px;background:#fff;color:#3b82f6;font-size:12px;cursor:pointer;">✏️</button>`:""}
           ${adm?`<button onclick="copiarLinkContrato('${r.cod}')" title="Copiar link do contrato" style="padding:4px 8px;border:1px solid var(--a);border-radius:6px;background:#fff;color:var(--a);font-size:12px;cursor:pointer;">🔗</button>`:""}
+          ${adm&&(r.assinatura_status==="enviado"||r.assinatura_status==="assinado"||r.contrato_ok)?`<button onclick="abrirAditivo('${r.cod}')" title="Termo aditivo" style="padding:4px 8px;border:1px solid #7c3aed;border-radius:6px;background:#fff;color:#7c3aed;font-size:12px;cursor:pointer;">📑</button>`:""}
           ${adm?`<button onclick="_contratoApagar('${r.cod}')" title="Apagar evento" style="padding:4px 8px;border:1px solid var(--er);border-radius:6px;background:#fff;color:var(--er);font-size:12px;cursor:pointer;">🗑</button>`:""}
           ${adm&&r.assinatura_doc_id&&!r.contrato_ok?`<button onclick="_verificarAutentique('${r.cod}',this)" title="Verificar assinatura no Autentique" style="padding:4px 8px;border:1px solid #7c3aed;border-radius:6px;background:#fff;color:#7c3aed;font-size:12px;cursor:pointer;">🔄</button>`:""}
         </td>

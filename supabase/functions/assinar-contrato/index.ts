@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     return json({ error: "JSON inválido." }, 400);
   }
 
-  const { cod, signerName, signerPhone, signerEmail, witnessName, witnessPhone, witnessEmail, pdfBase64, filename, docName } = payload || {};
+  const { cod, aditivoId, signerName, signerPhone, signerEmail, witnessName, witnessPhone, witnessEmail, pdfBase64, filename, docName } = payload || {};
   if (!pdfBase64 || !signerName || !signerPhone) {
     return json({ error: "Campos obrigatórios: pdfBase64, signerName, signerPhone." }, 400);
   }
@@ -129,7 +129,52 @@ Deno.serve(async (req) => {
   const docId = doc?.id || null;
   const link = doc?.signatures?.[0]?.link?.short_link || null;
 
-  // 2) Atualiza o evento (agenda) com o status e o id do documento
+  // 2) Atualiza o registro de origem com o status e o id do documento.
+  //
+  // Aditivo tem linha propria em aditivos e nao pode encostar na agenda: o
+  // contrato original ja foi assinado, e sobrescrever assinatura_doc_id ali
+  // deixaria o documento dele inalcancavel pelo check-autentique-status.
+  if (aditivoId) {
+    const SB_URL = Deno.env.get("SUPABASE_URL");
+    const SB_SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const sbH = {
+      apikey: SB_SR!,
+      Authorization: "Bearer " + SB_SR,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    };
+    try {
+      await fetch(`${SB_URL}/rest/v1/aditivos?id=eq.${encodeURIComponent(String(aditivoId))}`, {
+        method: "PATCH",
+        headers: sbH,
+        body: JSON.stringify({
+          assinatura_status: "enviado",
+          assinatura_doc_id: docId,
+          updated_at: new Date().toISOString(),
+        }),
+      });
+    } catch (_) {
+      // nao bloqueia: o documento ja foi criado no Autentique
+    }
+    try {
+      await fetch(`${SB_URL}/rest/v1/aditivos?id=eq.${encodeURIComponent(String(aditivoId))}&cliente_json=is.null`, {
+        method: "PATCH",
+        headers: sbH,
+        body: JSON.stringify({ cliente_json: {
+          origem: "assinatura",
+          nome: signerName || null,
+          whatsapp: signerPhone || null,
+          email: signerEmail || null,
+          testemunhaNome: witnessName || null,
+          testemunhaWhatsapp: witnessPhone || null,
+          testemunhaEmail: witnessEmail || null,
+        } }),
+      });
+    } catch (_) { /* nao bloqueia */ }
+
+    return json({ ok: true, docId, link });
+  }
+
   if (cod) {
     const SB_URL = Deno.env.get("SUPABASE_URL");
     const SB_SR = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
