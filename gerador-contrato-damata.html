@@ -152,11 +152,17 @@ select.inp{cursor:pointer}
       <div><span class="lbl">Horas Extras Recepção (h)</span><input class="inp" type="number" id="o-exHoras" min="0" max="99" value="0"></div>
     </div>
   </div>
-  <div>
+  <div style="margin-bottom:12px">
     <span class="lbl" style="margin-bottom:8px">Diárias Extras</span>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <div><span class="lbl">Diárias Montagem Extra</span><input class="inp" type="number" id="o-exMont" min="0" max="99" value="0"></div>
       <div><span class="lbl">Diárias Desmontagem Extra</span><input class="inp" type="number" id="o-exDesm" min="0" max="99" value="0"></div>
+    </div>
+  </div>
+  <div>
+    <span class="lbl" style="margin-bottom:8px">Serviços</span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><span class="lbl">Staff (qtd. diárias)</span><input class="inp" type="number" id="o-staff" min="0" max="99" value="0"></div>
     </div>
   </div>
 </div>
@@ -691,6 +697,7 @@ async function gerarLinkContrato(){
     acSb1:preset.acSb1,acSb2:preset.acSb2,acSb3:preset.acSb3,
     fuBal:preset.fuBal,fuMesas:preset.fuMesas,fuCad:preset.fuCad,fuBan:preset.fuBan,
     exHoras:preset.exHoras,exMont:preset.exMont,exDesm:preset.exDesm,
+    staffQty:preset.staffQty,
   };
   // Se estiver dentro do admin, envia para salvar e aguarda o código real confirmado
   if(window.parent&&window.parent!==window){
@@ -757,7 +764,7 @@ function collectPreset(){
     base.nomeNoivo=v("o-noivo");
     // Auto-mapear itens selecionados da tabela de preços para flags do contrato
     var _af={spTumb:false,spPeroba:false,spBrom:false,dayQty:0,
-      fuBal:false,fuMesas:0,fuCad:0,fuBan:0,exHoras:0,exMont:0,exDesm:0,
+      fuBal:false,fuMesas:0,fuCad:0,fuBan:0,exHoras:0,exMont:0,exDesm:0,staffQty:0,
       acLoft:false,acCasa:false,acSuiteAss:false,
       acSf1:false,acSf2:false,acSf3:false,acSf4:false,acSf5:false,
       acSb1:false,acSb2:false,acSb3:false};
@@ -769,6 +776,8 @@ function collectPreset(){
       if(c==="000007")_af.spPeroba=true;
       if(c==="000028")_af.dayQty=Math.max(_af.dayQty,q);
       if(c==="000032")_af.exMont+=q;
+      if(c==="000040")_af.exHoras+=q;
+      if(c==="000020")_af.staffQty+=q;
       if(c==="000001")_af.fuMesas+=q;
       if(c==="000003")_af.fuBal=true;
       if(c==="000010")_af.fuBan+=q;
@@ -797,6 +806,7 @@ function collectPreset(){
     base.exHoras=_af.exHoras||(parseInt(document.getElementById("o-exHoras").value)||0);
     base.exMont=_af.exMont||(parseInt(document.getElementById("o-exMont").value)||0);
     base.exDesm=_af.exDesm||(parseInt(document.getElementById("o-exDesm").value)||0);
+    base.staffQty=_af.staffQty||(parseInt(document.getElementById("o-staff").value)||0);
     base.acLoft=_af.acLoft||document.getElementById("o-acLoft").checked;
     base.acCasa=_af.acCasa||document.getElementById("o-acCasa").checked;
     base.acSuiteAss=_af.acSuiteAss||document.getElementById("o-acSuiteAss").checked;

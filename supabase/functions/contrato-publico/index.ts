@@ -238,7 +238,7 @@ Deno.serve(async (req) => {
       acSb1: extras.acSb1 || false, acSb2: extras.acSb2 || false, acSb3: extras.acSb3 || false,
       fuBal: extras.fuBal || false, fuMesas: extras.mesas || 0, fuCad: extras.cad || 0,
       fuBan: extras.ban || 0, exHoras: extras.horas || 0, exMont: extras.mont || 0,
-      exDesm: extras.desm || 0,
+      exDesm: extras.desm || 0, staffQty: extras.staff || 0,
     });
   }
 

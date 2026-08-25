@@ -191,7 +191,7 @@ body:has(#tab-form:target) #tab-form{display:block}
     </table>
 
     <table class="tb">
-      <tr><th style="width:8%">SIM</th><th style="width:8%">NÃO</th><th>5. Do Mobiliário DAMATA:</th></tr>
+      <tr><th style="width:8%">SIM</th><th style="width:8%">NÃO</th><th>5. Do Mobiliário e Serviços DAMATA:</th></tr>
       <tr><td id="fu1-s" style="text-align:center;font-weight:700"></td><td id="fu1-n" style="text-align:center;font-weight:700">✓</td><td><span id="fu1-txt"><strong>BALCÃO HEXAGONAL (completo)</strong>: Balcão/bar hexagonal modular em madeira maciça, diâmetro de 9,9m e altura de 1,10m.</span></td></tr>
       <tr><td id="fu2-s" style="text-align:center;font-weight:700"></td><td id="fu2-n" style="text-align:center;font-weight:700">✓</td><td><span id="fu2-txt"><strong>MESAS DE MADEIRA DE DEMOLIÇÃO</strong>: Madeira maciça com pés de ferro, capacidade para até 10 lugares.</span> <strong>Qtd.: <span id="c-mesas">0</span></strong></td></tr>
       <tr><td id="fu3-s" style="text-align:center;font-weight:700"></td><td id="fu3-n" style="text-align:center;font-weight:700">✓</td><td><span id="fu3-txt"><strong>CADEIRA TIFFANY</strong>: Polipropileno cor marrom com estofado capuccino.</span> <strong>Qtd.: <span id="c-cad">0</span></strong></td></tr>
@@ -199,6 +199,7 @@ body:has(#tab-form:target) #tab-form{display:block}
       <tr id="r-horas" style="display:none"><td style="text-align:center;font-weight:700">✓</td><td></td><td><strong>HORAS EXTRAS DE RECEPÇÃO</strong>: <strong><span id="c-horas">0</span> hora(s)</strong> adicionais além das 6h padrão — R$ 500,00/hora.</td></tr>
       <tr id="r-mont" style="display:none"><td style="text-align:center;font-weight:700">✓</td><td></td><td><strong>DIÁRIA(S) DE MONTAGEM EXTRA</strong>: <strong><span id="c-mont">0</span> dia(s)</strong> — R$ 500,00/dia.</td></tr>
       <tr id="r-desm" style="display:none"><td style="text-align:center;font-weight:700">✓</td><td></td><td><strong>DIÁRIA(S) DE DESMONTAGEM EXTRA</strong>: <strong><span id="c-desm">0</span> dia(s)</strong> — R$ 500,00/dia.</td></tr>
+      <tr id="r-staff" style="display:none"><td style="text-align:center;font-weight:700">✓</td><td></td><td><strong>STAFF</strong>: <strong><span id="c-staff">0</span> diária(s)</strong> de profissional de suporte durante o evento — banheiros, salão ou estacionamento.</td></tr>
     </table>
 
     <table class="tb" style="margin-bottom:18px">
@@ -396,6 +397,8 @@ function renderContract(){
   g('r-horas').style.display=(p.exHoras||0)>0?'':'none';
   g('r-mont').style.display=(p.exMont||0)>0?'':'none';
   g('r-desm').style.display=(p.exDesm||0)>0?'':'none';
+  tx('c-staff',p.staffQty||0);
+  g('r-staff').style.display=(p.staffQty||0)>0?'':'none';
   var ed='';
   if((p.exMont||0)>0||(p.exDesm||0)>0) ed='Neste contrato: '+(p.exMont||0)+' diária(s) de montagem e '+(p.exDesm||0)+' diária(s) de desmontagem extras.';
   tx('c-extdays',ed);

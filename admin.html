@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.24b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.24c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1103,6 +1103,7 @@
       <div class="ctr"><div><div class="ctr-n">Horas extras recepção</div><div class="ctr-s">R$ 500/h</div></div><div style="display:flex;align-items:center;gap:7px;"><button class="cbtn2" style="background:var(--br);color:var(--dk);" onclick="adj('horas',-1)">−</button><span id="v-horas" style="width:24px;text-align:center;font-weight:700;">0</span><button class="cbtn2" style="background:var(--a);color:var(--dk);" onclick="adj('horas',1)">+</button></div></div>
       <div class="ctr"><div><div class="ctr-n">Diárias montagem extra</div><div class="ctr-s">R$ 500/dia</div></div><div style="display:flex;align-items:center;gap:7px;"><button class="cbtn2" style="background:var(--br);color:var(--dk);" onclick="adj('mont',-1)">−</button><span id="v-mont" style="width:24px;text-align:center;font-weight:700;">0</span><button class="cbtn2" style="background:var(--a);color:var(--dk);" onclick="adj('mont',1)">+</button></div></div>
       <div class="ctr"><div><div class="ctr-n">Diárias desmontagem extra</div><div class="ctr-s">R$ 500/dia</div></div><div style="display:flex;align-items:center;gap:7px;"><button class="cbtn2" style="background:var(--br);color:var(--dk);" onclick="adj('desm',-1)">−</button><span id="v-desm" style="width:24px;text-align:center;font-weight:700;">0</span><button class="cbtn2" style="background:var(--a);color:var(--dk);" onclick="adj('desm',1)">+</button></div></div>
+      <div class="ctr"><div><div class="ctr-n">Staff</div><div class="ctr-s">diárias</div></div><div style="display:flex;align-items:center;gap:7px;"><button class="cbtn2" style="background:var(--br);color:var(--dk);" onclick="adj('staff',-1)">−</button><span id="v-staff" style="width:24px;text-align:center;font-weight:700;">0</span><button class="cbtn2" style="background:var(--a);color:var(--dk);" onclick="adj('staff',1)">+</button></div></div>
     </div>
     <div class="fsec" style="margin-bottom:10px;">
       <div class="fsec-title">💰 Valor e Parcelas</div>
@@ -2754,8 +2755,8 @@ async function deleteEventCascade() {
 // ══════════════════════════════════════════
 // NEW / EDIT EVENT
 // ══════════════════════════════════════════
-var pmts=[], cvals={day:0,mesas:10,cad:100,ban:30,horas:0,mont:0,desm:0};
-var cmax2={day:99,mesas:32,cad:999,ban:32,horas:99,mont:99,desm:99};
+var pmts=[], cvals={day:0,mesas:10,cad:100,ban:30,horas:0,mont:0,desm:0,staff:0};
+var cmax2={day:99,mesas:32,cad:999,ban:32,horas:99,mont:99,desm:99,staff:99};
 function adj(k,d){cvals[k]=Math.max(0,Math.min(cmax2[k]||999,cvals[k]+d));document.getElementById("v-"+k).textContent=cvals[k];}
 function togCb(el){el.closest("label").classList.toggle("on",el.checked);}
 function togCustom(f){const sel=document.getElementById("mef-"+f+"-sel");document.getElementById("mef-"+f+"-custom").style.display=sel.value==="outro"?"block":"none";}
@@ -2773,7 +2774,7 @@ async function genCode(){
 }
 
 function openNewEvent(existing){
-  pmts=[]; cvals={day:0,mesas:10,cad:100,ban:30,horas:0,mont:0,desm:0};
+  pmts=[]; cvals={day:0,mesas:10,cad:100,ban:30,horas:0,mont:0,desm:0,staff:0};
   Object.keys(cvals).forEach(k=>{const el=document.getElementById("v-"+k);if(el)el.textContent=cvals[k];});
   document.querySelectorAll(".cbtog").forEach(l=>{l.classList.remove("on");const cb=l.querySelector("input[type=checkbox]");if(cb)cb.checked=false;});
   renderPmts();
@@ -2808,7 +2809,7 @@ function openNewEvent(existing){
     else if(existing.tipo_evento){document.getElementById("mef-type-sel").value="outro";document.getElementById("mef-type-custom").style.display="block";document.getElementById("mef-type-txt").value=existing.tipo_evento;}
     const extras=existing.spaces_json?JSON.parse(existing.spaces_json):{};
     Object.entries({tumb:"spTumb",peroba:"spPeroba",brom:"spBrom",loft:"acLoft",casa:"acCasa",sf1:"acSf1",sf2:"acSf2",sf3:"acSf3",sf4:"acSf4",sf5:"acSf5",sb1:"acSb1",sb2:"acSb2",sb3:"acSb3",suiteass:"acSuiteAss",bal:"fuBal"}).forEach(([k,v])=>{const cb=document.getElementById("mef-"+k);if(cb&&extras[v]){cb.checked=true;cb.closest("label").classList.add("on");}});
-    ["day","mesas","cad","ban","horas","mont","desm"].forEach(k=>{if(extras[k]!=null){cvals[k]=extras[k];const el=document.getElementById("v-"+k);if(el)el.textContent=cvals[k];}});
+    ["day","mesas","cad","ban","horas","mont","desm","staff"].forEach(k=>{if(extras[k]!=null){cvals[k]=extras[k];const el=document.getElementById("v-"+k);if(el)el.textContent=cvals[k];}});
     pmts=existing.payments_json?JSON.parse(existing.payments_json):[];
     renderPmts();
   } else {
@@ -2954,7 +2955,8 @@ async function saveEvent(){
     acSf5:document.getElementById("mef-sf5").checked,acSb1:document.getElementById("mef-sb1").checked,
     acSb2:document.getElementById("mef-sb2").checked,acSb3:document.getElementById("mef-sb3").checked,
     fuBal:document.getElementById("mef-bal").checked,
-    mesas:cvals.mesas,cad:cvals.cad,ban:cvals.ban,horas:cvals.horas,mont:cvals.mont,desm:cvals.desm
+    mesas:cvals.mesas,cad:cvals.cad,ban:cvals.ban,horas:cvals.horas,mont:cvals.mont,desm:cvals.desm,
+    staff:cvals.staff
   };
 
   const statusVal = document.getElementById("mef-status").value;
@@ -3990,7 +3992,7 @@ async function openEventoDetalhe(cod) {
     acSb1:"Suíte Brom. 1", acSb2:"Suíte Brom. 2", acSb3:"Suíte Brom. 3",
     acSuiteAss:"Suíte Assessoria", fuBal:"Balcão Hexagonal"
   };
-  const COUNTER_LABELS = {day:"Piscina Day Use",mesas:"Mesas de Madeira",cad:"Cadeiras Tiffany",ban:"Bancos de Madeira",horas:"Horas extras recepção",mont:"Diárias montagem",desm:"Diárias desmontagem"};
+  const COUNTER_LABELS = {day:"Piscina Day Use",mesas:"Mesas de Madeira",cad:"Cadeiras Tiffany",ban:"Bancos de Madeira",horas:"Horas extras recepção",mont:"Diárias montagem",desm:"Diárias desmontagem",staff:"Staff (diárias)"};
   const STATUS_COLORS = {confirmado:"#16a34a",proposta:"#f59e0b",cancelado:"#dc2626",realizado:"#2563eb"};
 
   try {
@@ -5057,6 +5059,7 @@ async function salvarContrato(preset) {
       fuBal: preset.fuBal||false,
       mesas: preset.fuMesas||0, cad: preset.fuCad||0, ban: preset.fuBan||0,
       horas: preset.exHoras||0, mont: preset.exMont||0, desm: preset.exDesm||0,
+      staff: preset.staffQty||0,
       ...(isHospSave && {nomeLocatario: preset.nomeNoiva||""}),
     });
 
