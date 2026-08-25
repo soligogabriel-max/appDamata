@@ -3545,6 +3545,24 @@ async function vcDeletarSlot(id) {
   } catch(e) { toast("Erro: "+e.message); }
 }
 
+// Desfecho comercial: o que aconteceu depois da visita. E' anotacao da equipe,
+// diferente do feedback, que quem responde e' o cliente pelo link do follow-up.
+const VC_DESFECHOS = [
+  { v:"fechou_contrato", l:"🎉 Fechou contrato",     bg:"#d1fae5", fg:"#065f46" },
+  { v:"decidindo",       l:"🤔 Ainda está decidindo", bg:"#fef3c7", fg:"#92400e" },
+  { v:"nao_responde",    l:"🔇 Não responde",         bg:"#e5e7eb", fg:"#374151" },
+  { v:"fechou_outro",    l:"🏳️ Fechou outro espaço",  bg:"#fee2e2", fg:"#991b1b" }
+];
+// Fechou (aqui ou em outro lugar) encerra a prospeccao: nao faz sentido seguir
+// mandando follow-up. "Decidindo" e "nao responde" continuam no fluxo.
+const VC_DESFECHOS_FINAIS = ["fechou_contrato", "fechou_outro"];
+
+function vcDesfechoBadge(d) {
+  const o = VC_DESFECHOS.find(x => x.v === d);
+  if (!o) return "";
+  return `<div style="display:inline-block;font-size:10px;background:${o.bg};color:${o.fg};border-radius:4px;padding:1px 6px;margin-top:3px;font-weight:600;">${o.l}</div>`;
+}
+
 async function _vcLoadAgendadas() {
   const el = document.getElementById("vc-ag-lista");
   el.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
@@ -3580,7 +3598,7 @@ async function _vcLoadAgendadas() {
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);font-weight:600;">${fmtSlot(v.slot_id)}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.nome ? `<button onclick='abrirHistoricoVisitante(${JSON.stringify(v.visitor_id||null)},${JSON.stringify(v.nome||"")},${JSON.stringify(v.whatsapp||null)})' style='background:none;border:none;cursor:pointer;color:var(--a);font-weight:600;font-size:13px;text-decoration:underline;text-underline-offset:2px;padding:0;'>${v.nome}</button>` : "—"}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.whatsapp?`<a href="https://wa.me/55${v.whatsapp.replace(/\D/g,'')}" target="_blank" style="color:var(--a);">${v.whatsapp}</a>`:"—"}</td>
-        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${statusLabel[v.status]||v.status}${v.feedback?` <span style="font-size:10px;background:${v.feedback==='interesse'?'#d1fae5':'#fee2e2'};color:${v.feedback==='interesse'?'#065f46':'#991b1b'};border-radius:4px;padding:1px 5px;margin-left:4px;">${v.feedback==='interesse'?'✅ Interesse':'❌ Sem interesse'}</span>`:''}${v.feedback==='sem_interesse'&&v.feedback_motivo?`<div style="font-size:10px;color:var(--dl);margin-top:2px;">${v.feedback_motivo}</div>`:''}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${statusLabel[v.status]||v.status}${v.feedback?` <span style="font-size:10px;background:${v.feedback==='interesse'?'#d1fae5':'#fee2e2'};color:${v.feedback==='interesse'?'#065f46':'#991b1b'};border-radius:4px;padding:1px 5px;margin-left:4px;">${v.feedback==='interesse'?'✅ Interesse':'❌ Sem interesse'}</span>`:''}${v.feedback==='sem_interesse'&&v.feedback_motivo?`<div style="font-size:10px;color:var(--dl);margin-top:2px;">${v.feedback_motivo}</div>`:''}${vcDesfechoBadge(v.desfecho)}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">
           <div style="display:flex;align-items:center;gap:6px;">
           <button onclick="vcAbrirEdicao('${v.id}')" title="Editar visita" style="padding:4px 10px;background:none;border:1px solid var(--br);border-radius:6px;cursor:pointer;font-size:12px;color:var(--a);line-height:1;white-space:nowrap;">✏️ Editar</button>
@@ -3634,12 +3652,18 @@ async function vcAbrirEdicao(vcId) {
       <input type="hidden" id="vce-id"   value="${vcId}">
       <input type="hidden" id="vce-gcal"  value="${v.gcal_event_id || ''}">
       <input type="hidden" id="vce-slot0" value="${v.slot_id || ''}">
+      <input type="hidden" id="vce-desf0" value="${v.desfecho || ''}">
       <input type="hidden" id="vce-nome"  value="${(v.nome||'').replace(/"/g,'&quot;')}">
       <input type="hidden" id="vce-wpp"   value="${v.whatsapp||''}">
       <label class="lbl">Data e horário</label>
       <select id="vce-slot" class="inp">
         ${!v.slot_id ? '<option value="">— sem horário —</option>' : ''}
         ${slots.map(s => `<option value="${s.id}"${s.id === v.slot_id ? ' selected' : ''}>${fmtSlotOpt(s)}</option>`).join("")}
+      </select>
+      <label class="lbl">Desfecho <span style="font-weight:400;color:var(--dl);">— o que aconteceu depois da visita</span></label>
+      <select id="vce-desfecho" class="inp">
+        <option value="">— sem resposta ainda —</option>
+        ${VC_DESFECHOS.map(o => `<option value="${o.v}"${o.v === v.desfecho ? ' selected' : ''}>${o.l}</option>`).join("")}
       </select>
       <label class="lbl">Status</label>
       <select id="vce-status" class="inp">
@@ -3669,9 +3693,12 @@ async function vcSalvarEdicao() {
   btn.disabled = true; btn.textContent = "Salvando…";
   err.style.display = "none";
   try {
-    const patch = { status, obs: obs || null };
+    const desfecho  = document.getElementById("vce-desfecho").value || null;
+    const desfecho0 = document.getElementById("vce-desf0").value || null;
+    const patch = { status, obs: obs || null, desfecho };
     if (slotId) patch.slot_id = slotId;
-    if (["visitado_alta","visitado_baixa"].includes(status)) {
+    if (desfecho !== desfecho0) patch.desfecho_em = desfecho ? new Date().toISOString() : null;
+    if (["visitado_alta","visitado_baixa"].includes(status) && !VC_DESFECHOS_FINAIS.includes(desfecho)) {
       const d7 = new Date(); d7.setDate(d7.getDate() + 7);
       patch.followup_ativo    = true;
       patch.proximo_followup  = d7.toISOString().slice(0,10);
@@ -3694,7 +3721,7 @@ async function vcSalvarEdicao() {
     document.getElementById("m-vc-edit").classList.remove("open");
     _vcLoadAgendadas();
     toast("✅ Visita atualizada.");
-    if (["visitado_alta","visitado_baixa"].includes(status)) {
+    if (["visitado_alta","visitado_baixa"].includes(status) && !VC_DESFECHOS_FINAIS.includes(desfecho)) {
       const nome = document.getElementById("vce-nome")?.value || "";
       const wpp  = document.getElementById("vce-wpp")?.value  || "";
       vcAbrirFollowUp(vcId, nome, wpp);
