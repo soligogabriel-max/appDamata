@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.24c</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.25a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3291,11 +3291,7 @@ async function abrirHistoricoVisitante(visitorId, nome, whatsapp) {
 async function vcSyncGCal(vcId, btn) {
   btn.disabled = true; btn.textContent = "⏳";
   try {
-    const vcRows = await dbGet("visitas_comerciais", "id=eq."+vcId+"&select=nome,whatsapp,slot_id");
-    const v = vcRows[0]; if (!v) throw new Error("Visita não encontrada");
-    const slotRows = await dbGet("slots_visita", "id=eq."+v.slot_id+"&select=data,hora");
-    const s = slotRows[0]; if (!s) throw new Error("Slot não encontrado");
-    await _syncVCGoogleCal(vcId, v.nome||"", s.data, s.hora, v.whatsapp||null);
+    await _syncVCGoogleCal(vcId);
     toast("✅ Sincronizado com Google Calendar!");
     btn.textContent = "✅";
     btn.style.borderColor = "#86efac"; btn.style.color = "#15803d";
@@ -3305,26 +3301,18 @@ async function vcSyncGCal(vcId, btn) {
   }
 }
 
-async function _syncVCGoogleCal(vcId, nome, data, hora, whatsapp) {
+// Manda só o id da visita: a function le nome/horario/gcal_event_id no banco e
+// reaproveita o evento existente. Montar o evento aqui criava um evento novo a
+// cada clique no "Sync", porque o google_cal_id nunca ia junto.
+async function _syncVCGoogleCal(vcId) {
   const res = await fetch(SB_URL + "/functions/v1/sync-google-calendar", {
     method: "POST",
-    headers: { "apikey": SB_KEY, "Authorization": "Bearer " + _authToken, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "upsert",
-      nome_evento: "Visita — " + nome + (whatsapp ? " | 📱 " + whatsapp : ""),
-      data_evento: data,
-      hora_inicio: hora.slice(0, 5),
-      tipo_evento: "Visita Comercial",
-      local_evento: "Fazenda Damata, Mogi Mirim - SP",
-      notes: whatsapp ? "📱 WhatsApp: " + whatsapp : undefined,
-    }),
+    headers: { "apikey": SB_KEY, "Authorization": "Bearer " + (_authToken || SB_KEY), "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "upsert", visita_id: vcId }),
   });
-  const resp = await res.json();
-  if (resp.error) throw new Error(resp.detail?.message || resp.error);
-  if (resp.google_cal_id) {
-    await sbFetch("visitas_comerciais?id=eq."+vcId, { method:"PATCH", body:{ gcal_event_id: resp.google_cal_id }, prefer:"return=minimal" });
-  }
-  return resp;
+  const resp = await res.json().catch(() => ({}));
+  if (!res.ok || resp.error) throw new Error(resp.detail?.message || resp.error || ("HTTP " + res.status));
+  return resp;  // a function ja gravou o gcal_event_id na visita
 }
 
 // ══════════════════════════════════════════
@@ -3645,6 +3633,7 @@ async function vcAbrirEdicao(vcId) {
     document.getElementById("vce-form").innerHTML = `
       <input type="hidden" id="vce-id"   value="${vcId}">
       <input type="hidden" id="vce-gcal"  value="${v.gcal_event_id || ''}">
+      <input type="hidden" id="vce-slot0" value="${v.slot_id || ''}">
       <input type="hidden" id="vce-nome"  value="${(v.nome||'').replace(/"/g,'&quot;')}">
       <input type="hidden" id="vce-wpp"   value="${v.whatsapp||''}">
       <label class="lbl">Data e horário</label>
@@ -3690,11 +3679,18 @@ async function vcSalvarEdicao() {
     } else {
       patch.followup_ativo = false;
     }
-    if (status === "cancelada" && gcalId) {
-      await _vcDeleteGcal(gcalId);
+    if (status === "cancelada") {
+      if (!await _vcTentarDeleteGcal(vcId, gcalId)) { btn.disabled = false; btn.textContent = "💾 Salvar"; return; }
       patch.gcal_event_id = null;
     }
     await sbFetch("visitas_comerciais?id=eq." + vcId, { method:"PATCH", body:patch, prefer:"return=minimal" });
+    // Remarcou: o evento tem que andar junto. Roda depois do PATCH porque a
+    // function le a data nova direto do banco.
+    const slot0 = document.getElementById("vce-slot0")?.value || "";
+    if (status !== "cancelada" && slotId && slotId !== slot0) {
+      try { await _syncVCGoogleCal(vcId); }
+      catch(e) { toast("⚠️ Visita salva, mas o Google Calendar não atualizou: " + e.message, 5000); }
+    }
     document.getElementById("m-vc-edit").classList.remove("open");
     _vcLoadAgendadas();
     toast("✅ Visita atualizada.");
@@ -3755,36 +3751,37 @@ function vcAbrirFollowUp(vcId, nome, whatsapp) {
 }
 
 
-async function vcMudarStatus(id, gcalId, status) {
-  if(!status) return;
-  try {
-    if(status === "cancelada" && gcalId) {
-      await _vcDeleteGcal(gcalId);
-    }
-    await sbFetch("visitas_comerciais?id=eq."+id, { method:"PATCH", body:{ status }, prefer:"return=minimal" });
-    _vcLoadAgendadas();
-    toast("✅ Status atualizado.");
-  } catch(e) { toast("Erro: "+e.message); }
-}
-
 async function vcDeletarVisita(id, gcalId) {
   if(!confirm("Excluir esta visita permanentemente?")) return;
   try {
-    if(gcalId) await _vcDeleteGcal(gcalId);
+    if(!await _vcTentarDeleteGcal(id, gcalId)) return;
     await sbFetch("visitas_comerciais?id=eq."+id, { method:"DELETE", prefer:"return=minimal" });
     _vcLoadAgendadas();
     toast("✅ Visita excluída.");
   } catch(e) { toast("Erro ao excluir: "+e.message); }
 }
 
-async function _vcDeleteGcal(gcalId) {
+// Remove o evento do Google. Levanta erro se falhar — antes a resposta era
+// ignorada e o evento ficava orfao no calendario sem ninguem saber.
+async function _vcDeleteGcal(vcId) {
   const res = await fetch(SB_URL + "/functions/v1/sync-google-calendar", {
     method:"POST",
     headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken,"Content-Type":"application/json"},
-    body:JSON.stringify({ action:"delete", data_evento:"2000-01-01", google_cal_id:gcalId })
+    body:JSON.stringify({ action:"delete", visita_id:vcId })
   });
   const r = await res.json().catch(()=>({}));
-  if(r.error) toast("⚠️ GCal: "+r.error);
+  if(!res.ok || r.error) throw new Error(r.error || ("HTTP "+res.status));
+}
+
+// Retorna true se pode seguir: ou apagou no Google, ou o usuario decidiu
+// continuar mesmo assim ciente de que o evento vai sobrar la.
+async function _vcTentarDeleteGcal(vcId, gcalId) {
+  if(!gcalId) return true;
+  try { await _vcDeleteGcal(vcId); return true; }
+  catch(e) {
+    return confirm("Não consegui remover o evento do Google Calendar (" + e.message
+      + ").\n\nContinuar mesmo assim? O evento vai continuar aparecendo na agenda e você terá que apagá-lo à mão.");
+  }
 }
 
 function vcNovaManual() {
@@ -3838,12 +3835,7 @@ async function vcSalvarManual() {
   try {
     const rows = await sbFetch("visitas_comerciais",{ method:"POST", body:{ slot_id:slot, nome, whatsapp:wpp||null, obs:obs||null, status:"agendada" } });
     const inserted = Array.isArray(rows) ? rows[0] : rows;
-    if(inserted?.id) {
-      const opt = selEl.options[selEl.selectedIndex];
-      const slotData = opt?.dataset?.data;
-      const slotHora = opt?.dataset?.hora;
-      if(slotData && slotHora) _syncVCGoogleCal(inserted.id, nome, slotData, slotHora, wpp||null).catch(e=>toast("⚠️ GCal: "+e.message,4000));
-    }
+    if(inserted?.id) await _syncVCGoogleCal(inserted.id).catch(e=>toast("⚠️ GCal: "+e.message,4000));
     document.getElementById('m-vc-manual')?.classList.remove('open');
     _vcLoadAgendadas();
     toast("✅ Visita agendada.");
@@ -3954,9 +3946,7 @@ async function _orcConfirmarVisita() {
       body:{ slot_id:_vcSelectedSlotId, orc_id:_orc._dbId||null, visitor_id:vid, nome, whatsapp:_orc.whatsapp||null, email:_orc.email||null, status:"agendada" }
     });
     const inserted = Array.isArray(rows) ? rows[0] : rows;
-    if(inserted?.id && _vcSelectedSlotData && _vcSelectedSlotHora) {
-      _syncVCGoogleCal(inserted.id, nome, _vcSelectedSlotData, _vcSelectedSlotHora, _orc.whatsapp||null).catch(e=>toast("⚠️ GCal: "+e.message,4000));
-    }
+    if(inserted?.id) _syncVCGoogleCal(inserted.id).catch(e=>toast("⚠️ GCal: "+e.message,4000));
     document.getElementById("orc-slots-confirmar").style.display="none";
     document.getElementById("orc-slots-horas").style.display="none";
     document.getElementById("orc-slots-done").style.display="";

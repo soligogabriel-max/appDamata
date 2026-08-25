@@ -9,6 +9,11 @@
 //
 // Body: { action: "upsert"|"delete", cod, nome_evento, data_evento, data_fim?,
 //         tipo_evento?, local_evento?, status?, spaces_json?, google_cal_id? }
+//   — exige JWT de admin/equipe, ou a service role key (chamada entre funções).
+//
+// Body alternativo: { action?, visita_id } — para os fluxos sem login. A função
+// lê a visita comercial no banco, monta o evento a partir dela e grava o
+// gcal_event_id de volta. Nada do body do cliente entra no calendário.
 //
 // Resposta: { ok: true, google_cal_id: "..." }
 
@@ -98,12 +103,50 @@ function getJwtRole(authHeader: string): string | null {
   } catch { return null; }
 }
 
+// ── Modo visita comercial ────────────────────────────────────────────────
+// A página pública (index.html) e a confirmar-visita chamam sem JWT de
+// admin/equipe — a chave publishable nem é JWT. Em vez de confiar no que o
+// navegador manda, aceitamos só o visita_id e lemos o resto do banco com a
+// service role. Assim nada do body do cliente vira evento no calendário.
+const SB_URL   = Deno.env.get("SUPABASE_URL") ?? "";
+const SB_SVC   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const svcHeaders = {
+  apikey: SB_SVC,
+  Authorization: "Bearer " + SB_SVC,
+  "Content-Type": "application/json",
+};
+
+type Visita = {
+  id: string;
+  nome: string | null;
+  whatsapp: string | null;
+  status: string | null;
+  gcal_event_id: string | null;
+  slots_visita: { data: string; hora: string } | null;
+};
+
+async function fetchVisita(id: string): Promise<Visita | null> {
+  const res = await fetch(
+    `${SB_URL}/rest/v1/visitas_comerciais?id=eq.${encodeURIComponent(id)}` +
+      `&select=id,nome,whatsapp,status,gcal_event_id,slots_visita(data,hora)`,
+    { headers: svcHeaders },
+  );
+  if (!res.ok) return null;
+  const rows = await res.json().catch(() => []);
+  return Array.isArray(rows) ? (rows[0] ?? null) : null;
+}
+
+async function saveGcalId(id: string, gcalId: string | null) {
+  await fetch(`${SB_URL}/rest/v1/visitas_comerciais?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { ...svcHeaders, Prefer: "return=minimal" },
+    body: JSON.stringify({ gcal_event_id: gcalId }),
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
-
-  const role = getJwtRole(req.headers.get("Authorization") || "");
-  if (!["admin", "equipe"].includes(role ?? "")) return json({ error: "Não autorizado." }, 401);
 
   const clientId     = Deno.env.get("GOOGLE_OAUTH_CLIENT_ID");
   const clientSecret = Deno.env.get("GOOGLE_OAUTH_CLIENT_SECRET");
@@ -129,6 +172,7 @@ Deno.serve(async (req) => {
     google_cal_id?: string;
     assessoria_nome?: string;
     notes?: string;  // texto livre adicionado ao final da descrição
+    visita_id?: string;  // visita comercial: função monta o evento a partir do banco
   } = {};
 
   try {
@@ -137,9 +181,55 @@ Deno.serve(async (req) => {
     return json({ error: "JSON inválido." }, 400);
   }
 
-  const { action = "upsert", cod, nome_evento, data_evento, data_fim, hora_inicio, hora_fim, tipo_evento, local_evento, status, spaces_json, google_cal_id, assessoria_nome, notes } = body;
+  let { action = "upsert", cod, nome_evento, data_evento, data_fim, hora_inicio, hora_fim, tipo_evento, local_evento, status, spaces_json, google_cal_id, assessoria_nome, notes } = body;
 
-  if (!data_evento) return json({ error: "data_evento obrigatório." }, 400);
+  // Quem pode mandar um evento arbitrário: admin/equipe logados, ou uma outra
+  // Edge Function usando a service role. Os demais só podem pedir a sincronia
+  // de uma visita comercial pelo id — os dados vêm do banco, não do body.
+  const authHeader = req.headers.get("Authorization") || "";
+  const role  = getJwtRole(authHeader);
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const isStaff = ["admin", "equipe"].includes(role ?? "") || (!!SB_SVC && token === SB_SVC);
+
+  let visita: Visita | null = null;
+  if (body.visita_id) {
+    if (!SB_URL || !SB_SVC) return json({ error: "Function sem SUPABASE_URL/SERVICE_ROLE_KEY." }, 500);
+    visita = await fetchVisita(body.visita_id);
+    if (!visita) return json({ error: "Visita não encontrada." }, 404);
+  } else if (!isStaff) {
+    return json({ error: "Não autorizado." }, 401);
+  }
+
+  // Visita comercial: o evento é derivado da linha do banco.
+  if (visita) {
+    const slot = visita.slots_visita;
+    if (action !== "delete" && visita.status !== "agendada") {
+      // cancelada / já visitada não tem evento a criar; se sobrou algum, remove.
+      if (!visita.gcal_event_id) return json({ ok: true, msg: "Visita não está agendada." });
+      action = "delete";
+    }
+    if (action === "delete") {
+      google_cal_id = visita.gcal_event_id ?? undefined;
+    } else {
+      if (!slot) return json({ error: "Visita sem horário definido." }, 400);
+      const wpp   = visita.whatsapp || "";
+      nome_evento = "Visita — " + (visita.nome || "") + (wpp ? " | 📱 " + wpp : "");
+      cod         = undefined;
+      data_evento = slot.data;
+      hora_inicio = slot.hora.slice(0, 5);
+      hora_fim    = undefined;
+      data_fim    = undefined;
+      tipo_evento = "Visita Comercial";
+      local_evento = "Fazenda Damata, Mogi Mirim - SP";
+      status      = undefined;
+      spaces_json = undefined;
+      assessoria_nome = undefined;
+      notes         = wpp ? "📱 WhatsApp: " + wpp : undefined;
+      google_cal_id = visita.gcal_event_id ?? undefined;
+    }
+  }
+
+  if (action !== "delete" && !data_evento) return json({ error: "data_evento obrigatório." }, 400);
 
   let accessToken: string;
   try {
@@ -154,8 +244,14 @@ Deno.serve(async (req) => {
   // ── DELETE ──
   if (action === "delete") {
     if (!google_cal_id) return json({ ok: true, msg: "Sem google_cal_id, nada a deletar." });
-    await fetch(`${BASE}/${google_cal_id}`, { method: "DELETE", headers: authH });
-    return json({ ok: true });
+    const delRes = await fetch(`${BASE}/${google_cal_id}`, { method: "DELETE", headers: authH });
+    // 410/404 = evento já não existe (apagado na mão, por exemplo): fim igual.
+    if (!delRes.ok && delRes.status !== 404 && delRes.status !== 410) {
+      const detail = await delRes.text().catch(() => "");
+      return json({ error: `Google recusou a exclusão (HTTP ${delRes.status}).`, detail }, 502);
+    }
+    if (visita) await saveGcalId(visita.id, null);
+    return json({ ok: true, deleted: true });
   }
 
   // ── UPSERT (create ou update) ──
@@ -216,9 +312,13 @@ Deno.serve(async (req) => {
   }
 
   const calData = await calRes!.json();
-  if (calData.error) {
+  if (calData.error || !calData.id) {
     return json({ error: "Google Calendar retornou erro.", detail: calData.error }, 502);
   }
+
+  // Visita comercial: grava o id aqui, com a service role. Antes isso era feito
+  // pelo navegador com a chave anon e falhava calado, deixando evento órfão.
+  if (visita && calData.id !== visita.gcal_event_id) await saveGcalId(visita.id, calData.id);
 
   return json({ ok: true, google_cal_id: calData.id });
 });
