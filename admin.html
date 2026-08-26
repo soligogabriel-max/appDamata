@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.26d</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.26e</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1609,6 +1609,10 @@
       <div class="iblbl" id="evd-itens-lbl">🛒 Itens do pedido</div>
       <div id="evd-itens-body" style="margin-top:6px;"></div>
     </div>
+    <div id="evd-rec-wrap" style="display:none;background:var(--bg);border-radius:11px;padding:12px;margin-bottom:10px;border:1px solid var(--br);">
+      <div class="iblbl">💰 Contas a receber</div>
+      <div id="evd-rec-body" style="margin-top:6px;"></div>
+    </div>
     <div id="evd-obs-interna-wrap" style="display:none;background:#fffbeb;border-radius:11px;padding:12px;margin-bottom:10px;border:1px solid #fcd34d;">
       <div class="iblbl" style="color:#92400e;">🔒 Observações Internas (Equipe)</div>
       <textarea id="evd-obs-interna" rows="3" placeholder="Anotações internas sobre este evento..." style="width:100%;margin-top:6px;border:1px solid #fcd34d;border-radius:7px;padding:8px;font-size:13px;font-family:inherit;resize:vertical;background:#fff;box-sizing:border-box;"></textarea>
@@ -2790,7 +2794,9 @@ function openEvDet(ev){
   const _canObs=effIsAdmin()||effRole()==="equipe";
   _obsWrap.style.display=_canObs?"block":"none";
   if(_canObs){document.getElementById("evd-obs-interna").value=ev.obs_interna||"";document.getElementById("evd-obs-saved").style.display="none";}
-  loadEvDetItens(currentEvCod);
+  const _seq = ++_evdSeq;
+  loadEvDetItens(currentEvCod, _seq);
+  loadEvDetReceber(currentEvCod, _seq);
   document.getElementById("m-evdet").classList.add("open");
 }
 
@@ -2798,7 +2804,7 @@ function openEvDet(ev){
 // A descrição do item quase nunca está em itens_pedido (59 de ~2500 linhas):
 // o nome vem do inventário pelo cod_item. Assessoria não tem SELECT em
 // inventario, então a lista cai para o código — melhor que não mostrar nada.
-let _evdItensSeq = 0, _evdInvMap = null;
+let _evdSeq = 0, _evdInvMap = null;
 async function _getInvDescMap() {
   if(_evdInvMap) return _evdInvMap;
   try {
@@ -2809,8 +2815,8 @@ async function _getInvDescMap() {
   } catch(e) { return {}; } // falha de rede não vira cache permanente de códigos
 }
 function _evdQtd(q){ return q==null?"—":Number(q).toLocaleString("pt-BR",{maximumFractionDigits:2}); }
-async function loadEvDetItens(cod) {
-  const seq = ++_evdItensSeq;
+async function loadEvDetItens(cod, seq) {
+  if(seq!==_evdSeq) return;
   const wrap = document.getElementById("evd-itens-wrap");
   const body = document.getElementById("evd-itens-body");
   wrap.style.display = "none";
@@ -2819,13 +2825,13 @@ async function loadEvDetItens(cod) {
   wrap.style.display = "block";
   try {
     const peds = await dbGet("pedidos","cod_evento=eq."+encodeURIComponent(cod)+"&select=id,numero_pedido,total_pedido&order=id.asc&limit=50");
-    if(seq!==_evdItensSeq) return;
+    if(seq!==_evdSeq) return;
     if(!peds.length){ wrap.style.display="none"; return; }
     const [itens, invMap] = await Promise.all([
       dbGet("itens_pedido","pedido_id=in.("+peds.map(p=>p.id).join(",")+")&select=pedido_id,cod_item,descricao,quantidade,valor_unitario&order=id.asc&limit=1000"),
       _getInvDescMap()
     ]);
-    if(seq!==_evdItensSeq) return;
+    if(seq!==_evdSeq) return;
     const showVals = effIsAdmin();
     const porPedido = {};
     itens.forEach(it=>{ (porPedido[it.pedido_id]=porPedido[it.pedido_id]||[]).push(it); });
@@ -2863,8 +2869,54 @@ async function loadEvDetItens(cod) {
       </table>`;
     }).join("");
   } catch(e) {
-    if(seq!==_evdItensSeq) return;
+    if(seq!==_evdSeq) return;
     body.innerHTML = '<div style="font-size:12px;color:#A03030;">Erro ao carregar itens: '+_esc(e.message)+'</div>';
+  }
+}
+// ── Contas a receber no modal do evento ──
+// Só admin: o valor do contrato já é escondido dos demais papéis na agenda.
+// Status na base vem em três grafias — PAGO, pago e NP — então "em aberto" é
+// testado por NP, mesmo critério da ficha do evento e do painel financeiro.
+async function loadEvDetReceber(cod, seq) {
+  if(seq!==_evdSeq) return;
+  const wrap = document.getElementById("evd-rec-wrap");
+  const body = document.getElementById("evd-rec-body");
+  wrap.style.display = "none";
+  if(!cod || !effIsAdmin()) return;
+  body.innerHTML = '<div style="font-size:12px;color:var(--dl);">Carregando parcelas…</div>';
+  wrap.style.display = "block";
+  try {
+    const rows = await dbGet("contas_a_receber","cod_evento=eq."+encodeURIComponent(cod)+"&select=valor,status,vencimento&order=vencimento.asc&limit=300");
+    if(seq!==_evdSeq) return;
+    if(!rows.length){ wrap.style.display="none"; return; }
+    const hoje    = localDate();
+    const soma    = list => list.reduce((s,r)=>s+(Number(r.valor)||0),0);
+    const total   = soma(rows);
+    const abertas = rows.filter(r=>r.status==="NP");
+    const falta   = soma(abertas);
+    const pago    = total - falta;
+    const pct     = total>0 ? Math.round(pago/total*100) : 0;
+    const atras   = abertas.filter(r=>r.vencimento && r.vencimento < hoje);
+    const vAtras  = soma(atras);
+    const prox    = abertas.find(r=>r.vencimento && r.vencimento >= hoje);
+    const linha = (lbl,val,cor,forte)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:12px;">
+      <span style="color:var(--dl);">${lbl}</span>
+      <span style="white-space:nowrap;${forte?"font-weight:700;":""}${cor?"color:"+cor+";":"color:var(--dk);"}">${fmt(val)}</span>
+    </div>`;
+    body.innerHTML = `
+      <div style="height:5px;border-radius:3px;background:var(--br);overflow:hidden;margin-bottom:5px;">
+        <div style="height:100%;width:${pct}%;background:var(--ok);border-radius:3px;"></div>
+      </div>
+      <div style="font-size:10px;color:var(--dl);margin-bottom:6px;">${pct}% recebido · ${rows.length-abertas.length} de ${rows.length} parcela${rows.length>1?"s":""} paga${rows.length-abertas.length===1?"":"s"}</div>
+      ${linha("Total das parcelas", total, null, true)}
+      ${linha("Já pago", pago, "var(--ok)", true)}
+      ${linha("Falta receber", falta, falta>0?"#dc2626":"var(--dl)", true)}
+      ${atras.length?`<div style="margin-top:6px;font-size:11px;color:#dc2626;font-weight:700;">⚠️ ${atras.length} parcela${atras.length>1?"s":""} vencida${atras.length>1?"s":""} — ${fmt(vAtras)}</div>`:""}
+      ${prox?`<div style="margin-top:4px;font-size:11px;color:var(--dl);">Próxima: ${fmtDate(prox.vencimento)} · ${fmt(prox.valor)}</div>`:""}
+    `;
+  } catch(e) {
+    if(seq!==_evdSeq) return;
+    body.innerHTML = '<div style="font-size:12px;color:#A03030;">Erro ao carregar parcelas: '+_esc(e.message)+'</div>';
   }
 }
 async function saveObsInterna(){
