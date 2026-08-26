@@ -88,28 +88,37 @@ Deno.serve(async (req) => {
     const token = Deno.env.get("Autentique_token");
     if (!token) return json({ error: "Token do Autentique não configurado." }, 500);
 
-    let body: { cod?: string } = {};
+    let body: { cod?: string; aditivoId?: number | string } = {};
     try { body = await req.json(); } catch { return json({ error: "JSON inválido." }, 400); }
 
-    const { cod } = body;
-    if (!cod) return json({ error: "cod obrigatório." }, 400);
+    // Dois documentos independentes no Autentique: o contrato (agenda) e o
+    // termo aditivo (aditivos). Quem chama diz qual, e o PATCH do fim volta
+    // para a mesma linha — marcar a agenda por um aditivo assinado daria o
+    // contrato como concluido sem ele ter sido.
+    const { cod, aditivoId } = body;
+    const ehAditivo = aditivoId !== undefined && aditivoId !== null && aditivoId !== "";
+    if (!ehAditivo && !cod) return json({ error: "cod ou aditivoId obrigatório." }, 400);
 
-    // 1) Busca o assinatura_doc_id do evento
+    const alvo = ehAditivo
+      ? { rotulo: "Termo aditivo", filtro: `aditivos?id=eq.${encodeURIComponent(String(aditivoId))}` }
+      : { rotulo: "Evento",        filtro: `agenda?cod=eq.${encodeURIComponent(String(cod))}` };
+
+    // 1) Busca o assinatura_doc_id do registro
     let evRows: any[] = [];
     try {
       const evRes = await fetch(
-        `${SB_URL}/rest/v1/agenda?cod=eq.${encodeURIComponent(cod)}&select=cod,assinatura_doc_id,assinatura_status,contrato_ok`,
+        `${SB_URL}/rest/v1/${alvo.filtro}&select=assinatura_doc_id,assinatura_status,contrato_ok`,
         { headers: { apikey: SB_SR, Authorization: "Bearer " + SB_SR } }
       );
       evRows = await evRes.json();
     } catch (e) {
-      return json({ error: "Erro ao consultar evento: " + String(e) }, 502);
+      return json({ error: "Erro ao consultar registro: " + String(e) }, 502);
     }
 
-    if (!evRows.length) return json({ error: "Evento não encontrado." }, 404);
+    if (!evRows.length) return json({ error: alvo.rotulo + " não encontrado." }, 404);
 
     const ev = evRows[0];
-    if (!ev.assinatura_doc_id) return json({ error: "Evento não tem documento Autentique vinculado." }, 400);
+    if (!ev.assinatura_doc_id) return json({ error: alvo.rotulo + " não tem documento Autentique vinculado." }, 400);
 
     // 2) Consulta o Autentique
     const query = `query GetDocument($id: UUID!) {
@@ -162,7 +171,7 @@ Deno.serve(async (req) => {
       if (pdfUrl) patch.assinatura_pdf_url = pdfUrl;
 
       try {
-        await fetch(`${SB_URL}/rest/v1/agenda?cod=eq.${encodeURIComponent(cod)}`, {
+        await fetch(`${SB_URL}/rest/v1/${alvo.filtro}`, {
           method: "PATCH",
           headers: {
             apikey: SB_SR,

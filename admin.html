@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.26b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.26c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3637,11 +3637,38 @@ function _adAlteracoes(){
   return alt;
 }
 
-function _adNovoSpacesJson(){
+// Itens de catalogo tambem sao espaco/mobiliario/servico do evento. Sem este
+// mapeamento eles paravam em itens_pedido e sumiam da ficha do evento, que
+// monta os chips a partir do spaces_json — incluir 50 cadeiras num aditivo
+// deixava a producao montando as 100 do contrato original.
+//
+// Mesmos codigos do auto-mapeamento do gerador (collectPreset), com as chaves
+// que a agenda usa: mesas/cad/ban/horas/mont/desm/staff, nao fuMesas/exHoras.
+const AD_COD_FLAG = {
+  "000004":["b","spTumb"], "000005":["b","spBrom"], "000007":["b","spPeroba"],
+  "000003":["b","fuBal"],
+  "000019":["b","acLoft"], "000006":["b","acCasa"], "000022":["b","acSuiteAss"],
+  "000011":["b","acSf1"], "000012":["b","acSf2"], "000029":["b","acSf3"],
+  "000030":["b","acSf4"], "000031":["b","acSf5"],
+  "000013":["b","acSb1"], "000014":["b","acSb2"], "000015":["b","acSb3"],
+  "000001":["n","mesas"], "000025":["n","cad"], "000010":["n","ban"],
+  "000040":["n","horas"], "000032":["n","mont"], "000020":["n","staff"],
+  "000028":["max","dayQty"],
+};
+
+function _adNovoSpacesJson(itens){
   const extras={...( _adEv._extras||{} )};
   AD_ESPACOS.forEach(([k])=>{
     const cb=document.getElementById("ad-e-"+k);
     if(cb) extras[k]=cb.checked;
+  });
+  (itens||[]).forEach(it=>{
+    const m=AD_COD_FLAG[it.cod];
+    if(!m) return;                                  // item avulso nao tem destino no quadro
+    const q=Math.round(Number(it.quantidade)||1);
+    if(m[0]==="b") extras[m[1]]=true;
+    else if(m[0]==="n") extras[m[1]]=(Number(extras[m[1]])||0)+q;
+    else if(m[0]==="max") extras[m[1]]=Math.max(Number(extras[m[1]])||0, q);
   });
   return JSON.stringify(extras);
 }
@@ -3721,7 +3748,7 @@ async function salvarAditivo(){
     if(d2) patch.data_fim=d2;
     if(cin) patch.cin=cin;
     if(cout) patch.cout=cout;
-    patch.spaces_json=_adNovoSpacesJson();
+    patch.spaces_json=_adNovoSpacesJson(itens);
     await sbFetch("agenda?cod=eq."+encodeURIComponent(cod),{method:"PATCH",prefer:"return=minimal",body:patch});
 
     // 4. Parcelas. aditivo_id marca a origem: sincronizarParcelasReceber()
@@ -3761,6 +3788,38 @@ async function salvarAditivo(){
   } finally {
     btn.disabled=false; btn.textContent="Gerar aditivo e copiar link";
   }
+}
+
+// Mesmo modal do contrato — a edge function devolve a lista de signatarios
+// dos dois tipos de documento, so muda quem ela consulta e marca.
+// "3º termo aditivo — contrato 202633" em vez de um id cru. Sai da pagina ja
+// carregada; se nao achar, cai no numero do registro.
+function _adRotulo(id){
+  for(const cod in _aditivosPorEvento){
+    const a=(_aditivosPorEvento[cod]||[]).find(x=>x.id===id);
+    if(a) return a.numero+"º termo aditivo — contrato "+cod;
+  }
+  return "Termo aditivo #"+id;
+}
+
+async function _verificarAutentiqueAditivo(id, btn){
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = "⏳";
+  try {
+    const { data: { session } } = await _sb.auth.getSession();
+    const token = session?.access_token;
+    if (!token) { toast("❌ Sessão expirada."); btn.disabled=false; btn.textContent=orig; return; }
+    const res = await fetch(SB_URL + "/functions/v1/check-autentique-status", {
+      method: "POST",
+      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ aditivoId: id }),
+    });
+    const data = await res.json();
+    if (data.error) { toast("❌ " + data.error); btn.disabled=false; btn.textContent=orig; return; }
+    if (data.todosAssinaram) renderContratos();
+    else { btn.disabled=false; btn.textContent=orig; }
+    _showAssinaturaModal(_adRotulo(id), data);
+  } catch(e) { toast("❌ Erro: " + e.message); btn.disabled=false; btn.textContent=orig; }
 }
 
 async function copiarLinkAditivo(token, status){
@@ -5756,6 +5815,7 @@ function _linhaAditivos(r, i) {
       ${contratoStatusBadge(st)}
       ${a.assinatura_pdf_url?`<a href="${a.assinatura_pdf_url}" target="_blank" style="font-size:11px;font-weight:700;color:#166534;text-decoration:none;background:#dcfce7;padding:2px 8px;border-radius:99px;white-space:nowrap;">✅ Ver PDF</a>`:""}
       <button onclick="copiarLinkAditivo('${a.token}','${st||""}')" title="${morto?"Link expirado — já foi para assinatura":"Copiar link do aditivo"}" style="padding:2px 8px;border:1px solid ${morto?"var(--br)":"var(--a)"};border-radius:6px;background:#fff;color:${morto?"var(--dl)":"var(--a)"};font-size:11px;cursor:pointer;">🔗 Link</button>
+      ${a.assinatura_doc_id&&!a.contrato_ok?`<button onclick="_verificarAutentiqueAditivo(${a.id},this)" title="Verificar assinatura no Autentique" style="padding:2px 8px;border:1px solid #7c3aed;border-radius:6px;background:#fff;color:#7c3aed;font-size:11px;cursor:pointer;">🔄</button>`:""}
     </div>`;
   }).join("");
   return `<tr style="background:${i%2===0?'var(--s1)':'var(--s2)'};border-bottom:1px solid var(--br);">
@@ -5785,7 +5845,7 @@ function _showAssinaturaModal(cod, data) {
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
       <div>
         <div style="font-size:16px;font-weight:700;color:var(--dk);">Status de Assinaturas</div>
-        <div style="font-size:12px;color:var(--dl);margin-top:2px;">Contrato ${_esc(cod)}</div>
+        <div style="font-size:12px;color:var(--dl);margin-top:2px;">${_esc(cod)}</div>
       </div>
       <button onclick="document.getElementById('m-autentique').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--dl);">✕</button>
     </div>
@@ -5831,7 +5891,7 @@ async function _verificarAutentique(cod, btn) {
     if (data.error) { toast("❌ " + data.error); btn.disabled=false; btn.textContent=orig; return; }
     if (data.todosAssinaram) renderContratos();
     else { btn.disabled=false; btn.textContent=orig; }
-    _showAssinaturaModal(cod, data);
+    _showAssinaturaModal("Contrato " + cod, data);
   } catch(e) { toast("❌ Erro: " + e.message); btn.disabled=false; btn.textContent=orig; }
 }
 
@@ -5955,7 +6015,7 @@ async function renderContratos(pagina) {
       try {
         const ads = await dbGet("aditivos",
           "cod_evento=in.(" + rows.map(r=>r.cod).join(",") + ")" +
-          "&select=id,cod_evento,numero,valor,assinatura_status,contrato_ok,assinatura_pdf_url,token" +
+          "&select=id,cod_evento,numero,valor,assinatura_status,contrato_ok,assinatura_pdf_url,assinatura_doc_id,token" +
           "&order=numero.asc&limit=500");
         ads.forEach(a => { (_aditivosPorEvento[a.cod_evento] ||= []).push(a); });
       } catch(_) { /* a tabela de contratos nao depende disto para aparecer */ }
