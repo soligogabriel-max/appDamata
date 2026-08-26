@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.26a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.26b</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -5705,6 +5705,7 @@ function contratoStatusBadge(st) {
 }
 
 let _contratosRows = [];
+let _aditivosPorEvento = {};
 
 function _renderContratosTabela(rows) {
   const el = document.getElementById("contratos-list");
@@ -5734,8 +5735,33 @@ function _renderContratosTabela(rows) {
           ${adm?`<button onclick="_contratoApagar('${r.cod}')" title="Apagar evento" style="padding:4px 8px;border:1px solid var(--er);border-radius:6px;background:#fff;color:var(--er);font-size:12px;cursor:pointer;">🗑</button>`:""}
           ${adm&&r.assinatura_doc_id&&!r.contrato_ok?`<button onclick="_verificarAutentique('${r.cod}',this)" title="Verificar assinatura no Autentique" style="padding:4px 8px;border:1px solid #7c3aed;border-radius:6px;background:#fff;color:#7c3aed;font-size:12px;cursor:pointer;">🔄</button>`:""}
         </td>
-      </tr>`).join("")}
+      </tr>
+      ${_linhaAditivos(r, i)}`).join("")}
     </tbody></table>`;
+}
+
+// Aditivos aparecem como sub-linha da propria linha do contrato: e onde o
+// usuario ja esta olhando. Antes a lista so existia dentro do modal de criar
+// aditivo, entao copiar um link exigia entrar no fluxo de criacao.
+function _linhaAditivos(r, i) {
+  const ads = _aditivosPorEvento[r.cod] || [];
+  if (!ads.length) return "";
+  const fmt = v => "R$ " + (parseFloat(v||0)).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const linhas = ads.map(a => {
+    const st = a.contrato_ok ? "assinado" : (a.assinatura_status||null);
+    const morto = st === "enviado" || st === "assinado";
+    return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;flex-wrap:wrap;">
+      <span style="font-weight:700;color:#7c3aed;white-space:nowrap;">📑 ${a.numero}º aditivo</span>
+      <span style="color:var(--dm);white-space:nowrap;">${fmt(a.valor)}</span>
+      ${contratoStatusBadge(st)}
+      ${a.assinatura_pdf_url?`<a href="${a.assinatura_pdf_url}" target="_blank" style="font-size:11px;font-weight:700;color:#166534;text-decoration:none;background:#dcfce7;padding:2px 8px;border-radius:99px;white-space:nowrap;">✅ Ver PDF</a>`:""}
+      <button onclick="copiarLinkAditivo('${a.token}','${st||""}')" title="${morto?"Link expirado — já foi para assinatura":"Copiar link do aditivo"}" style="padding:2px 8px;border:1px solid ${morto?"var(--br)":"var(--a)"};border-radius:6px;background:#fff;color:${morto?"var(--dl)":"var(--a)"};font-size:11px;cursor:pointer;">🔗 Link</button>
+    </div>`;
+  }).join("");
+  return `<tr style="background:${i%2===0?'var(--s1)':'var(--s2)'};border-bottom:1px solid var(--br);">
+    <td></td>
+    <td colspan="4" style="padding:4px 12px 10px;font-size:12px;border-left:2px solid #ede9fe;">${linhas}</td>
+  </tr>`;
 }
 
 function _showAssinaturaModal(cod, data) {
@@ -5920,6 +5946,21 @@ async function renderContratos(pagina) {
     // Página vazia por ter passado do fim (ex.: apagaram registros): volta uma.
     if (!rows.length && _contratosPagina > 0) { renderContratos(_contratosPagina - 1); return; }
     _contratosRows = rows;
+
+    // Aditivos da pagina numa consulta so, em vez de uma por linha. Sem isto
+    // a unica forma de ver a lista era abrir o modal de criar aditivo — que
+    // e o fluxo de criacao, nao o de consulta.
+    _aditivosPorEvento = {};
+    if (rows.length) {
+      try {
+        const ads = await dbGet("aditivos",
+          "cod_evento=in.(" + rows.map(r=>r.cod).join(",") + ")" +
+          "&select=id,cod_evento,numero,valor,assinatura_status,contrato_ok,assinatura_pdf_url,token" +
+          "&order=numero.asc&limit=500");
+        ads.forEach(a => { (_aditivosPorEvento[a.cod_evento] ||= []).push(a); });
+      } catch(_) { /* a tabela de contratos nao depende disto para aparecer */ }
+    }
+
     _renderContratosTabela(rows);
     _renderContratosPager(rows.length);
   } catch(e) {
