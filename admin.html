@@ -89,7 +89,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.26c</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.08.26d</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1605,6 +1605,10 @@
       <div class="iblbl">Observações / Nome</div>
       <div class="ibtext" id="evd-notes"></div>
     </div>
+    <div id="evd-itens-wrap" style="display:none;background:var(--bg);border-radius:11px;padding:12px;margin-bottom:10px;border:1px solid var(--br);">
+      <div class="iblbl" id="evd-itens-lbl">🛒 Itens do pedido</div>
+      <div id="evd-itens-body" style="margin-top:6px;"></div>
+    </div>
     <div id="evd-obs-interna-wrap" style="display:none;background:#fffbeb;border-radius:11px;padding:12px;margin-bottom:10px;border:1px solid #fcd34d;">
       <div class="iblbl" style="color:#92400e;">🔒 Observações Internas (Equipe)</div>
       <textarea id="evd-obs-interna" rows="3" placeholder="Anotações internas sobre este evento..." style="width:100%;margin-top:6px;border:1px solid #fcd34d;border-radius:7px;padding:8px;font-size:13px;font-family:inherit;resize:vertical;background:#fff;box-sizing:border-box;"></textarea>
@@ -2786,7 +2790,82 @@ function openEvDet(ev){
   const _canObs=effIsAdmin()||effRole()==="equipe";
   _obsWrap.style.display=_canObs?"block":"none";
   if(_canObs){document.getElementById("evd-obs-interna").value=ev.obs_interna||"";document.getElementById("evd-obs-saved").style.display="none";}
+  loadEvDetItens(currentEvCod);
   document.getElementById("m-evdet").classList.add("open");
+}
+
+// ── Itens do pedido no modal do evento ──
+// A descrição do item quase nunca está em itens_pedido (59 de ~2500 linhas):
+// o nome vem do inventário pelo cod_item. Assessoria não tem SELECT em
+// inventario, então a lista cai para o código — melhor que não mostrar nada.
+let _evdItensSeq = 0, _evdInvMap = null;
+async function _getInvDescMap() {
+  if(_evdInvMap) return _evdInvMap;
+  try {
+    const rows = await dbGet("inventario","select=cod,descricao&limit=1000");
+    const m = {}; rows.forEach(r=>{ m[r.cod]=r.descricao; });
+    _evdInvMap = m;
+    return m;
+  } catch(e) { return {}; } // falha de rede não vira cache permanente de códigos
+}
+function _evdQtd(q){ return q==null?"—":Number(q).toLocaleString("pt-BR",{maximumFractionDigits:2}); }
+async function loadEvDetItens(cod) {
+  const seq = ++_evdItensSeq;
+  const wrap = document.getElementById("evd-itens-wrap");
+  const body = document.getElementById("evd-itens-body");
+  wrap.style.display = "none";
+  if(!cod) return;
+  body.innerHTML = '<div style="font-size:12px;color:var(--dl);">Carregando itens…</div>';
+  wrap.style.display = "block";
+  try {
+    const peds = await dbGet("pedidos","cod_evento=eq."+encodeURIComponent(cod)+"&select=id,numero_pedido,total_pedido&order=id.asc&limit=50");
+    if(seq!==_evdItensSeq) return;
+    if(!peds.length){ wrap.style.display="none"; return; }
+    const [itens, invMap] = await Promise.all([
+      dbGet("itens_pedido","pedido_id=in.("+peds.map(p=>p.id).join(",")+")&select=pedido_id,cod_item,descricao,quantidade,valor_unitario&order=id.asc&limit=1000"),
+      _getInvDescMap()
+    ]);
+    if(seq!==_evdItensSeq) return;
+    const showVals = effIsAdmin();
+    const porPedido = {};
+    itens.forEach(it=>{ (porPedido[it.pedido_id]=porPedido[it.pedido_id]||[]).push(it); });
+    document.getElementById("evd-itens-lbl").textContent = "🛒 Itens do pedido" + (peds.length>1?"s":"");
+    body.innerHTML = peds.map(ped=>{
+      const lista = porPedido[ped.id]||[];
+      // valor_subtotal gravado diverge do qtd×vun em boa parte da base; o total
+      // do pedido bate com qtd×vun, então a soma é sempre recalculada aqui.
+      const soma = lista.reduce((s,it)=>s+(it.quantidade||0)*(it.valor_unitario||0),0);
+      const cab = `<div style="font-size:11px;font-weight:700;color:var(--dm);margin:6px 0 4px;">Pedido ${_esc(ped.numero_pedido)||"—"}</div>`;
+      if(!lista.length) return cab+'<div style="font-size:12px;color:var(--dl);">Nenhum item lançado.</div>';
+      const linhas = lista.map(it=>{
+        const nome = invMap[it.cod_item] || it.descricao || it.cod_item || "—";
+        const sub = (it.quantidade||0)*(it.valor_unitario||0);
+        return `<tr>
+          <td style="padding:3px 0;">${_esc(nome)}</td>
+          <td style="padding:3px 6px;text-align:right;white-space:nowrap;">${_evdQtd(it.quantidade)}</td>
+          ${showVals?`<td style="padding:3px 0;text-align:right;white-space:nowrap;font-weight:700;">${sub?fmt(sub):"—"}</td>`:""}
+        </tr>`;
+      }).join("");
+      const totalPed = ped.total_pedido!=null?parseFloat(ped.total_pedido):null;
+      const desconto = totalPed!=null && soma>totalPed+0.01 ? soma-totalPed : null;
+      const rodape = showVals?`<tr style="border-top:1px solid var(--br);">
+          <td style="padding:5px 0;font-weight:700;">Total do pedido</td>
+          <td></td>
+          <td style="padding:5px 0;text-align:right;font-weight:700;">${totalPed!=null?fmt(totalPed):fmt(soma)}</td>
+        </tr>${desconto?`<tr><td style="padding:0 0 3px;font-size:11px;color:var(--dl);">Desconto aplicado</td><td></td><td style="padding:0 0 3px;text-align:right;font-size:11px;color:#dc2626;font-weight:700;">−${fmt(desconto)}</td></tr>`:""}`:"";
+      return cab+`<table style="width:100%;border-collapse:collapse;font-size:12px;color:var(--dk);">
+        <thead><tr style="font-size:10px;color:var(--dl);text-transform:uppercase;letter-spacing:.5px;">
+          <th style="text-align:left;font-weight:700;padding-bottom:3px;">Item</th>
+          <th style="text-align:right;font-weight:700;padding-bottom:3px;">Qtd</th>
+          ${showVals?'<th style="text-align:right;font-weight:700;padding-bottom:3px;">Valor</th>':""}
+        </tr></thead>
+        <tbody>${linhas}${rodape}</tbody>
+      </table>`;
+    }).join("");
+  } catch(e) {
+    if(seq!==_evdItensSeq) return;
+    body.innerHTML = '<div style="font-size:12px;color:#A03030;">Erro ao carregar itens: '+_esc(e.message)+'</div>';
+  }
 }
 async function saveObsInterna(){
   if(!currentEvCod) return;
