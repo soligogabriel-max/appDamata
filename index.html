@@ -677,28 +677,17 @@ async function confirmarVisitaPublica() {
     if (!res.ok) throw new Error(res.status);
     const insertedRows = await res.json().catch(()=>[]);
     const insertedId = Array.isArray(insertedRows) ? insertedRows[0]?.id : insertedRows?.id;
-    // Sync Google Calendar (fire-and-forget, usa anon key)
-    fetch(SB_URL+"/functions/v1/sync-google-calendar", {
-      method: "POST",
-      headers: { apikey:SB_KEY, Authorization:"Bearer "+SB_KEY, "Content-Type":"application/json" },
-      body: JSON.stringify({
-        action: "upsert",
-        nome_evento: "Visita — "+nome+(wpp?" | 📱 "+wpp:""),
-        data_evento: _vSelData,
-        hora_inicio: _vSelHora.slice(0,5),
-        tipo_evento: "Visita Comercial",
-        local_evento: "Fazenda Damata, Mogi Mirim - SP",
-        notes: wpp ? "📱 WhatsApp: "+wpp : undefined,
-      })
-    }).then(r=>r.json()).then(resp=>{
-      if (resp?.google_cal_id && insertedId) {
-        fetch(SB_URL+"/rest/v1/visitas_comerciais?id=eq."+insertedId, {
-          method: "PATCH",
-          headers: { apikey:SB_KEY, Authorization:"Bearer "+SB_KEY, "Content-Type":"application/json", Prefer:"return=minimal" },
-          body: JSON.stringify({ gcal_event_id: resp.google_cal_id })
-        });
-      }
-    }).catch(()=>{});
+    // Sync Google Calendar (fire-and-forget). Manda só o id: a function monta o
+    // evento a partir do banco e grava o gcal_event_id de volta com a service
+    // role. Mandar o evento pronto daqui dava 401 — a chave publishable não é
+    // JWT, então a function não via role nenhuma e recusava.
+    if (insertedId) {
+      fetch(SB_URL+"/functions/v1/sync-google-calendar", {
+        method: "POST",
+        headers: { apikey:SB_KEY, Authorization:"Bearer "+SB_KEY, "Content-Type":"application/json" },
+        body: JSON.stringify({ action:"upsert", visita_id: insertedId })
+      }).catch(()=>{});
+    }
     // Notifica visitante e equipe via WhatsApp (fire-and-forget)
     if (insertedId) {
       fetch(SB_URL+"/functions/v1/notificar-visita-nova", {
