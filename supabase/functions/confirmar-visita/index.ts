@@ -105,6 +105,17 @@ Deno.serve(async (req) => {
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
         body: JSON.stringify({ status: "cancelada" })
       });
+      // Tira o evento do Google Calendar. Sem isto a visita cancelada pelo
+      // cliente continuava ocupando o horário na agenda da equipe.
+      try {
+        await fetch(`${SB_URL}/functions/v1/sync-google-calendar`, {
+          method: "POST",
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "delete", visita_id: id })
+        });
+      } catch (e) {
+        console.error("cancelar: falha ao remover evento do Google Calendar", id, e);
+      }
     }
     return page(`<div class="msg">😔</div><div class="msg-title">Visita cancelada</div><div class="msg-text">Sua visita de <strong>${dataFmt} às ${hora}</strong> foi cancelada.<br><br>Quando quiser reagendar:<br><a class="link" href="https://fazendadamata.com/#visita">fazendadamata.com</a></div>`);
   }

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Termo Aditivo — Fazenda Damata</title>
+<!--
+  Página do termo aditivo. Recebe ?token=<uuid>, busca os dados na Edge
+  Function aditivo-publico e injeta no template.
+
+  Mesma divisão de contrato.html, e pelo mesmo motivo: o gateway do Supabase
+  força content-type: text/plain e CSP sandbox em tudo que sai de
+  *.supabase.co/functions/v1/ (proteção anti-phishing do domínio
+  compartilhado), então HTML servido de lá chega ao cliente como código-fonte.
+  Aqui é o domínio da Damata, que serve HTML normalmente — e o cliente vê
+  fazendadamata.com no endereço, não um supabase.co que parece golpe.
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;background:#f5f0eb;min-height:100vh;
+     display:flex;align-items:center;justify-content:center;padding:24px;color:#222}
+.card{background:#fff;border-radius:16px;padding:40px 28px;max-width:460px;width:100%;
+      text-align:center;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.brand{color:#8b5a2b;font-size:13px;font-weight:700;letter-spacing:.8px;margin-bottom:20px}
+h1{color:#8b5a2b;font-size:20px;margin-bottom:10px;font-weight:700}
+p{color:#666;font-size:14px;line-height:1.6}
+.spin{width:32px;height:32px;margin:0 auto 18px;border:3px solid #e8dfd5;border-top-color:#8b5a2b;
+      border-radius:50%;animation:g .8s linear infinite}
+@keyframes g{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="card" id="cx">
+  <div class="brand">FAZENDA DAMATA</div>
+  <div class="spin"></div>
+  <p>Carregando seu termo aditivo…</p>
+</div>
+
+<script>
+var FN = "https://wwnndsprpofmgbklqdgg.supabase.co/functions/v1/aditivo-publico";
+
+function aviso(titulo, texto){
+  document.getElementById("cx").innerHTML =
+    '<div class="brand">FAZENDA DAMATA</div><h1></h1><p></p>';
+  document.querySelector("#cx h1").textContent = titulo;
+  document.querySelector("#cx p").textContent  = texto;
+}
+
+(async function(){
+  var token = new URLSearchParams(location.search).get("token") || "";
+  if(!token){
+    aviso("Link inválido","Confira o link que você recebeu ou peça um novo à nossa equipe.");
+    return;
+  }
+  try{
+    var r = await fetch(FN + "?token=" + encodeURIComponent(token));
+    var d = await r.json();
+    if(!r.ok || d.erro){
+      var e = d.erro || {};
+      aviso(e.titulo || "Não foi possível abrir o termo aditivo",
+            e.texto  || "Tente novamente em instantes.");
+      return;
+    }
+    var tr = await fetch("aditivo.tpl.html", { cache: "no-cache" });
+    if(!tr.ok) throw new Error("template " + tr.status);
+    var tmpl = await tr.text();
+
+    // O JSON entra dentro de um <script> inline do template, então um "<"
+    // vindo do preset (descrição de item, nome ou justificativa digitada)
+    // fecharia a tag e deixaria a página em branco. Dentro de JSON o "<" só
+    // aparece em valor de string, onde < é o mesmo caractere.
+    var json = JSON.stringify(d.preset).replace(/</g, "\\u003c");
+    var out = tmpl.replace("null;/*DAMATA_PRESET*/", json + ";");
+    if(out === tmpl) throw new Error("marcador de dados não encontrado no template");
+
+    document.open(); document.write(out); document.close();
+  }catch(err){
+    aviso("Não foi possível abrir o termo aditivo",
+          "Tente novamente em instantes. Se persistir, fale com a nossa equipe.");
+    console.error("[aditivo]", err);
+  }
+})();
+</script>
+</body>
+</html>

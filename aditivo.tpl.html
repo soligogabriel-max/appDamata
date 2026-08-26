@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Termo Aditivo DAMATA</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9}
+.cf{font-family:'Times New Roman',Georgia,serif}
+.tc{display:none}.tc.active{display:block}
+/* fallback CSS-only para iOS quando JS está bloqueado */
+#tab-preview:target{display:block}
+body:has(#tab-preview:target) #tab-form{display:none}
+body:has(#tab-form:target) #tab-preview{display:none}
+body:has(#tab-form:target) #tab-form{display:block}
+.cp{font-size:10.5pt;line-height:1.7;text-align:justify;margin-bottom:8px}
+.ct{font-size:11pt;font-weight:700;text-transform:uppercase;margin:18px 0 8px}
+.sub{padding-left:20px}
+.tb{border-collapse:collapse;width:100%;margin-bottom:10px}
+.tb td,.tb th{border:1px solid #555;padding:5px 8px;font-size:10pt;vertical-align:top}
+.tb th{background:#f0f0f0;font-weight:700}
+.inp{width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;outline:none;background:white;transition:border .2s;font-family:inherit}
+.inp:focus{border-color:#1e3a5f}
+.sl{font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px}
+.ib{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px;margin-bottom:8px}
+.ir{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #dbeafe}
+.ir:last-child{border-bottom:none}
+.ik{color:#64748b}.iv{color:#1e3a5f;font-weight:600}
+@media print{.np{display:none!important}body{background:white}.cp-wrap{box-shadow:none!important;padding:1.5cm 2cm!important;max-width:100%!important;border-radius:0!important}}
+</style>
+</head>
+<body>
+<script>var PRESET=null;/*DAMATA_PRESET*/</script>
+
+<div class="np" style="background:white;border-bottom:1px solid #e2e8f0;position:sticky;top:0;z-index:50">
+  <div style="max-width:800px;margin:0 auto;padding:14px 16px 0">
+    <div style="font-weight:800;color:#1e3a5f;font-size:17px">FAZENDA DAMATA</div>
+    <div style="font-size:12px;color:#64748b;margin-top:2px" id="hdr-code"></div>
+  </div>
+  <div style="max-width:800px;margin:0 auto;padding:0 16px;display:flex;gap:20px">
+    <a href="#tab-form" onclick="showTab('form');return false" id="tbf" style="padding:10px 0;font-size:14px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #1e3a5f;color:#1e3a5f;text-decoration:none;display:inline-block">Seus Dados</a>
+    <a href="#tab-preview" onclick="showTab('preview');return false" id="tbp" style="padding:10px 0;font-size:14px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:#64748b;text-decoration:none;display:inline-block">Termo Aditivo</a>
+  </div>
+</div>
+
+<div id="tab-form" class="tc np">
+<div style="max-width:600px;margin:0 auto;padding:24px 16px">
+  <div id="evt-summary" style="display:none;margin-bottom:20px">
+    <div style="background:#1e3a5f;color:white;border-radius:14px 14px 0 0;padding:14px 18px">
+      <div style="font-weight:700;font-size:15px">Resumo do Aditivo</div>
+      <div style="font-size:12px;opacity:.7;margin-top:2px">Preenchido pela DAMATA – somente leitura</div>
+    </div>
+    <div class="ib" style="border-radius:0 0 14px 14px;border-top:none;margin-bottom:0">
+      <div class="ir"><span class="ik">Contrato</span><span class="iv" id="s-code">—</span></div>
+      <div class="ir"><span class="ik">Aditivo nº</span><span class="iv" id="s-num">—</span></div>
+      <div class="ir"><span class="ik">Itens incluídos</span><span class="iv" id="s-itens">—</span></div>
+      <div class="ir"><span class="ik">Alterações</span><span class="iv" id="s-alt">—</span></div>
+      <div class="ir"><span class="ik">Valor do aditivo</span><span class="iv" id="s-valor">—</span></div>
+      <div class="ir"><span class="ik">Novo total do contrato</span><span class="iv" id="s-total">—</span></div>
+    </div>
+  </div>
+  <div style="background:white;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:22px;margin-bottom:14px">
+    <div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid #f1f5f9">Seus Dados Pessoais</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div><span class="sl">Nome Completo *</span><input class="inp" type="text" id="f-name" placeholder="Nome completo" oninput="liveSync()"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><span class="sl">Nacionalidade</span><input class="inp" type="text" id="f-nat" value="brasileira" oninput="liveSync()"></div>
+        <div><span class="sl">Profissão</span><input class="inp" type="text" id="f-prof" placeholder="Profissão" oninput="liveSync()"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><span class="sl">RG</span><input class="inp" type="text" id="f-rg" placeholder="00.000.000-0" oninput="liveSync()"></div>
+        <div><span class="sl">CPF</span><input class="inp" type="text" id="f-cpf" placeholder="000.000.000-00" oninput="liveSync()"></div>
+      </div>
+      <div><span class="sl">Endereço Completo</span><input class="inp" type="text" id="f-addr" placeholder="Rua, número, bairro, cidade - UF" oninput="liveSync()"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><span class="sl">WhatsApp / Celular *</span><input class="inp" type="tel" id="f-phone" placeholder="(00) 00000-0000" oninput="maskPhone(this);liveSync()"></div>
+        <div><span class="sl">Confirmar WhatsApp *</span><input class="inp" type="tel" id="f-phone2" placeholder="(00) 00000-0000" oninput="maskPhone(this)"></div>
+      </div>
+      <div><span class="sl">E-mail</span><input class="inp" type="email" id="f-email" placeholder="email@exemplo.com" oninput="liveSync()"></div>
+    </div>
+  </div>
+  <div style="background:white;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:22px;margin-bottom:16px">
+    <div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:4px">Testemunha 2</div>
+    <div style="font-size:13px;color:#64748b;margin-bottom:14px">Indique uma testemunha de sua escolha</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div><span class="sl">Nome Completo</span><input class="inp" type="text" id="w-name" placeholder="Nome completo" oninput="liveSync()"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><span class="sl">WhatsApp / Celular *</span><input class="inp" type="tel" id="w-phone" placeholder="(00) 00000-0000" oninput="maskPhone(this)"></div>
+        <div><span class="sl">Confirmar WhatsApp *</span><input class="inp" type="tel" id="w-phone2" placeholder="(00) 00000-0000" oninput="maskPhone(this)"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><span class="sl">CPF</span><input class="inp" type="text" id="w-cpf" placeholder="000.000.000-00" oninput="liveSync()"></div>
+        <div><span class="sl">E-mail</span><input class="inp" type="email" id="w-email" placeholder="email@exemplo.com" oninput="liveSync()"></div>
+      </div>
+    </div>
+  </div>
+  <div id="alert-msg" style="display:none;padding:12px 16px;border-radius:10px;margin-bottom:12px;font-size:13px;line-height:1.5"></div>
+  <a href="#tab-preview" onclick="showTab('preview');return false" style="width:100%;padding:14px;background:#1e3a5f;color:white;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;text-decoration:none;display:block;text-align:center;box-sizing:border-box">Ver Termo Aditivo →</a>
+</div>
+</div>
+
+<div id="tab-preview" class="tc active">
+<div style="max-width:800px;margin:0 auto;padding:20px 8px">
+  <div class="np" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+    <button onclick="window.print()" style="display:flex;align-items:center;gap:6px;background:#1e3a5f;color:white;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
+      <svg width="15" height="15" fill="none" stroke="white" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+      Salvar PDF / Imprimir
+    </button>
+    <a href="#tab-form" onclick="showTab('form');return false" style="background:white;border:1.5px solid #e2e8f0;color:#334155;padding:10px 18px;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-block">← Editar</a>
+  </div>
+  <div class="np" style="max-width:800px;margin:0 auto;padding:0 0 14px">
+    <div id="alert-msg2" style="display:none;padding:12px 16px;border-radius:10px;margin-bottom:14px;font-size:13px;line-height:1.5"></div>
+    <button id="btn-assinar-wpp" onclick="assinarWhatsApp()" style="display:flex;align-items:center;gap:6px;background:#25D366;color:white;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;width:100%;justify-content:center;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.127.558 4.122 1.533 5.855L0 24l6.335-1.652A11.954 11.954 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.885 0-3.65-.498-5.18-1.369l-.372-.22-3.758.98.998-3.652-.242-.378A9.957 9.957 0 012 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+      Assinar por WhatsApp
+    </button>
+    <div style="font-size:11px;color:#64748b;margin-top:10px;text-align:center">Ao enviar, você receberá o termo aditivo para assinatura no WhatsApp informado.</div>
+  </div>
+  <div class="cp-wrap cf" style="background:white;padding:36px;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.1)">
+
+    <p class="cp" style="text-align:center;font-weight:700;font-size:13pt;text-transform:uppercase;margin-bottom:4px"><span id="t-ordinal"></span> TERMO ADITIVO AO CONTRATO DE LOCAÇÃO DE ESPAÇO PARA EVENTOS – FAZENDA DAMATA</p>
+    <p class="cp" style="text-align:center;font-size:10pt;color:#555" id="c-codeline"></p>
+
+    <p class="cp">Pelo presente instrumento particular, de um lado</p>
+    <p class="cp"><strong>ESPAÇO DAMATA EVENTOS LTDA</strong>, CNPJ/MF sob o nº. 35.602.719/0001-87, com sede na Estrada da Servidão, S/N, Bairro da Cachoeira, cidade de Mogi Mirim, Estado de São Paulo, CEP n. 13.800-970, neste ato representada por sua sócia Vitória Bedutti Rodrigues, CPF n. 329.098.078-27, doravante denominada <strong>LOCADORA/CONTRATADA</strong>;</p>
+    <p class="cp">e de outro lado, doravante denominado(a) <strong>LOCATÁRIO(A)/CONTRATANTE</strong>,</p>
+
+    <table class="tb" style="margin-bottom:14px">
+      <tr><th style="width:38%">NOME COMPLETO:</th><td id="c-name"></td></tr>
+      <tr><th>NACIONALIDADE:</th><td id="c-nat"></td></tr>
+      <tr><th>PROFISSÃO:</th><td id="c-prof"></td></tr>
+      <tr><th>RG:</th><td id="c-rg"></td></tr>
+      <tr><th>CPF:</th><td id="c-cpf"></td></tr>
+      <tr><th>ENDEREÇO:</th><td id="c-addr"></td></tr>
+      <tr><th>TELEFONE/CELULAR:</th><td id="c-phone"></td></tr>
+      <tr><th>E-MAIL:</th><td id="c-email"></td></tr>
+    </table>
+
+    <p class="cp"><strong>CONSIDERANDO</strong> que as partes celebraram entre si o Contrato de Locação de Espaço para Eventos identificado pelo código <strong id="c-cod"></strong>, referente ao evento <strong id="c-evento"></strong>, com período de locação de <strong id="c-d1"></strong> a <strong id="c-d2"></strong> (doravante <strong>CONTRATO ORIGINÁRIO</strong>);</p>
+    <p class="cp"><strong>CONSIDERANDO</strong> o interesse de ambas as partes em alterá-lo nos termos abaixo<span id="c-just-wrap">, pelo seguinte motivo: <span id="c-just"></span></span>;</p>
+    <p class="cp">resolvem celebrar o presente <strong>TERMO ADITIVO</strong>, que se regerá pelas cláusulas seguintes:</p>
+
+    <p class="ct">CLÁUSULA PRIMEIRA – DA INCLUSÃO DE ITENS</p>
+    <div id="bloco-itens">
+      <p class="cp">1.1. Ficam incluídos no <strong>CONTRATO ORIGINÁRIO</strong>, passando a integrá-lo para todos os efeitos, os itens discriminados na tabela abaixo:</p>
+      <table class="tb">
+        <thead><tr><th style="width:52%">Descrição</th><th style="width:12%;text-align:center">Qtd.</th><th style="width:18%;text-align:right">Valor unit.</th><th style="width:18%;text-align:right">Subtotal</th></tr></thead>
+        <tbody id="c-itens-body"></tbody>
+      </table>
+    </div>
+    <p class="cp" id="bloco-sem-itens" style="display:none">1.1. O presente termo aditivo não inclui novos itens ao <strong>CONTRATO ORIGINÁRIO</strong>.</p>
+
+    <p class="ct">CLÁUSULA SEGUNDA – DAS DEMAIS ALTERAÇÕES</p>
+    <div id="bloco-alt">
+      <p class="cp">2.1. Ficam alteradas as seguintes condições do <strong>CONTRATO ORIGINÁRIO</strong>:</p>
+      <table class="tb">
+        <thead><tr><th style="width:34%">Condição</th><th style="width:33%">Redação anterior</th><th style="width:33%">Nova redação</th></tr></thead>
+        <tbody id="c-alt-body"></tbody>
+      </table>
+    </div>
+    <p class="cp" id="bloco-sem-alt" style="display:none">2.1. Permanecem inalteradas as datas, os espaços e as acomodações do <strong>CONTRATO ORIGINÁRIO</strong>.</p>
+
+    <p class="ct">CLÁUSULA TERCEIRA – DO VALOR E DA FORMA DE PAGAMENTO</p>
+    <p class="cp">3.1. Em razão do presente termo aditivo, o valor de <strong id="c-valor"></strong> é acrescido ao <strong>CONTRATO ORIGINÁRIO</strong>, cujo valor passa de <strong id="c-valor-antes"></strong> para <strong id="c-valor-depois"></strong>.</p>
+    <div id="bloco-pmts">
+      <p class="cp">3.2. O valor acrescido será pago da seguinte forma:</p>
+      <table class="tb">
+        <thead><tr><th style="width:10%;text-align:center">#</th><th>Descrição</th><th style="width:22%">Vencimento</th><th style="width:22%;text-align:right">Valor</th></tr></thead>
+        <tbody id="c-pmts-body"></tbody>
+      </table>
+      <p class="cp sub"><strong>Parágrafo Único</strong> – O parcelamento acima é adicional e independente das parcelas do <strong>CONTRATO ORIGINÁRIO</strong>, que permanecem devidas nas datas e valores originalmente ajustados.</p>
+    </div>
+    <p class="cp" id="bloco-sem-pmts" style="display:none">3.2. A forma de pagamento do valor acrescido será ajustada entre as partes.</p>
+
+    <p class="ct">CLÁUSULA QUARTA – DA RATIFICAÇÃO</p>
+    <p class="cp">4.1. Permanecem íntegras, válidas e em pleno vigor todas as demais cláusulas e condições do <strong>CONTRATO ORIGINÁRIO</strong> não expressamente alteradas por este instrumento, às quais as partes se obrigam reciprocamente.</p>
+    <p class="cp">4.2. Aplicam-se a este termo aditivo, no que couber, as disposições do <strong>CONTRATO ORIGINÁRIO</strong>, inclusive as relativas à desistência, ao inadimplemento e ao foro de eleição.</p>
+
+    <p class="ct">DISPOSIÇÕES FINAIS</p>
+    <p class="cp">E, por estarem justos(as) e contratados, firmam e assinam perante as testemunhas abaixo o presente termo aditivo por assinatura eletrônica, ficando cada parte com uma via em seu poder.</p>
+    <p class="cp" style="text-align:center"><strong>Mogi Mirim/SP, <span id="c-today"></span>.</strong></p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:48px">
+      <div style="text-align:center"><div style="border-top:1px solid #555;margin-top:64px;padding-top:8px">
+        <p class="cp" style="text-align:center"><strong>LOCADORA – DAMATA</strong><br>ESPAÇO DAMATA EVENTOS LTDA<br>CNPJ/MF: 35.602.719/0001-87</p>
+      </div></div>
+      <div style="text-align:center"><div style="border-top:1px solid #555;margin-top:64px;padding-top:8px">
+        <p class="cp" style="text-align:center"><strong>LOCATÁRIO(A)</strong><br>Nome: <span id="sig-name">_____________________</span><br>CPF: <span id="sig-cpf">_____________________</span><br>E-mail: <span id="sig-email">_____________________</span></p>
+      </div></div>
+      <div style="text-align:center"><div style="border-top:1px solid #555;margin-top:64px;padding-top:8px">
+        <p class="cp" style="text-align:center"><strong>TESTEMUNHA 1</strong><br>Nome: Gabriel José Soligo<br>CPF: 302.326.678-61<br>E-mail: soligogabriel@gmail.com</p>
+      </div></div>
+      <div style="text-align:center"><div style="border-top:1px solid #555;margin-top:64px;padding-top:8px">
+        <p class="cp" style="text-align:center"><strong>TESTEMUNHA 2</strong><br>Nome: <span id="sig-wname">_____________________</span><br>CPF: <span id="sig-wcpf">_____________________</span><br>E-mail: <span id="sig-wemail">_____________________</span></p>
+      </div></div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+var SB_ANON_KEY="sb_publishable__RQxBa8P-lryd0LtWgTJPw_-aSWERWK";
+var ASSINAR_URL="https://wwnndsprpofmgbklqdgg.supabase.co/functions/v1/assinar-contrato";
+var ADITIVO_FN="https://wwnndsprpofmgbklqdgg.supabase.co/functions/v1/aditivo-publico";
+var ASSINAR_KEY=SB_ANON_KEY;
+
+function showTab(t) {
+  var tabForm=document.getElementById('tab-form'), tabPrev=document.getElementById('tab-preview');
+  var tbf=document.getElementById('tbf'), tbp=document.getElementById('tbp');
+  if (t === 'preview') {
+    tabForm.classList.remove('active'); tabPrev.classList.add('active');
+    tbf.style.borderBottomColor='transparent'; tbf.style.color='#64748b';
+    tbp.style.borderBottomColor='#1e3a5f';     tbp.style.color='#1e3a5f';
+    void tabPrev.offsetHeight;
+    renderContract();
+    requestAnimationFrame(renderContract);
+  } else {
+    tabPrev.classList.remove('active'); tabForm.classList.add('active');
+    tbf.style.borderBottomColor='#1e3a5f'; tbf.style.color='#1e3a5f';
+    tbp.style.borderBottomColor='transparent'; tbp.style.color='#64748b';
+  }
+}
+function g(id){return document.getElementById(id);}
+function tx(id,v){var e=g(id);if(e)e.textContent=v||'';}
+// Descricoes vem do inventario/itens extras e sao montadas com innerHTML:
+// escapar para que um "<" digitado no cadastro nao coma o resto da linha.
+function esc(v){return String(v==null?'':v).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function fd(d){if(!d)return null;var p=String(d).split('-');return p.length<3?d:p[2]+'/'+p[1]+'/'+p[0];}
+function fc(v){if(v===null||v===undefined||v==='')return null;
+  return parseFloat(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function liveSync(){renderContract();}
+
+var ORDINAIS=["","PRIMEIRO","SEGUNDO","TERCEIRO","QUARTO","QUINTO","SEXTO","SÉTIMO","OITAVO","NONO","DÉCIMO"];
+
+function renderContract(){
+  var p=PRESET||{};
+  tx('c-name',g('f-name').value);tx('c-nat',g('f-nat').value);tx('c-prof',g('f-prof').value);
+  tx('c-rg',g('f-rg').value);tx('c-cpf',g('f-cpf').value);tx('c-addr',g('f-addr').value);
+  tx('c-phone',g('f-phone').value);tx('c-email',g('f-email').value);
+  tx('sig-name',g('f-name').value||'_____________________');
+  tx('sig-cpf',g('f-cpf').value||'_____________________');
+  tx('sig-email',g('f-email').value||'_____________________');
+  tx('sig-wname',g('w-name').value||'_____________________');
+  tx('sig-wcpf',g('w-cpf').value||'_____________________');
+  tx('sig-wemail',g('w-email').value||'_____________________');
+
+  var n=parseInt(p.numero||1,10);
+  tx('t-ordinal', ORDINAIS[n] ? (n+"º ("+ORDINAIS[n]+")") : (n+"º"));
+  tx('c-codeline', (p.code?'Contrato nº '+p.code:'') + (p.numero?'  ·  Termo aditivo nº '+p.numero:''));
+  tx('c-cod',p.code||'—'); tx('c-evento',p.nomeEvento||'—');
+  tx('c-d1',fd(p.contratoDate1)||'—'); tx('c-d2',fd(p.contratoDate2)||'—');
+
+  if(p.justificativa){ tx('c-just',p.justificativa); g('c-just-wrap').style.display=''; }
+  else { g('c-just-wrap').style.display='none'; }
+
+  // ── Cláusula 1: itens ──
+  var itens=p.itens||[];
+  var somaItens=0;
+  if(itens.length){
+    var h='';
+    itens.forEach(function(it){
+      var q=Number(it.quantidade||1), vu=Number(it.valor_unitario||0), st=q*vu;
+      somaItens+=st;
+      h+='<tr><td>'+esc(it.descricao)+'</td>'+
+         '<td style="text-align:center">'+q+'</td>'+
+         '<td style="text-align:right">R$ '+fc(vu)+'</td>'+
+         '<td style="text-align:right">R$ '+fc(st)+'</td></tr>';
+    });
+    h+='<tr><th colspan="3" style="text-align:right">TOTAL DOS ITENS INCLUÍDOS</th>'+
+       '<th style="text-align:right">R$ '+fc(somaItens)+'</th></tr>';
+    g('c-itens-body').innerHTML=h;
+    g('bloco-itens').style.display=''; g('bloco-sem-itens').style.display='none';
+  } else {
+    g('bloco-itens').style.display='none'; g('bloco-sem-itens').style.display='';
+  }
+
+  // ── Cláusula 2: de-para ──
+  var alts=p.alteracoes||[];
+  if(alts.length){
+    g('c-alt-body').innerHTML=alts.map(function(a){
+      return '<tr><td>'+esc(a.campo)+'</td><td>'+esc(a.de||'—')+'</td><td>'+esc(a.para||'—')+'</td></tr>';
+    }).join('');
+    g('bloco-alt').style.display=''; g('bloco-sem-alt').style.display='none';
+  } else {
+    g('bloco-alt').style.display='none'; g('bloco-sem-alt').style.display='';
+  }
+
+  // ── Cláusula 3: valores e parcelas ──
+  tx('c-valor','R$ '+(fc(p.valorAditivo)||'0,00'));
+  tx('c-valor-antes','R$ '+(fc(p.valorContrato)||'0,00'));
+  tx('c-valor-depois','R$ '+(fc(p.valorTotal)||'0,00'));
+  var pmts=p.payments||[];
+  if(pmts.length){
+    g('c-pmts-body').innerHTML=pmts.map(function(pm,i){
+      return '<tr><td style="text-align:center">'+(i+1)+'</td><td>'+esc(pm.desc||'—')+'</td>'+
+             '<td>'+(pm.date?fd(pm.date):'—')+'</td>'+
+             '<td style="text-align:right">'+(pm.value?'R$ '+fc(pm.value):'—')+'</td></tr>';
+    }).join('');
+    g('bloco-pmts').style.display=''; g('bloco-sem-pmts').style.display='none';
+  } else {
+    g('bloco-pmts').style.display='none'; g('bloco-sem-pmts').style.display='';
+  }
+
+  var today=new Date();
+  tx('c-today',today.toLocaleDateString('pt-BR',{day:'numeric',month:'long',year:'numeric'}));
+}
+
+function _amsg(html,ok){
+  ["alert-msg","alert-msg2"].forEach(function(id){
+    var el=g(id);if(!el)return;
+    el.style.display="block";
+    el.style.background=ok?"#dcfce7":"#fee2e2";
+    el.style.color=ok?"#166534":"#991b1b";
+    el.innerHTML=html;
+  });
+}
+
+function maskPhone(el){
+  var v=el.value.replace(/\D/g,"");
+  if(v.length>11)v=v.slice(0,11);
+  if(v.length>10) v=v.replace(/^(\d{2})(\d{5})(\d{4})$/,"($1) $2-$3");
+  else if(v.length>6) v=v.replace(/^(\d{2})(\d{4})(\d*)$/,"($1) $2-$3");
+  else if(v.length>2) v=v.replace(/^(\d{2})(\d*)$/,"($1) $2");
+  el.value=v;
+}
+function phoneDigits(v){return (v||"").replace(/\D/g,"");}
+function phoneValido(v){var d=phoneDigits(v);return d.length===10||d.length===11;}
+
+// Grava o que o cliente preencheu antes de gerar o PDF, como no contrato: o
+// objetivo do link e justamente que os dados existam fora do PDF. Uma
+// retentativa — falha de rede no celular do cliente e comum e nao deve custar
+// a assinatura.
+async function salvarDados(){
+  var token=(PRESET&&PRESET.aditivoToken)||
+            new URLSearchParams(location.search).get("token")||"";
+  if(!token) return true;
+  var corpo={
+    nome:(g("f-name")||{}).value||"", nacionalidade:(g("f-nat")||{}).value||"",
+    profissao:(g("f-prof")||{}).value||"", rg:(g("f-rg")||{}).value||"",
+    cpf:(g("f-cpf")||{}).value||"", endereco:(g("f-addr")||{}).value||"",
+    whatsapp:(g("f-phone")||{}).value||"", email:(g("f-email")||{}).value||"",
+    testemunhaNome:(g("w-name")||{}).value||"", testemunhaCpf:(g("w-cpf")||{}).value||"",
+    testemunhaWhatsapp:(g("w-phone")||{}).value||"", testemunhaEmail:(g("w-email")||{}).value||""
+  };
+  for(var tentativa=1;tentativa<=2;tentativa++){
+    try{
+      var r=await fetch(ADITIVO_FN+"?token="+encodeURIComponent(token),{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(corpo)
+      });
+      var d=await r.json().catch(function(){return {};});
+      if(r.ok&&d.ok) return true;
+      if(tentativa===2){
+        var e=d.erro||{};
+        _amsg("Não foi possível salvar seus dados: "+(e.texto||"tente novamente em instantes.")+
+              " O termo aditivo ainda não foi enviado para assinatura.",false);
+        return false;
+      }
+    }catch(err){
+      if(tentativa===2){
+        _amsg("Não foi possível salvar seus dados. Verifique sua conexão e tente novamente."+
+              " O termo aditivo ainda não foi enviado para assinatura.",false);
+        return false;
+      }
+    }
+  }
+  return false;
+}
+
+async function assinarWhatsApp(){
+  var nome=(g("f-name")||{}).value||"", fone=(g("f-phone")||{}).value||"";
+  var fone2=(g("f-phone2")||{}).value||"", email=(g("f-email")||{}).value||"";
+  var wnome=(g("w-name")||{}).value||"", wfone=(g("w-phone")||{}).value||"";
+  var wfone2=(g("w-phone2")||{}).value||"", wemail=(g("w-email")||{}).value||"";
+
+  if(!nome.trim()||!fone.trim()){
+    showTab("form");
+    _amsg("Preencha pelo menos <strong>Nome Completo</strong> e <strong>WhatsApp</strong> do contratante.",false); return;
+  }
+  if(!phoneValido(fone)){
+    showTab("form");
+    _amsg("O <strong>WhatsApp do contratante</strong> está incompleto. Use o formato (00) 00000-0000.",false); return;
+  }
+  if(phoneDigits(fone)!==phoneDigits(fone2)){
+    showTab("form");
+    _amsg("Os campos de <strong>WhatsApp do contratante</strong> não coincidem. Verifique e tente novamente.",false); return;
+  }
+  if(!wnome.trim()||!wfone.trim()){
+    showTab("form");
+    _amsg("Preencha o <strong>Nome</strong> e o <strong>WhatsApp da testemunha</strong>.",false); return;
+  }
+  if(!phoneValido(wfone)){
+    showTab("form");
+    _amsg("O <strong>WhatsApp da testemunha</strong> está incompleto. Use o formato (00) 00000-0000.",false); return;
+  }
+  if(phoneDigits(wfone)!==phoneDigits(wfone2)){
+    showTab("form");
+    _amsg("Os campos de <strong>WhatsApp da testemunha</strong> não coincidem. Verifique e tente novamente.",false); return;
+  }
+
+  renderContract();
+  var btn=g("btn-assinar-wpp");
+  btn.disabled=true; var _o=btn.innerHTML; btn.innerHTML="Salvando seus dados…";
+  _amsg("Salvando seus dados…",true);
+
+  if(!(await salvarDados())){ btn.disabled=false; btn.innerHTML=_o; return; }
+
+  btn.innerHTML="Gerando termo aditivo…";
+  _amsg("Gerando o termo aditivo e enviando para assinatura…",true);
+  try{
+    var el=document.querySelector(".cp-wrap");
+    var opt={margin:[10,12,10,12],filename:"aditivo.pdf",image:{type:"jpeg",quality:.95},
+      html2canvas:{scale:2,useCORS:true},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}};
+    var dataUri=await html2pdf().set(opt).from(el).outputPdf("datauristring");
+    var b64=dataUri.split(",")[1];
+    var code=(PRESET&&PRESET.code)||"", num=(PRESET&&PRESET.numero)||"";
+    var res=await fetch(ASSINAR_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+ASSINAR_KEY,"apikey":ASSINAR_KEY},
+      body:JSON.stringify({
+        // aditivoId e o que impede assinar-contrato de marcar o contrato
+        // original como reenviado — sao documentos independentes.
+        aditivoId:(PRESET&&PRESET.aditivoId)||null,
+        signerName:nome.trim(), signerPhone:fone.trim(), signerEmail:email.trim(),
+        witnessName:wnome.trim(), witnessPhone:wfone.trim(), witnessEmail:wemail.trim(),
+        pdfBase64:b64,
+        filename:"aditivo-"+num+"-"+(code||"damata")+".pdf",
+        docName:num+"º Termo Aditivo — Contrato "+(code?code+" ":"")+"Fazenda Damata"
+      })
+    });
+    var j=await res.json();
+    if(res.ok&&j.ok){
+      _amsg("✅ Termo aditivo enviado! Você receberá o link de assinatura no WhatsApp <strong>"+fone+"</strong> em instantes.",true);
+      btn.style.display="none";
+    } else {
+      _amsg("Não foi possível enviar para assinatura. "+(j.error||"Tente novamente."),false);
+      btn.disabled=false; btn.innerHTML=_o;
+    }
+  } catch(e){
+    _amsg("Erro ao gerar o termo aditivo: "+e.message,false);
+    btn.disabled=false; btn.innerHTML=_o;
+  }
+}
+
+function applyPreset(){
+  var p=PRESET; if(!p) return;
+  if(p.code) tx('hdr-code','Contrato '+p.code+' · '+(p.numero||1)+'º termo aditivo');
+  tx('s-code',p.code||'—'); tx('s-num',(p.numero||1)+'º');
+  var itens=p.itens||[];
+  tx('s-itens', itens.length ? itens.length+' item(ns)' : 'Nenhum');
+  var alts=p.alteracoes||[];
+  tx('s-alt', alts.length ? alts.length+' alteração(ões)' : 'Nenhuma');
+  tx('s-valor','R$ '+(fc(p.valorAditivo)||'0,00'));
+  tx('s-total','R$ '+(fc(p.valorTotal)||'0,00'));
+  g('evt-summary').style.display='block';
+
+  // Prefill: o aditivo nasce de um contrato ja assinado, entao quase sempre
+  // ja sabemos quem e o cliente.
+  var set=function(id,v){var e=g(id); if(e&&v) e.value=v;};
+  set('f-name',p.clientName); set('f-nat',p.clientNat); set('f-prof',p.clientProf);
+  set('f-rg',p.clientRg); set('f-cpf',p.clientCpf); set('f-addr',p.clientAddr);
+  set('f-phone',p.clientPhone); set('f-phone2',p.clientPhone); set('f-email',p.clientEmail);
+  set('w-name',p.w2Name); set('w-cpf',p.w2Cpf); set('w-email',p.w2Email);
+  ['f-phone','f-phone2'].forEach(function(id){var e=g(id); if(e&&e.value) maskPhone(e);});
+}
+
+applyPreset();
+renderContract();
+</script>
+</body>
+</html>
