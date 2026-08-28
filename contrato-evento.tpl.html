@@ -27,6 +27,16 @@ body:has(#tab-form:target) #tab-form{display:block}
 .ir{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #dbeafe}
 .ir:last-child{border-bottom:none}
 .ik{color:#64748b}.iv{color:#1e3a5f;font-weight:600}
+/* Paginacao do PDF. O html2pdf corta o conteudo pela altura da folha, nao pelo
+   bloco logico: era isso que partia a tabela de parcelas entre duas paginas —
+   fazendo-a aparecer dentro da clausula anterior — e empurrava a Clausula
+   Quinta para depois do Foro e das assinaturas. No fonte a ordem sempre esteve
+   certa. Estas propriedades nao tem efeito na tela, so na paginacao. */
+.tb{page-break-inside:avoid}
+.tb tr{page-break-inside:avoid}
+.cp{page-break-inside:avoid}
+.ct{page-break-inside:avoid;page-break-after:avoid}
+.anexo{page-break-before:always}
 @media print{.np{display:none!important}body{background:white}.cp-wrap{box-shadow:none!important;padding:1.5cm 2cm!important;max-width:100%!important;border-radius:0!important}}
 </style>
 </head>
@@ -208,73 +218,85 @@ body:has(#tab-form:target) #tab-form{display:block}
     </table>
 
     <p class="ct">CLÁUSULA PRIMEIRA – DO OBJETO E PRAZO DA CONTRATAÇÃO</p>
-    <p class="cp">1.1 O presente ajuste tem por objeto a locação ao <strong>LOCATÁRIO(A)</strong> do espaço físico para eventos especificado no <strong>Quadro Resumo item 3</strong>, das Acomodações especificadas no <strong>Quadro Resumo item 4</strong> e dos mobiliários na quantidade especificada no <strong>Quadro Resumo item 5</strong>, no período compreendido e para o evento determinado no <strong>Quadro Resumo item 2</strong>.</p>
-    <p class="cp">1.2. As datas contratadas poderão ser alteradas a depender da disponibilidade da <strong>LOCADORA</strong>, sendo que o(a) <strong>LOCATÁRIO(A)</strong> arcará com uma taxa de 40% do TOTAL GERAL a título de indenização, além de eventual reequilíbrio econômico financeiro (IGPM) caso a nova data seja superior a 6 meses da data contratada, salvo convenção diversa entre as partes.</p>
-    <p class="cp sub"><strong>Parágrafo Único</strong> – Esta taxa não se aplica quando, em razão de caso fortuito e/ou força maior, o poder público proibir a realização de todo e qualquer tipo de evento no período contratado.</p>
-    <p class="cp">1.3. O(A) <strong>LOCATÁRIO(A)</strong> somente poderá iniciar a montagem nos salões locados no dia do evento previsto no <strong>Quadro Resumo item 2</strong>, salvo acordo prévio e expresso entre as partes.</p>
-    <p class="cp sub"><strong>Parágrafo Primeiro</strong> – Para eventos com início antes das 16h, os salões estarão disponíveis para montagem a partir das 8h; para eventos com início após as 16h, os salões estarão disponíveis 8 horas antes do início.</p>
-    <p class="cp sub"><strong>Parágrafo Segundo</strong> – A desmontagem deverá ocorrer até no máximo 02 horas após o fim do evento.</p>
-    <p class="cp sub"><strong>Parágrafo Terceiro</strong> – Para diária extra de montagem ou desmontagem, será cobrado R$ 500,00 por dia. <span id="c-extdays"></span></p>
-    <p class="cp">1.4. O DAMATA deverá ser desocupado até às 14h00min do último dia previsto no <strong>Quadro Resumo item 2</strong>, sob pena de multa de R$ 150,00 por pessoa.</p>
+    <p class="cp">1.1. O presente ajuste tem por objeto a locação ao <strong>LOCATÁRIO(A)</strong> do espaço físico para eventos, especificado e selecionado no <strong>Quadro Resumo item 3</strong>, no interior do DAMATA, das eventuais Acomodações especificadas no <strong>Quadro Resumo item 4</strong> e dos mobiliários, se houver, na quantidade especificada no <strong>Quadro Resumo item 5</strong>, ao <strong>LOCATÁRIO(A)</strong> no período compreendido e para o evento determinado no <strong>Quadro Resumo item 2</strong>.</p>
+    <p class="cp">1.2. As datas contratadas e especificadas no <strong>Quadro Resumo item 2</strong> poderão ser alteradas, a depender da disponibilidade da <strong>LOCADORA</strong>, sendo que o(a) <strong>LOCATÁRIO(A)</strong> arcará com uma taxa no importe de 40% (quarenta por cento) do TOTAL GERAL previsto no <strong>Quadro Resumo item 6</strong>, a título de indenização por conta da impossibilidade de negociação do espaço para outros eventos na data até então fixada, além de eventual valor referente à necessidade de reequilíbrio econômico-financeiro (IGPM) do contrato que será aplicado caso a nova data seja no período superior a 6 (seis) meses da data contratada, salvo se convencionado de forma diversa entre as partes.</p>
+    <p class="cp sub"><strong>Parágrafo Único</strong> – A taxa prevista no caput dessa cláusula não se aplica aos casos em que, em razão de caso fortuito e/ou força maior, o poder público proibir a realização de todo e qualquer tipo de evento no período contratado e torne necessária a sua alteração, mantendo-se a possibilidade de restabelecimento do equilíbrio econômico-financeiro do contrato.</p>
+    <p class="cp">1.3. O(A) <strong>LOCATÁRIO(A)</strong> somente poderá iniciar a montagem e os preparativos do evento nos salões locados no dia do evento previsto no <strong>Quadro Resumo item 2</strong>, salvo em caso de acordo prévio e expresso entre as partes deste CONTRATO. Caso seja convencionado o uso do espaço em data e horário além do contratado, durante todo o período ou a partir do momento em que qualquer item ou objeto referente ao evento estiver no espaço, o(a) <strong>LOCATÁRIO(A)</strong> terá suas responsabilidades estendidas, especialmente pela segurança do espaço e dos bens alocados.</p>
+    <p class="cp sub"><strong>Parágrafo Primeiro</strong> – Para os eventos com o início previsto em convite antes das 16h00min, os salões estarão disponíveis para montagem a partir das 8h00min; para eventos com início previsto em convite após as 16h00min, os salões estarão disponíveis 8 (oito) horas antes do início.</p>
+    <p class="cp sub"><strong>Parágrafo Segundo</strong> – A desmontagem do evento deverá ocorrer até no máximo 02 (duas) horas após o fim do evento.</p>
+    <p class="cp sub"><strong>Parágrafo Terceiro</strong> – Para diária extra de montagem ou desmontagem, além dos dias dispostos no <strong>Quadro Resumo item 2</strong>, será cobrado o valor de R$ 500,00 (quinhentos reais) por dia. <span id="c-extdays"></span></p>
+    <p class="cp">1.4. O DAMATA deverá ser desocupado pelo(a) <strong>LOCATÁRIO(A)</strong> e seus hóspedes impreterivelmente até às 14h00min do último dia previsto no <strong>Quadro Resumo item 2</strong>, sob pena de multa de R$ 150,00 (cento e cinquenta reais) por pessoa, sendo que todo o material usado na decoração e no evento deverá ser retirado e o local entregue nas mesmas condições em que foi recebido.</p>
 
-    <p class="ct">CLÁUSULA SEGUNDA – DO VALOR DA LOCAÇÃO</p>
-    <p class="cp">2.1. Pela locação ora ajustada o(a) <strong>LOCATÁRIO(A)</strong> pagará à <strong>LOCADORA</strong>, através de PIX (chave: 35.602.719/0001-87), a quantia de <strong id="c-total2">R$ ___________________________</strong>, da seguinte forma:</p>
+    <p class="ct">CLÁUSULA SEGUNDA – DO VALOR DA LOCAÇÃO E CAUÇÃO</p>
+    <p class="cp">2.1. Pela locação ora ajustada o(a) <strong>LOCATÁRIO(A)</strong> pagará à <strong>LOCADORA</strong> o valor constante no <strong>Quadro Resumo item 6</strong>, a ser adimplido nas condições e vencimentos dispostos no cronograma abaixo:</p>
     <div id="c-pmts" style="margin:10px 0"></div>
-    <p class="cp">2.2. No caso de impontualidade, será cobrada multa de 1% do valor atrasado, além de juros de 1% ao mês, acrescidos de custas processuais e 20% de honorários advocatícios em caso de cobrança judicial.</p>
-    <p class="cp sub"><strong>Parágrafo Primeiro</strong> – O recebimento de valores em atraso constituirá ato de mera tolerância, permanecendo exigíveis as sanções contratuais.</p>
-    <p class="cp sub"><strong>Parágrafo Segundo</strong> – A falta de pagamento integral até a data prevista rescindirá automaticamente o contrato, exonerando a <strong>LOCADORA</strong> da disponibilização dos espaços.</p>
+    <p class="cp">2.2. O valor referido no <strong>Quadro Resumo item 6</strong> deverá ser pago à <strong>LOCADORA</strong> na data de vencimento ajustada. No caso de a data de vencimento cair em dia não útil, o pagamento deverá ser realizado no primeiro dia útil seguinte. No caso de impontualidade, incidirá multa de 1% (um por cento) do valor atrasado, juros de 1% (um por cento) ao mês e, em caso de cobrança judicial, custas processuais e 20% (vinte por cento) de honorários advocatícios.</p>
+    <p class="cp sub"><strong>Parágrafo Primeiro</strong> – O recebimento de valores em atraso constituirá ato de mera tolerância e não implicará renúncia às sanções contratuais.</p>
+    <p class="cp sub"><strong>Parágrafo Segundo</strong> – A falta de pagamento da quantia integral até as datas previstas rescindirá automaticamente o contrato, exonerando a <strong>LOCADORA</strong> da disponibilização dos espaços, com retenção dos valores pagos a título de indenização pela impossibilidade de negociação do espaço.</p>
     <p class="cp sub"><strong>Parágrafo Terceiro</strong> – Havendo parcela em atraso, não será permitido o agendamento de visita técnica no DAMATA.</p>
-    <p class="cp">2.3. O(A) <strong>LOCATÁRIO(A)</strong> deverá fornecer, em até 2 dias antes do período locado, a título de caução, o montante de R$ 1.000,00 via PIX (chave: 35.602.719/0001-87), a ser devolvido no primeiro dia útil após a locação caso não haja danos.</p>
+    <p class="cp">2.3. O(A) <strong>LOCATÁRIO(A)</strong> deverá fornecer, em até 2 (dois) dias antes do período locado, a título de caução, o montante de R$ 1.000,00 (mil reais), para ressarcimento de eventuais danos causados ao espaço físico, despesas não quitadas e/ou extravios/avarias de bens e equipamentos, devendo a quantia ser devolvida no primeiro dia útil após o término da locação caso não haja danos.</p>
+    <p class="cp sub"><strong>Parágrafo Primeiro</strong> – Caso os valores para ressarcimento de eventuais danos ou avarias sejam superiores ao valor da caução ou esta não tenha sido entregue, o(a) <strong>LOCATÁRIO(A)</strong> obriga-se a pagar imediatamente a diferença ou o valor integral apurado.</p>
+    <p class="cp sub"><strong>Parágrafo Segundo</strong> – A não entrega da caução nos termos estabelecidos constituirá ato de mera tolerância por parte da <strong>LOCADORA</strong>, permanecendo o(a) <strong>LOCATÁRIO(A)</strong> obrigado(a) a ressarcir todo e qualquer prejuízo causado.</p>
 
     <p class="ct">CLÁUSULA TERCEIRA – DAS OBRIGAÇÕES DOS CONTRATANTES</p>
-    <p class="cp"><strong>Obrigações da LOCADORA:</strong></p>
-    <p class="cp sub">a) Disponibilizar as dependências locadas limpas e em condições de uso, desde que o valor pactuado tenha sido adimplido;</p>
-    <p class="cp sub">b) Realizar obras ou benfeitorias a qualquer tempo, exceto durante o evento, sem necessidade de anuência prévia do <strong>LOCATÁRIO(A)</strong>;</p>
-    <p class="cp sub">c) Não se comprometer com a imutabilidade da formação vegetativa no entorno das áreas alugadas.</p>
-    <p class="cp"><strong>Obrigações do(a) LOCATÁRIO(A):</strong></p>
-    <p class="cp sub">a) Usar com zelo as dependências e todos os equipamentos, sem qualquer dano ou deterioração;</p>
-    <p class="cp sub">b) Fornecer à <strong>LOCADORA</strong> lista detalhada de todos os fornecedores do evento, cuja contratação dependerá da aprovação da <strong>LOCADORA</strong>;</p>
-    <p class="cp sub">c) Realizar REUNIÃO final com fornecedores junto à equipe da <strong>LOCADORA</strong> em até 20 dias antes do evento, sob pena de não liberação do espaço;</p>
-    <p class="cp sub">d) Exigir que fornecedores retirem caixas e cases antes do início do evento, sob pena de multa de R$ 500,00;</p>
-    <p class="cp sub">e) Caso o evento ultrapasse 06 horas<span id="c-hclause"></span>, pagar R$ 500,00 por hora adicional;</p>
-    <p class="cp sub">f) Brinquedos infantis somente podem ser montados nas áreas contratadas, sendo OBRIGATÓRIA a contratação de equipe de monitores;</p>
-    <p class="cp sub">g) Fornecer alimentação adequada para toda a equipe de staff da <strong>LOCADORA</strong> durante o evento;</p>
-    <p class="cp sub">h) Locar gerador de energia elétrica, sob pena de multa de R$ 2.000,00. A <strong>LOCADORA</strong> disponibiliza disjuntor de 80A bifásico (17 Kw) para som e iluminação;</p>
-    <p class="cp sub">i) Não montar tendas sem autorização prévia da <strong>LOCADORA</strong>;</p>
-    <p class="cp sub">j) Responsabilizar-se pelo uso e volume do som durante o evento;</p>
-    <p class="cp sub">k) Garantir a integralidade física de toda a vegetação do DAMATA, responsabilizando-se por sua restituição em caso de deterioração;</p>
-    <p class="cp sub">l) Garantir que fornecedores façam o recolhimento de todo o lixo gerado, sob pena de multa de R$ 500,00;</p>
-    <p class="cp sub">m) Para eventos com bilheteria, responsabilizar-se por toda documentação e alvarás necessários;</p>
-    <p class="cp sub">n) Arcar com todos os impostos, tributos e taxas incidentes, inclusive eventuais obrigações ao ECAD;</p>
-    <p class="cp sub">o) Responsabilizar-se pela segurança do evento, contratando serviço de segurança para todo o período, inclusive montagem e desmontagem;</p>
-    <p class="cp sub">p) Estar permanentemente proibido de usar fogos, bombas ou similares, lançar confetes, papéis picados, glitters, massinha de modelar ou adesivos, sob pena de multa de R$ 1.000,00;</p>
-    <p class="cp sub">q) Autorizar a divulgação de imagens captadas durante o evento para fins de propaganda do espaço, desde que não implique em violação à honra, intimidade ou privacidade.</p>
+    <p class="cp">Constituem obrigações da <strong>LOCADORA</strong>:</p>
+    <p class="cp sub">a) Colocar à disposição do(a) <strong>LOCATÁRIO(A)</strong> as dependências locadas limpas, conservadas e em condições de uso, bem como o mobiliário contratado, desde que adimplido o valor pactuado;</p>
+    <p class="cp sub">b) Fornecer equipe para limpeza dos banheiros, vassourinha para o salão, portaria e insumos para os banheiros dos espaços locados, ressalvado que esses prestadores NÃO são responsáveis pelo serviço de segurança do espaço;</p>
+    <p class="cp sub">c) Realizar obras ou benfeitorias a qualquer tempo no imóvel, exceto durante a realização do evento, sem necessidade de anuência prévia;</p>
+    <p class="cp sub">d) A <strong>LOCADORA</strong> não se compromete com a imutabilidade da formação vegetativa no entorno das áreas alugadas, estando o locatário ciente de eventuais variações por causas climáticas ou naturais.</p>
+    <p class="cp">Constituem obrigações do(a) <strong>LOCATÁRIO(A)</strong>:</p>
+    <p class="cp sub">a) Usar com zelo as dependências e equipamentos colocados à disposição, sem causar danos ou deterioração;</p>
+    <p class="cp sub">b) Fornecer lista detalhada dos fornecedores envolvidos no evento, ciente de que a contratação depende da aprovação da <strong>LOCADORA</strong>;</p>
+    <p class="cp sub">c) Realizar REUNIÃO final com fornecedores junto à equipe da <strong>LOCADORA</strong> em até 20 (vinte) dias antes do evento para alinhamento de montagem e regras, sob pena de não liberação do espaço;</p>
+    <p class="cp sub">d) Exigir que fornecedores retirem, antes do horário de início do evento, todas as caixas e cases utilizados para guardar materiais, sob pena de multa de R$ 500,00 (quinhentos reais);</p>
+    <p class="cp sub">e) Caso o evento ultrapasse 06 (seis) horas de duração a contar do início da recepção e haja permanência de convidados não hospedados<span id="c-hclause"></span>, pagar a taxa de R$ 500,00 (quinhentos reais) por hora adicional;</p>
+    <p class="cp sub">f) Montar brinquedos infantis exclusivamente nas áreas contratadas, sendo OBRIGATÓRIA a contratação de monitores durante todo o período;</p>
+    <p class="cp sub">g) Fornecer alimentação adequada para toda a equipe de staff da <strong>LOCADORA</strong> durante o evento, sob pena de cobrança do custo de alimentação por pessoa;</p>
+    <p class="cp sub">h) Retirar todos os pertences que não façam parte da locação até o termo final do contrato, sob pena de multa de R$ 100,00 (cem reais) por hora de atraso;</p>
+    <p class="cp sub">i) Garantir a integridade física de toda a vegetação do DAMATA, protegendo-a com barreiras físicas caso necessário e responsabilizando-se por sua recomposição/indenização em caso de dano;</p>
+    <p class="cp sub">j) Exigir que fornecedores (especialmente buffet, bar e decoração) recolham integralmente o lixo gerado no evento até o término da locação, sob pena de multa de R$ 500,00 (quinhentos reais);</p>
+    <p class="cp sub">k) Obter e arcar com toda a documentação, impostos, taxas e alvarás necessários, inclusive ECAD e tributos municipais/federais;</p>
+    <p class="cp sub">l) Locar obrigatoriamente gerador de energia elétrica, sob pena de multa de R$ 2.000,00 (dois mil reais), ciente de que a <strong>LOCADORA</strong> disponibiliza apenas disjuntor de 80A bifásico (17 Kw) e não se responsabiliza por oscilações da rede da concessionária;</p>
+    <p class="cp sub">m) Não montar tendas ou palcos sem autorização prévia da <strong>LOCADORA</strong>, ficando obrigado(a) a apresentar a respectiva Anotação de Responsabilidade Técnica (ART) das estruturas provisórias;</p>
+    <p class="cp sub">n) Responsabilizar-se pelo volume e uso do som durante o evento, respeitando os limites legais;</p>
+    <p class="cp sub">o) Respeitar rigorosamente a lotação máxima permitida para cada espaço contratado;</p>
+    <p class="cp sub">p) Estar ciente de que é permanentemente PROIBIDO o uso de fogos de artifício, bombas de pressão, papéis picados, confetes, glitters, massinha de modelar ou adesivos, sob pena de multa de R$ 1.000,00 (mil reais);</p>
+    <p class="cp sub">q) Autorizar a divulgação de imagens captadas durante o evento para fins de divulgação do espaço da <strong>LOCADORA</strong>, resguardada a intimidade e a honra;</p>
+    <p class="cp sub">r) É expressamente VEDADO utilizar as acomodações e suítes como camarim para atrações ou bandas, bem como transferir móveis entre suítes e salões, sob pena de multa de R$ 500,00 (quinhentos reais);</p>
+    <p class="cp sub">s) Enviar a lista com nome e CPF de todos os hóspedes com 1 (uma) semana de antecedência, sendo vedado o acesso de pessoas não cadastradas às suítes;</p>
+    <p class="cp sub">t) Responsabilizar-se pela contratação de serviço de segurança especializado para todo o período da locação (inclusive montagem, realização e desmontagem);</p>
+    <p class="cp sub">u) Garantir que instalações elétricas e cenográficas sejam executadas por profissionais habilitados, podendo a <strong>LOCADORA</strong> embargar instalações que ofereçam risco;</p>
+    <p class="cp sub">v) Em caso de pouso de helicópteros ou aeronaves, apresentar cópia da autorização formal da ANAC com antecedência mínima de 40 (quarenta) dias (RBHA nº 91);</p>
+    <p class="cp sub">w) Permitir que a <strong>LOCADORA</strong> realize visitas técnicas monitoradas no espaço com terceiros durante o período de montagem, desde que não haja prejuízo aos trabalhos;</p>
+    <p class="cp sub">x) Realizar vistoria de entrada e saída, arcando com o custo de qualquer reparo ou reposição de bens danificados;</p>
+    <p class="cp sub">y) <strong>Regras do Mobiliário</strong>: O mobiliário contratado (com exceção dos bancos) destina-se exclusivamente ao salão indicado. O deslocamento de bancos para local descoberto acarretará taxa de R$ 5,00 por banco, cadeiras R$ 2,00 por unidade e mesas R$ 10,00 por unidade, sendo que o deslocamento para áreas abertas só será permitido em dias de tempo firme, arcando o locatário com eventuais danos por chuvas.</p>
 
-    <p class="ct">CLÁUSULA QUARTA – RESPONSABILIDADE CÍVEL E CRIMINAL</p>
-    <p class="cp">4.1. O(A) <strong>LOCATÁRIO(A)</strong> responderá civil e criminalmente por todo e qualquer ato ocorrido nas dependências do DAMATA durante a locação.</p>
-    <p class="cp">4.2. O(A) <strong>LOCATÁRIO(A)</strong> responderá exclusivamente pelo comportamento, segurança e por quaisquer acidentes que venham a ocorrer com qualquer pessoa dentro do espaço locado.</p>
-    <p class="cp">4.3. A <strong>LOCADORA</strong> não se responsabiliza por eventuais danos, furtos ou tipificação penal realizada aos veículos ou objetos que se encontrem nas dependências do local durante o período locado.</p>
-    <p class="cp">4.4. A <strong>LOCADORA</strong> não se responsabiliza por eventos naturais e climáticos, danos por intempéries, nem nas hipóteses de caso fortuito e força maior.</p>
+    <p class="ct">CLÁUSULA QUARTA – DA RESPONSABILIDADE CIVIL E CRIMINAL</p>
+    <p class="cp">4.1. O(A) <strong>LOCATÁRIO(A)</strong> responderá civil e criminalmente por todo e qualquer ato ou fato ocorrido nas dependências do DAMATA durante o período locado, resguardado o direito de ação de regresso da <strong>LOCADORA</strong> caso esta venha a ser acionada judicialmente.</p>
+    <p class="cp">4.2. O(A) <strong>LOCATÁRIO(A)</strong> responderá pelo comportamento de seus convidados e prestadores de serviços, zelando pela segurança de todos nas áreas de risco, especialmente no entorno do lago e da reserva de mata virgem.</p>
+    <p class="cp">4.3. A <strong>LOCADORA</strong> não se responsabiliza por furtos, roubos, danos ou avarias causados a veículos ou pertences deixados no interior das dependências do imóvel durante o período contratado.</p>
+    <p class="cp">4.4. A <strong>LOCADORA</strong> não se responsabiliza por fenômenos da natureza, intempéries climáticas, falta de energia da rede pública ou situações de caso fortuito e força maior.</p>
 
     <p class="ct">CLÁUSULA QUINTA – DA DESISTÊNCIA E DO INADIMPLEMENTO</p>
-    <p class="cp">5.1. Em caso de desistência por parte do(a) <strong>LOCATÁRIO(A)</strong>, a <strong>LOCADORA</strong> cobrará multa contratual progressiva:</p>
+    <p class="cp">5.1. Em caso de desistência por iniciativa do(a) <strong>LOCATÁRIO(A)</strong>, a <strong>LOCADORA</strong> reterá, a título de cláusula penal compensatória sobre o valor total do contrato, o percentual progressivo estabelecido na tabela abaixo:</p>
     <table class="tb" style="margin-bottom:8px">
-      <tr><th>Antecedência em relação à data do evento</th><th>Multa/Retenção</th></tr>
-      <tr><td>Até 18 meses antes</td><td>50% do valor total</td></tr>
-      <tr><td>Entre 18 e 12 meses antes</td><td>60% do valor total</td></tr>
-      <tr><td>Entre 12 e 6 meses antes</td><td>80% do valor total</td></tr>
-      <tr><td>Entre 6 meses e a data do evento</td><td>100% do valor total</td></tr>
+      <tr><th>Antecedência da Desistência em Relação ao Evento</th><th>Percentual de Retenção / Multa</th></tr>
+      <tr><td>Até 18 meses antes da data do evento</td><td>50% do valor total do contrato</td></tr>
+      <tr><td>Entre 18 e 12 meses antes da data do evento</td><td>60% do valor total do contrato</td></tr>
+      <tr><td>Entre 12 e 6 meses antes da data do evento</td><td>80% do valor total do contrato</td></tr>
+      <tr><td>Entre 6 meses até a data do evento</td><td>100% do valor total do contrato</td></tr>
     </table>
-    <p class="cp">Em caso de desistência por parte da <strong>LOCADORA</strong>, além da devolução dos valores já pagos, será aplicada a mesma progressividade da multa em favor do(a) <strong>LOCATÁRIO(A)</strong>.</p>
-    <p class="cp sub"><strong>Parágrafo Primeiro</strong> – O termo "data do evento" corresponde à data do contrato originário, não de eventuais remarcações.</p>
-    <p class="cp sub"><strong>Parágrafo Segundo</strong> – A <strong>LOCADORA</strong> estará autorizada a reter os valores já pagos a título de multa, podendo cobrar a quantia remanescente inclusive judicialmente.</p>
-    <p class="cp">5.4. O inadimplemento de qualquer parcela implicará rescisão contratual independentemente de notificações ou avisos.</p>
+    <p class="cp">5.2. Em caso de desistência imotivada por parte da <strong>LOCADORA</strong>, haverá a devolução integral dos valores pagos, incidindo a mesma tabela de multa progressiva em favor do(a) <strong>LOCATÁRIO(A)</strong>.</p>
+    <p class="cp sub"><strong>Parágrafo Primeiro</strong> – A apuração do prazo de antecedência para cálculo da multa terá como base a data original do evento prevista neste contrato, desconsiderando-se prazos decorrentes de eventuais remarcações.</p>
+    <p class="cp sub"><strong>Parágrafo Segundo</strong> – A <strong>LOCADORA</strong> fica expressamente autorizada a reter os valores pagos para quitação da multa, podendo cobrar eventual saldo devedor remanescente judicialmente.</p>
+    <p class="cp">5.3. O inadimplemento de qualquer uma das parcelas ou a falta de quitação integral no prazo pactuado ensejará a rescisão automática do contrato, independentemente de notificação, desobrigando a <strong>LOCADORA</strong> da entrega do espaço e autorizando a retenção das quantias pagas.</p>
 
     <p class="ct">CLÁUSULA SEXTA – DO FORO DE ELEIÇÃO</p>
-    <p class="cp">Elegem os CONTRATANTES o foro de Mogi Mirim/SP para dirimir quaisquer dúvidas decorrentes do presente contrato.</p>
+    <p class="cp">Elegem os <strong>CONTRATANTES</strong> o foro de Mogi Mirim/SP para dirimir quaisquer dúvidas decorrentes do presente contrato.</p>
 
-    <p class="ct">DISPOSIÇÕES FINAIS</p>
-    <p class="cp">E, por estarem justos(as) e contratados, firmam e assinam perante as testemunhas abaixo o presente contrato por assinatura eletrônica (Clicksign), ficando cada parte com uma via em seu poder.</p>
+    <p class="ct">DISPOSIÇÕES FINAIS E ASSINATURA ELETRÔNICA</p>
+    <p class="cp">E, por estarem justas e contratadas, firmam o presente contrato por assinatura eletrônica por meio da plataforma <strong>Autentique</strong>, conferindo validade jurídica plena ao documento nos termos da legislação vigente e da Lei nº 14.063/2020.</p>
+
     <p class="cp" style="text-align:center"><strong>Mogi Mirim/SP, <span id="c-today"></span>.</strong></p>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:48px">
@@ -291,6 +313,28 @@ body:has(#tab-form:target) #tab-form{display:block}
       <div style="text-align:center"><div style="border-top:1px solid #555;margin-top:64px;padding-top:8px">
         <p class="cp" style="text-align:center"><strong>TESTEMUNHA 2</strong><br>Nome: <span id="sig-wname">_____________________</span><br>CPF: <span id="sig-wcpf">_____________________</span><br>E-mail: <span id="sig-wemail">_____________________</span></p>
       </div></div>
+    </div>
+
+    <div class="anexo">
+    <p class="ct" style="text-align:center;margin-top:0">ANEXO 1 – INVENTÁRIO DO ESPAÇO E MOBILIÁRIO DAMATA</p>
+    <p class="cp"><strong>ENTREGA DAS CHAVES</strong>: Na entrega do espaço locado, a <strong>LOCADORA</strong> fornecerá ao <strong>LOCATÁRIO(A)</strong> ou responsável: 01 (uma) chave da Casa Flamboyant e 01 (uma) chave do portão de entrada do DAMATA, que deverão ser devolvidas no encerramento da locação, sob pena de indenização do custo de troca de segredos.</p>
+    <p class="cp"><strong>SALÃO TUMBÉRGIA</strong>: Banheiros femininos com cabines privativas; banheiros masculinos com cabines privativas e mictórios; infraestrutura básica de iluminação; cozinha com 02 pias, 01 bancada inox, 02 prateleiras, 01 coifa, porta/tela de correr; bar com 02 pias e armário de aço; sanitários de staff; instalações elétricas e hidráulicas conservadas.</p>
+    <p class="cp"><strong>SALÃO BROMÉLIAS</strong>: Sanitários privativos masculinos e femininos; infraestrutura básica de iluminação LED; bancada de buffet com 01 pia; sanitários para prestadores de serviço/staff.</p>
+    <p class="cp"><strong>CASA FLAMBOYANT</strong></p>
+    <p class="cp sub"><strong>Cozinha Americana</strong>: 01 pia com duas cubas; 01 fogão cooktop 5 bocas; 01 micro-ondas; 02 geladeiras; 01 filtro de água; 01 cafeteira Dolce Gusto; louças (pratos, copos, xícaras, taças de vinho e champagne) e talheres completos; panelas, frigideiras e assadeiras; banquetas.</p>
+    <p class="cp sub"><strong>Sala de TV / Estar</strong>: 01 mesa de madeira com bancos; 02 sofás corvin e 01 sofá suede cinza; 01 TV de 50&quot;; 01 rack; 02 espelhos de 2m com iluminação camarim; 02 poltronas de maquiagem/cabelo; 01 cristaleira e 01 estante; 02 ares-condicionados com controle.</p>
+    <p class="cp sub"><strong>Área Externa</strong>: 01 mesa de sinuca com bolas e tacos; 01 mesa de pebolim; 01 fogão a lenha com churrasqueira integrada; 01 fogão industrial de 2 bocas; 01 geladeira extra; 01 pia; bancos e cadeiras de madeira e ferro.</p>
+    <p class="cp"><strong>SUÍTES FLAMBOYANT (1 a 5) &amp; LOFT</strong>: Camas king/solteiro conforme especificação; travesseiros, lençóis com elástico, lençóis superiores, colchas e almofadas; toalhas de banho e rosto brancas; criados-mudos, abajures, armários e ares-condicionados com controle remoto; Loft com frigobar e banheira de hidromassagem para 6 lugares.</p>
+    <p class="cp"><strong>SUÍTES BROMÉLIAS (1 a 3)</strong>: Camas casal/solteiro completas com enxoval de cama e banho; frigobares; cortinas de voil branca; armários abertos; criados-mudos; ares-condicionados com controle.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:44px">
+      <div style="text-align:center"><div style="border-top:1px solid #555;margin-top:52px;padding-top:8px">
+        <p class="cp" style="text-align:center"><strong>LOCADORA – DAMATA</strong><br>ESPAÇO DAMATA EVENTOS LTDA</p>
+      </div></div>
+      <div style="text-align:center"><div style="border-top:1px solid #555;margin-top:52px;padding-top:8px">
+        <p class="cp" style="text-align:center"><strong>LOCATÁRIO(A)</strong><br>Nome: <span id="anx-name">_____________________</span></p>
+      </div></div>
+    </div>
     </div>
 
   </div>
@@ -346,6 +390,7 @@ function renderContract(){
   tx('sig-wname',g('w-name').value||'_____________________');
   tx('sig-wcpf',g('w-cpf').value||'_____________________');
   tx('sig-wemail',g('w-email').value||'_____________________');
+  tx('anx-name',g('f-name').value||'_____________________');
   if(isCorp){
     var razao=g('f-razao')?g('f-razao').value:'';
     var cnpj=g('f-cnpj')?g('f-cnpj').value:'';
@@ -405,7 +450,7 @@ function renderContract(){
   var hc=(p.exHoras||0)>0?' – sendo que neste contrato estão previstas '+p.exHoras+' hora(s) adicional(is) –':'';
   tx('c-hclause',hc);
   var tot=p.total?'R$ '+fc(p.total):'R$ ___________________________';
-  tx('c-total',tot);tx('c-total2',tot);
+  tx('c-total',tot);
   var pmts=p.payments||[];
   if(pmts.length>0){
     var h='<table class="tb"><thead><tr><th>#</th><th>Descrição</th><th>Vencimento</th><th>Valor</th></tr></thead><tbody>';
@@ -544,8 +589,11 @@ async function assinarWhatsApp(){
   _amsg("Gerando o contrato e enviando para assinatura…",true);
   try{
     var el=document.querySelector(".cp-wrap");
+    // pagebreak: sem isto o html2pdf ignora as regras de page-break do CSS e
+    // corta onde a altura da folha acabar, no meio de tabelas e clausulas.
     var opt={margin:[10,12,10,12],filename:"contrato.pdf",image:{type:"jpeg",quality:.95},
-      html2canvas:{scale:2,useCORS:true},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}};
+      html2canvas:{scale:2,useCORS:true},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
+      pagebreak:{mode:["css","legacy"],avoid:["tr","table",".cp",".ct"]}};
     var dataUri=await html2pdf().set(opt).from(el).outputPdf("datauristring");
     var b64=dataUri.split(",")[1];
     var code=(PRESET&&PRESET.code)||"";
