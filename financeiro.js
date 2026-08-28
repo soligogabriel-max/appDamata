@@ -57,7 +57,55 @@ function statusBadgeVenc(s,venc){
   return '<span class="stbadge pend">Pendente</span>';
 }
 
-let _recFiltrado=[], _recAgendaMap={}, _recConcilMap={}, _recConcilTituloMap={};
+// ── Rateio: extrato × títulos a receber ─────────────────────────────
+// Uma movimentação pode pagar vários títulos e um título pode ser pago
+// por várias movimentações, então o vínculo mora em conciliacao_receber
+// com o valor de cada parte. extrato_bancario.titulo_a_receber é só o
+// histórico da época 1:1 — ninguém mais lê.
+async function getRateioReceber(){
+  const [alocs, movs] = await Promise.all([
+    dbGetAll("conciliacao_receber","select=id,extrato_id,titulo_id,valor"),
+    dbGetAll("extrato_bancario","select=id_extrato_c6,titulo,descricao,data_lancamento,entrada&entrada=gt.0")
+  ]);
+  const movMap={};
+  movs.forEach(m=>{ if(!movMap[m.id_extrato_c6]) movMap[m.id_extrato_c6]=m; });
+  const porTitulo={}, porMov={};
+  (alocs||[]).forEach(a=>{
+    const v=+a.valor||0;
+    const t=String(a.titulo_id), e=String(a.extrato_id);
+    (porTitulo[t]=porTitulo[t]||{total:0,itens:[]});
+    porTitulo[t].total+=v; porTitulo[t].itens.push({...a, valor:v, mov:movMap[e]||null});
+    (porMov[e]=porMov[e]||{total:0,itens:[]});
+    porMov[e].total+=v;   porMov[e].itens.push({...a, valor:v});
+  });
+  return {porTitulo, porMov, movMap};
+}
+function _recAlocado(map,id){ return (map[String(id)]||{}).total||0; }
+
+// Estado do título. "pago" continua vindo do status na base — quem
+// escreve é o trigger, a partir da soma do rateio. O que o rateio
+// acrescenta é o meio do caminho: recebido em parte, ainda em aberto.
+function _recEstado(r, alocado){
+  if((r.status||"").trim().toUpperCase()==="PAGO") return "pago";
+  if(alocado>0) return "parcial";
+  const hoje=new Date(); hoje.setHours(0,0,0,0);
+  if((r.valor||0)>0 && r.vencimento && new Date(r.vencimento)<hoje) return "atrasado";
+  return "pendente";
+}
+// Vencida = passou do vencimento e ainda não quitou. Independe de ter
+// recebido parte: o que sobrou continua atrasado, e é o que se cobra.
+function _recVencida(r){
+  if((r.status||"").trim().toUpperCase()==="PAGO") return false;
+  if(!((r.valor||0)>0) || !r.vencimento) return false;
+  const hoje=new Date(); hoje.setHours(0,0,0,0);
+  return new Date(r.vencimento)<hoje;
+}
+const _REC_BADGE={pago:'<span class="stbadge pago">Pago</span>',
+                  parcial:'<span class="stbadge parc">Parcial</span>',
+                  atrasado:'<span class="stbadge atras">Atrasado</span>',
+                  pendente:'<span class="stbadge pend">Pendente</span>'};
+
+let _recFiltrado=[], _recAgendaMap={}, _recConcilMap={}, _recConcilTituloMap={}, _recEstadoMap={};
 
 async function renderReceber(){
   const wr=document.getElementById("rec-list"); wr.innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
@@ -69,14 +117,26 @@ async function renderReceber(){
     const busca=(document.getElementById("rec-busca").value||"").toLowerCase().trim();
     let q="order=vencimento.asc.nullslast&limit=2000&select=*";
     if(mes){ const[y,m]=mes.split("-"); const prox=m==="12"?(parseInt(y)+1)+"-01":(y+"-"+String(parseInt(m)+1).padStart(2,"0")); q+="&vencimento=gte."+y+"-"+m+"-01&vencimento=lt."+prox+"-01"; }
-    if(st==="Pago") q+="&status=eq.PAGO";
-    else if(st==="Pendente"||st==="Atrasado") q+="&status=eq.NP";
-    const rows=await dbGetAll("contas_a_receber",q);
-    const hoje=new Date(); hoje.setHours(0,0,0,0);
+    const [rows, rateio] = await Promise.all([
+      dbGetAll("contas_a_receber",q),
+      getRateioReceber()
+    ]);
+    const concilMap={}, concilTituloMap={}, estadoMap={};
+    rows.forEach(r=>{
+      const al=_recAlocado(rateio.porTitulo,r.id);
+      if(al>0){
+        concilMap[String(r.id)]=al;
+        const t=(rateio.porTitulo[String(r.id)].itens||[])
+          .map(i=>(i.mov&&(i.mov.titulo||i.mov.descricao))||i.extrato_id)
+          .filter(Boolean).join(", ");
+        if(t) concilTituloMap[String(r.id)]=t;
+      }
+      estadoMap[String(r.id)]=_recEstado(r,al);
+    });
     let filtrado=rows.filter(r=>{
       if(_userEventIds != null && !_userEventIds.includes(r.cod_evento)) return false;
-      if(st==="Atrasado") return (r.valor||0)>0&&r.vencimento&&new Date(r.vencimento)<hoje;
-      if(st==="Pendente") return !r.vencimento||new Date(r.vencimento)>=hoje;
+      if(st==="Atrasado") return _recVencida(r);
+      if(st) return estadoMap[String(r.id)]===st.toLowerCase();
       return true;
     });
     const agendaMapRec = await getAgendaMap();
@@ -85,27 +145,16 @@ async function renderReceber(){
       return nomeEv.includes(busca)||(r.cod_evento||"").toLowerCase().includes(busca);
     });
     const total=filtrado.reduce((a,r)=>a+(r.valor||0),0);
-    const recebido=filtrado.filter(r=>(r.status||"").toUpperCase()==="PAGO").reduce((a,r)=>a+(r.valor||0),0);
+    const recebido=filtrado.reduce((a,r)=>a+(estadoMap[String(r.id)]==="pago"?(r.valor||0):(concilMap[String(r.id)]||0)),0);
     const pendente=total-recebido;
     totWr.innerHTML=`
       <div class="tot-card"><div class="tot-lbl">Total</div><div class="tot-val blue">${fmt(total)}</div></div>
       <div class="tot-card"><div class="tot-lbl">Recebido</div><div class="tot-val green">${fmt(recebido)}</div></div>
       <div class="tot-card"><div class="tot-lbl">Pendente</div><div class="tot-val red">${fmt(pendente)}</div></div>
       <div class="tot-card"><div class="tot-lbl">Títulos</div><div class="tot-val">${filtrado.length}</div></div>`;
-    // Carrega extrato SEM filtro de mês para pegar conciliações de qualquer data
     const agendaMap = agendaMapRec;
-    const extratoRows = await dbGet("extrato_bancario","select=id_extrato_c6,titulo_a_receber,entrada,titulo&titulo_a_receber=not.is.null&limit=2000");
-    // Deduplica extrato por id_extrato_c6 antes de montar mapa
-    const seenExt=new Set();
-    const extratoDedup=extratoRows.filter(e=>{ if(seenExt.has(e.id_extrato_c6)){return false;} seenExt.add(e.id_extrato_c6); return true; });
-    const concilMap = {}; const concilTituloMap = {};
-    extratoDedup.forEach(e=>{
-      const k=String(e.titulo_a_receber);
-      concilMap[k]=(concilMap[k]||0)+(e.entrada||0);
-      if(e.titulo){ concilTituloMap[k]=concilTituloMap[k]?concilTituloMap[k]+", "+e.titulo:e.titulo; }
-    });
-
-    _recFiltrado=filtrado; _recAgendaMap=agendaMap; _recConcilMap=concilMap; _recConcilTituloMap=concilTituloMap;
+    _recFiltrado=filtrado; _recAgendaMap=agendaMap; _recConcilMap=concilMap;
+    _recConcilTituloMap=concilTituloMap; _recEstadoMap=estadoMap;
     if(!filtrado.length){ wr.innerHTML='<div class="empty"><div class="eicon">💰</div>Nenhum título encontrado.</div>'; return; }
     wr.innerHTML=`
     <div id="rec-bulk-bar" style="display:none;align-items:center;gap:10px;padding:8px 12px;background:var(--al);border:1.5px solid var(--am);border-radius:10px;margin-bottom:8px;">
@@ -118,9 +167,10 @@ async function renderReceber(){
       <tbody>${filtrado.map(r=>{
         const nomeEv=agendaMap[r.cod_evento]||"";
         const concil=concilMap[String(r.id)]||0;
-        const isPago=(r.status||"").toUpperCase()==="PAGO";
-        const isAtras=!isPago&&(r.valor||0)>0&&r.vencimento&&new Date(r.vencimento)<hoje;
-        const badge=isPago?'<span class="stbadge pago">Pago</span>':(isAtras?'<span class="stbadge atras">Atrasado</span>':'<span class="stbadge pend">Pendente</span>');
+        const estado=estadoMap[String(r.id)];
+        const isAtras=_recVencida(r);
+        const badge=_REC_BADGE[estado];
+        const falta=(r.valor||0)-concil;
         const rj=_esc(JSON.stringify(r));
         const tituloExt=(_recConcilTituloMap||{})[String(r.id)]||"";
         return`<tr>
@@ -131,7 +181,7 @@ async function renderReceber(){
           <td style="color:var(--dm);">${r.natureza||"—"}</td>
           <td style="color:var(--dm);">${r.parcela||r.num_parcela||"—"}</td>
           <td style="font-weight:700;color:#1A4A7C;">${fmt(r.valor)}</td>
-          <td style="font-weight:600;color:${concil>0?"#2A6644":"var(--dl)"};">${concil>0?fmt(concil):"—"}</td>
+          <td style="font-weight:600;color:${concil>0?"#2A6644":"var(--dl)"};">${concil>0?fmt(concil):"—"}${estado==="parcial"?`<div style="font-size:10px;font-weight:600;color:var(--er);">faltam ${fmt(falta)}</div>`:""}</td>
           <td style="font-size:11px;color:var(--dl);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(tituloExt)}">${tituloExt||"—"}</td>
           <td>${badge}</td>
           <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openCrud("contas_a_receber",JSON.parse(this.dataset.r),renderReceber)' data-r="${rj}">✏️</button>${isAtras?`<button class="act-btn" title="Lembrete WhatsApp" style="color:#25D366;" data-id="${r.id}" data-cod="${r.cod_evento||''}" onclick="_recEnviarLembrete(this)">📱</button>`:''}</div></td>
@@ -143,7 +193,6 @@ async function renderReceber(){
 
 function exportarReceberPDF(){
   if(!_recFiltrado.length){ alert("Nenhum registro para exportar."); return; }
-  const hoje=new Date(); hoje.setHours(0,0,0,0);
   const mes  = document.getElementById("rec-fil-mes").value;
   const st   = document.getElementById("rec-fil-status").value;
   const busca= document.getElementById("rec-busca").value.trim();
@@ -153,15 +202,14 @@ function exportarReceberPDF(){
     busca ? "Busca: "+busca : "",
   ].filter(Boolean).join(" · ") || "Todos os registros";
   const total    =_recFiltrado.reduce((a,r)=>a+(r.valor||0),0);
-  const recebido =_recFiltrado.filter(r=>(r.status||"").toUpperCase()==="PAGO").reduce((a,r)=>a+(r.valor||0),0);
+  const recebido =_recFiltrado.reduce((a,r)=>a+(_recEstadoMap[String(r.id)]==="pago"?(r.valor||0):(_recConcilMap[String(r.id)]||0)),0);
   const pendente =total-recebido;
   const rows=_recFiltrado.map(r=>{
     const nomeEv=_recAgendaMap[r.cod_evento]||r.cod_evento||"—";
     const concil=_recConcilMap[String(r.id)]||0;
-    const isPago=(r.status||"").toUpperCase()==="PAGO";
-    const isAtras=!isPago&&(r.valor||0)>0&&r.vencimento&&new Date(r.vencimento)<hoje;
-    const status=isPago?"Pago":isAtras?"Atrasado":"Pendente";
-    const statusCor=isPago?"#166534":isAtras?"#b91c1c":"#92400e";
+    const estado=_recEstadoMap[String(r.id)]||"pendente";
+    const status={pago:"Pago",parcial:"Parcial",atrasado:"Atrasado",pendente:"Pendente"}[estado];
+    const statusCor={pago:"#166534",parcial:"#1d4ed8",atrasado:"#b91c1c",pendente:"#92400e"}[estado];
     return `<tr>
       <td>${fmtDate(r.vencimento)||"—"}</td>
       <td style="font-size:11px;color:#6b7280">${r.cod_evento||"—"}</td>
@@ -694,6 +742,18 @@ function _extApplyDescFilter(){
   const filtered=_extAllRows.filter(r=>(r.titulo||r.descricao||"").toLowerCase().includes(term));
   _extRenderTable(filtered,true);
 }
+let _extRateio={};
+// Uma entrada pode estar rateada entre vários títulos: mostra o total
+// alocado e o que sobrou por alocar, que é o que pede providência.
+function _extRateioCell(r){
+  if(!((r.entrada||0)>0)) return '<span style="color:var(--dl);">—</span>';
+  const a=_extRateio[String(r.id_extrato_c6)]||{total:0,n:0};
+  const sobra=(r.entrada||0)-a.total;
+  if(!a.n) return '<span style="color:var(--wa);font-weight:600;">a ratear</span>';
+  return `<span style="color:#2A6644;font-weight:600;">${fmt(a.total)}</span>`
+    +`<span style="color:var(--dl);"> · ${a.n} tít.</span>`
+    +(sobra>0.02?`<div style="color:var(--er);font-weight:600;">sobra ${fmt(sobra)}</div>`:"");
+}
 function _extRenderTable(rows,filtered){
   const wr=document.getElementById("ext-list");
   const totWr=document.getElementById("ext-totais");
@@ -710,7 +770,7 @@ function _extRenderTable(rows,filtered){
     <div class="tot-card"><div class="tot-lbl">Saldo Final</div><div class="tot-val ${saldoFinal>=0?"blue":"red"}">${fmt(saldoFinal)}</div></div>
     <div class="tot-card"><div class="tot-lbl">Lançamentos</div><div class="tot-val">${rows.length}</div></div>`;
   wr.innerHTML=`<div class="table-wrap"><table class="fin-table">
-    <thead><tr><th style="width:32px;"><input type="checkbox" id="ext-chk-all" onchange="_extToggleAll(this)" style="cursor:pointer;"/></th><th>Data</th><th>Descrição</th><th style="color:#2A6644;">Entrada</th><th style="color:var(--er);">Saída</th><th>Saldo do Dia</th><th>Título Receber</th><th>Título Pagar</th><th></th></tr></thead>
+    <thead><tr><th style="width:32px;"><input type="checkbox" id="ext-chk-all" onchange="_extToggleAll(this)" style="cursor:pointer;"/></th><th>Data</th><th>Descrição</th><th style="color:#2A6644;">Entrada</th><th style="color:var(--er);">Saída</th><th>Saldo do Dia</th><th>Rateio (Receber)</th><th>Título Pagar</th><th></th></tr></thead>
     <tbody>${rows.map(r=>{const rj=_esc(JSON.stringify(r));return`<tr>
       <td><input type="checkbox" class="ext-chk" data-id="${_esc(r.id_extrato_c6)}" onchange="_extChkChange()" style="cursor:pointer;"/></td>
       <td style="white-space:nowrap;">${fmtDate(r.data_lancamento)}</td>
@@ -718,11 +778,152 @@ function _extRenderTable(rows,filtered){
       <td style="font-weight:${r.entrada>0?700:400};color:${r.entrada>0?"#2A6644":"var(--dl)"};">${r.entrada>0?fmt(r.entrada):"—"}</td>
       <td style="font-weight:${r.saida>0?700:400};color:${r.saida>0?"var(--er)":"var(--dl)"};">${r.saida>0?fmt(r.saida):"—"}</td>
       <td style="color:var(--dm);">${fmt(r.saldo_do_dia)}</td>
-      <td style="color:var(--dl);font-size:11px;">${r.titulo_a_receber||"—"}</td>
+      <td style="font-size:11px;">${_extRateioCell(r)}</td>
       <td style="color:var(--dl);font-size:11px;">${r.titulo_a_pagar||"—"}</td>
-      <td><div class="row-acts"><button class="act-btn" title="Associar título" onclick='openCrud("extrato_bancario",JSON.parse(this.dataset.r),renderExtrato)' data-r="${rj}">🔗</button></div></td>
+      <td><div class="row-acts">${(r.entrada||0)>0?`<button class="act-btn" title="Ratear entre títulos" onclick="openRateio('${_esc(r.id_extrato_c6)}',renderExtrato)">🔗</button>`:``}<button class="act-btn" title="Editar lançamento" onclick='openCrud("extrato_bancario",JSON.parse(this.dataset.r),renderExtrato)' data-r="${rj}">✏️</button></div></td>
     </tr>`}).join("")}</tbody>
   </table></div>`;
+}
+
+// ── Ratear uma movimentação entre títulos ───────────────────────────
+// O mesmo depósito pode quitar dois títulos, e dois depósitos podem
+// quitar um só. Cada linha aqui é quanto DESTA movimentação foi para
+// AQUELE título; o status do título sai da soma, recalculado no banco.
+let _ratMov=null, _ratAlocs=[], _ratTitulos=[], _ratAlocadoPorTitulo={}, _ratAgMap={}, _ratAfter=null;
+
+function closeRateio(){ document.getElementById("m-rateio").classList.remove("open"); }
+function _ratErr(e){ try{ const j=JSON.parse(e.message); return j.message||e.message; }catch(_){ return e.message||String(e); } }
+function _ratNum(v){
+  const s=String(v==null?"":v).trim().replace(/[^\d.,-]/g,"");
+  if(!s) return 0;
+  // "1.234,56" (pt-BR) vs "1234.56": a vírgula, quando existe, é o decimal
+  const norm = s.includes(",") ? s.replace(/\./g,"").replace(",",".") : s;
+  return parseFloat(norm)||0;
+}
+function _ratSaldo(t){ return (+t.valor||0)-(_ratAlocadoPorTitulo[String(t.id)]||0); }
+
+async function openRateio(idExtrato, after){
+  if(after!==undefined) _ratAfter=after;
+  document.getElementById("m-rateio").classList.add("open");
+  document.getElementById("rateio-head").innerHTML="";
+  document.getElementById("rateio-acts").innerHTML='<button class="btn-cancel" onclick="closeRateio()">Fechar</button>';
+  document.getElementById("rateio-body").innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  try{
+    const COLS="select=id,cod_evento,parcela,num_parcela,valor,vencimento,status";
+    const [mov, alocs, todas, abertos, agMap]=await Promise.all([
+      dbGet("extrato_bancario","id_extrato_c6=eq."+encodeURIComponent(idExtrato)+"&select=id_extrato_c6,data_lancamento,titulo,descricao,entrada&limit=1"),
+      dbGet("conciliacao_receber","extrato_id=eq."+encodeURIComponent(idExtrato)+"&select=id,titulo_id,valor&order=id.asc"),
+      dbGetAll("conciliacao_receber","select=titulo_id,valor"),
+      dbGetAll("contas_a_receber",COLS+"&status=eq.NP&valor=gt.0&order=vencimento.asc.nullslast"),
+      getAgendaMap()
+    ]);
+    if(!mov.length){ document.getElementById("rateio-body").innerHTML='<div class="empty"><div class="eicon">⚠️</div>Movimentação não encontrada.</div>'; return; }
+    // Os títulos que esta movimentação já paga saíram do NP quando ficaram
+    // quitados — buscados à parte, senão a linha do rateio perde o nome.
+    const idsAloc=(alocs||[]).map(a=>a.titulo_id);
+    const faltando=idsAloc.filter(id=>!(abertos||[]).some(t=>String(t.id)===String(id)));
+    const jaPagos=faltando.length
+      ? await dbGet("contas_a_receber",COLS+"&id=in.("+faltando.join(",")+")&limit=200")
+      : [];
+    _ratMov=mov[0]; _ratAlocs=alocs||[]; _ratTitulos=(abertos||[]).concat(jaPagos||[]); _ratAgMap=agMap;
+    _ratAlocadoPorTitulo={};
+    (todas||[]).forEach(a=>{ const k=String(a.titulo_id); _ratAlocadoPorTitulo[k]=(_ratAlocadoPorTitulo[k]||0)+(+a.valor||0); });
+    _ratRender();
+  }catch(e){
+    document.getElementById("rateio-body").innerHTML='<div class="empty"><div class="eicon">⚠️</div>'+_esc(_ratErr(e))+'</div>';
+  }
+}
+
+function _ratLabel(t){
+  const ev=_ratAgMap[t.cod_evento]||t.cod_evento||"?";
+  return `${ev} — Parc. ${t.parcela||"?"}/${t.num_parcela||"?"} — ${fmt(t.valor)}${t.vencimento?" — venc. "+fmtDate(t.vencimento):""}`;
+}
+
+function _ratRender(){
+  const alocado=_ratAlocs.reduce((a,x)=>a+(+x.valor||0),0);
+  const entrada=+_ratMov.entrada||0;
+  const sobra=entrada-alocado;
+  document.getElementById("rateio-title").textContent="Ratear entrada de "+fmt(entrada);
+  document.getElementById("rateio-head").innerHTML=`
+    <div style="font-size:12px;color:var(--dm);margin:10px 0 4px;">
+      ${fmtDate(_ratMov.data_lancamento)} · ${_esc(_ratMov.titulo||_ratMov.descricao||"—")}
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
+      <div class="tot-card" style="flex:1;min-width:120px;"><div class="tot-lbl">Entrada</div><div class="tot-val blue">${fmt(entrada)}</div></div>
+      <div class="tot-card" style="flex:1;min-width:120px;"><div class="tot-lbl">Alocado</div><div class="tot-val green">${fmt(alocado)}</div></div>
+      <div class="tot-card" style="flex:1;min-width:120px;"><div class="tot-lbl">Sobra</div><div class="tot-val ${sobra>0.02?"red":""}">${fmt(sobra)}</div></div>
+    </div>`;
+
+  const tMap={}; _ratTitulos.forEach(t=>tMap[String(t.id)]=t);
+  const linhas=_ratAlocs.map(a=>{
+    const t=tMap[String(a.titulo_id)];
+    return `<tr>
+      <td>${t?_esc(_ratLabel(t)):("Título "+a.titulo_id)}</td>
+      <td style="text-align:right;font-weight:700;white-space:nowrap;">${fmt(a.valor)}</td>
+      <td style="width:36px;"><button class="act-btn" title="Remover rateio" onclick="_ratRemover(${a.id})">🗑</button></td>
+    </tr>`;
+  }).join("");
+
+  const disponiveis=_ratTitulos.filter(t=>(t.status||"").trim().toUpperCase()!=="PAGO"&&_ratSaldo(t)>0.02);
+  const opts=disponiveis.map(t=>`<option value="${t.id}" data-saldo="${_ratSaldo(t)}">${_esc(_ratLabel(t))}${_ratSaldo(t)<(+t.valor||0)-0.02?" — saldo "+fmt(_ratSaldo(t)):""}</option>`).join("");
+
+  document.getElementById("rateio-body").innerHTML=`
+    ${linhas?`<div class="table-wrap" style="margin-bottom:14px;"><table class="fin-table">
+      <thead><tr><th>Título</th><th style="text-align:right;">Valor alocado</th><th></th></tr></thead>
+      <tbody>${linhas}</tbody></table></div>`:'<p style="font-size:13px;color:var(--dl);margin-bottom:14px;">Esta movimentação ainda não foi rateada.</p>'}
+    <div style="border-top:1px solid var(--br);padding-top:12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Adicionar título</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">
+        <select class="inp" id="rat-add-tit" style="flex:1;min-width:260px;margin-bottom:0;" onchange="_ratSugereValor()">
+          <option value="">— Escolha o título —</option>${opts}
+        </select>
+        <input class="inp" id="rat-add-val" style="width:130px;margin-bottom:0;" placeholder="Valor"/>
+        <button class="btn-confirm" style="padding:9px 16px;" onclick="_ratAdicionar()">Alocar</button>
+      </div>
+      <div id="rat-err" style="display:none;color:var(--er);font-size:12px;margin-top:8px;"></div>
+      ${disponiveis.length?"":'<p style="font-size:12px;color:var(--dl);margin-top:8px;">Nenhum título com saldo em aberto.</p>'}
+    </div>`;
+  _ratSugereValor();
+}
+
+// Preenche com o que fecha a conta: o menor entre o que sobrou da
+// movimentação e o que falta no título.
+function _ratSugereValor(){
+  const sel=document.getElementById("rat-add-tit"); const inp=document.getElementById("rat-add-val");
+  if(!sel||!inp)return;
+  const opt=sel.selectedOptions[0];
+  if(!opt||!sel.value){ inp.value=""; return; }
+  const alocado=_ratAlocs.reduce((a,x)=>a+(+x.valor||0),0);
+  const sobra=Math.max(0,(+_ratMov.entrada||0)-alocado);
+  const saldo=+opt.dataset.saldo||0;
+  inp.value=Math.min(sobra,saldo).toFixed(2).replace(".",",");
+}
+
+async function _ratAdicionar(){
+  const err=document.getElementById("rat-err");
+  const tid=parseInt(document.getElementById("rat-add-tit").value||"0",10);
+  const valor=_ratNum(document.getElementById("rat-add-val").value);
+  err.style.display="none";
+  if(!tid){ err.textContent="Escolha um título."; err.style.display="block"; return; }
+  if(!(valor>0)){ err.textContent="Informe um valor maior que zero."; err.style.display="block"; return; }
+  try{
+    await sbFetch("conciliacao_receber",{method:"POST",prefer:"return=minimal",
+      body:[{extrato_id:_ratMov.id_extrato_c6, titulo_id:tid, valor:valor}]});
+    const id=_ratMov.id_extrato_c6;
+    await openRateio(id);
+    if(_ratAfter)_ratAfter();
+    toast("✅ Rateio salvo");
+  }catch(e){ err.textContent=_ratErr(e); err.style.display="block"; }
+}
+
+async function _ratRemover(id){
+  if(!confirm("Remover este rateio? O título volta a ficar em aberto se deixar de estar coberto."))return;
+  try{
+    await sbFetch("conciliacao_receber?id=eq."+id,{method:"DELETE"});
+    const idm=_ratMov.id_extrato_c6;
+    await openRateio(idm);
+    if(_ratAfter)_ratAfter();
+  }catch(e){ alert("Erro ao remover: "+_ratErr(e)); }
 }
 
 async function renderExtrato(){
@@ -752,9 +953,12 @@ async function renderExtrato(){
   }
 
   try {
-    const rawRows=await dbGet("extrato_bancario",
-      "order=data_lancamento.asc,id_extrato_c6.asc&limit=5000"+dateFilter
-    );
+    const [rawRows, alocs]=await Promise.all([
+      dbGet("extrato_bancario","order=data_lancamento.asc,id_extrato_c6.asc&limit=5000"+dateFilter),
+      dbGetAll("conciliacao_receber","select=extrato_id,valor")
+    ]);
+    _extRateio={};
+    (alocs||[]).forEach(a=>{ const k=String(a.extrato_id); const x=(_extRateio[k]=_extRateio[k]||{total:0,n:0}); x.total+=(+a.valor||0); x.n++; });
     const seen=new Set();
     _extAllRows=rawRows.filter(r=>{ if(seen.has(r.id_extrato_c6)){return false;} seen.add(r.id_extrato_c6); return true; });
 
@@ -769,6 +973,8 @@ async function renderExtrato(){
 // ══════════════════════════════════════════
 let _impRows = [], _impEntradas = [], _impSaidas = [], _impStep = 0;
 let _impNaturezas = [], _impFornecList = [], _impNatByFornec = {};
+// Títulos em aberto com o saldo já descontado do que foi rateado antes
+let _impTitulos = [], _impAlocado = {}, _impAgMap = {};
 const C6_ZIP_PASS = "356027";
 
 function _djb2(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h)^s.charCodeAt(i);return(h>>>0).toString(36);}
@@ -820,21 +1026,44 @@ async function _dedupExtrato(rows){
   return rows.filter(r=>!existing.has(r.id_extrato_c6));
 }
 
+// Casa cada entrada do extrato com o que ela pode ter pago. Duas
+// formas, nesta ordem: um título cujo saldo bate com a entrada, ou um
+// par de títulos cuja soma bate — o caso "um depósito, dois títulos".
+// Em ambas a janela é de 45 dias em torno do vencimento.
 async function _matchEntradas(entradas){
-  const receber=await dbGetAll("contas_a_receber","select=id,cod_evento,parcela,num_parcela,valor,vencimento,status&status=eq.NP");
+  const [receber, alocs] = await Promise.all([
+    dbGetAll("contas_a_receber","select=id,cod_evento,parcela,num_parcela,valor,vencimento,status&status=eq.NP"),
+    dbGetAll("conciliacao_receber","select=titulo_id,valor")
+  ]);
+  _impAlocado={};
+  (alocs||[]).forEach(a=>{ const k=String(a.titulo_id); _impAlocado[k]=(_impAlocado[k]||0)+(+a.valor||0); });
+  _impTitulos=(receber||[]).map(r=>({...r, _saldo:(+r.valor||0)-(_impAlocado[String(r.id)]||0)}))
+                           .filter(r=>r._saldo>0.02);
   const agMap=await getAgendaMap();
+  _impAgMap=agMap;
   return entradas.map(row=>{
     const d=new Date(row.data_lancamento);
-    const cands=receber.filter(r=>{
-      if(!r.vencimento||!r.valor)return false;
-      const diff=Math.abs(new Date(r.vencimento)-d)/86400000;
-      return diff<=45 && Math.abs(r.valor-row.entrada)<0.02;
-    });
-    cands.sort((a,b)=>Math.abs(new Date(a.vencimento)-d)-Math.abs(new Date(b.vencimento)-d));
-    const match=cands[0]||null;
-    return{...row,_match:match,_matchId:match?match.id:null,
-      _matchLabel:match?`${agMap[match.cod_evento]||match.cod_evento||"?"} — Parc. ${match.parcela||"?"}/${match.num_parcela||"?"} (${fmt(match.valor)})`:null,
-      _allCands:cands};
+    const dist=r=>Math.abs(new Date(r.vencimento)-d)/86400000;
+    const janela=_impTitulos.filter(r=>r.vencimento&&dist(r)<=45).sort((a,b)=>dist(a)-dist(b));
+
+    const exato=janela.filter(r=>Math.abs(r._saldo-row.entrada)<0.02);
+    if(exato.length) return {...row, _allocs:[{titulo_id:String(exato[0].id), valor:+exato[0]._saldo.toFixed(2)}], _sugestao:"1 título"};
+
+    // Par: prioriza dois títulos do mesmo evento, depois os vencimentos
+    // mais próximos da data do depósito.
+    const cands=janela.slice(0,40);
+    let melhor=null;
+    for(let i=0;i<cands.length;i++){
+      for(let j=i+1;j<cands.length;j++){
+        if(Math.abs(cands[i]._saldo+cands[j]._saldo-row.entrada)>=0.02) continue;
+        const mesmoEvento=cands[i].cod_evento&&cands[i].cod_evento===cands[j].cod_evento;
+        const peso=(mesmoEvento?0:1000)+dist(cands[i])+dist(cands[j]);
+        if(!melhor||peso<melhor.peso) melhor={peso, par:[cands[i],cands[j]]};
+      }
+    }
+    if(melhor) return {...row, _allocs:melhor.par.map(t=>({titulo_id:String(t.id), valor:+t._saldo.toFixed(2)})), _sugestao:"2 títulos"};
+
+    return {...row, _allocs:[], _sugestao:null};
   });
 }
 
@@ -941,12 +1170,7 @@ async function _renderImportStep1(){
   document.getElementById("import-title").textContent=`Conciliar Entradas (${_impEntradas.length})`;
   document.getElementById("import-body").innerHTML='<div class="empty"><div class="eicon">⏳</div>Buscando sugestões...</div>';
   document.getElementById("import-acts").innerHTML="";
-  const withMatch=await _matchEntradas(_impEntradas);
-  _impEntradas=withMatch;
-  // Load all NP receber for the dropdowns
-  const receber=await dbGetAll("contas_a_receber","select=id,cod_evento,parcela,num_parcela,valor,vencimento,status&status=eq.NP");
-  const agMap=await getAgendaMap();
-  const recOpts=receber.map(r=>`<option value="${r.id}">${(agMap[r.cod_evento]||r.cod_evento||"?")} — Parc.${r.parcela||"?"}/${r.num_parcela||"?"} (${fmt(r.valor)}) ${r.vencimento||""}</option>`).join("");
+  _impEntradas=await _matchEntradas(_impEntradas);
 
   if(!_impEntradas.length){
     document.getElementById("import-body").innerHTML='<div class="empty"><div class="eicon">—</div>Nenhuma entrada nova para conciliar.</div>';
@@ -955,44 +1179,113 @@ async function _renderImportStep1(){
   }
   const rows=_impEntradas.map((r,i)=>`<tr id="imp-ent-row-${i}">
     <td style="white-space:nowrap;font-size:12px;">${fmtDate(r.data_lancamento)}</td>
-    <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.titulo)}">${_esc(r.titulo||r.descricao||"—")}</td>
+    <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(r.titulo)}">${_esc(r.titulo||r.descricao||"—")}</td>
     <td style="color:#2A6644;font-weight:700;white-space:nowrap;">${fmt(r.entrada)}</td>
-    <td>${r._matchLabel?`<span class="imp-badge-match">✓ Sugerido</span>`:`<span class="imp-badge-no">Sem sugestão</span>`}</td>
-    <td style="min-width:220px;">
-      <select class="imp-sel" id="imp-ent-sel-${i}" onchange="_impEntSelChange(${i})">
-        <option value="">— Não conciliar —</option>
-        ${r._matchId?`<option value="${r._matchId}" selected>${_esc(r._matchLabel)}</option>`:""}
-        ${recOpts}
-      </select>
-    </td>
+    <td>${r._sugestao?`<span class="imp-badge-match">✓ ${r._sugestao}</span>`:`<span class="imp-badge-no">Sem sugestão</span>`}</td>
+    <td style="min-width:320px;"><div id="imp-alloc-${i}">${_impAllocCell(i)}</div></td>
   </tr>`).join("");
   document.getElementById("import-body").innerHTML=`
-    <p style="font-size:13px;color:var(--dm);margin-bottom:10px;">Confira as sugestões de conciliação. Selecione o título correspondente ou deixe "Não conciliar".</p>
+    <p style="font-size:13px;color:var(--dm);margin-bottom:10px;">Cada entrada pode ser dividida entre vários títulos, e um título pode receber pedaços de várias entradas. Confira as sugestões e ajuste os valores; deixe vazio para não conciliar.</p>
     <div class="table-wrap"><table class="imp-table">
-      <thead><tr><th>Data</th><th>Descrição</th><th>Entrada</th><th>Status</th><th>Título a Receber</th></tr></thead>
+      <thead><tr><th>Data</th><th>Descrição</th><th>Entrada</th><th>Sugestão</th><th>Rateio</th></tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
   document.getElementById("import-acts").innerHTML=`<button class="btn-cancel" onclick="closeImport()">Cancelar</button><button class="btn-confirm" onclick="_renderImportStep2()">Avançar → Saídas</button>`;
-  // Remove duplicates in selects (match already shown as first option)
-  _impEntradas.forEach((_,i)=>{
-    const sel=document.getElementById(`imp-ent-sel-${i}`);
-    if(!sel)return;
-    const vals=new Set();
-    Array.from(sel.options).forEach(o=>{if(vals.has(o.value)&&o.value)o.remove();else vals.add(o.value);});
-  });
 }
 
-function _impEntSelChange(i){
-  const sel=document.getElementById(`imp-ent-sel-${i}`);
-  if(sel) _impEntradas[i]._selectedRecId=sel.value||null;
+// Saldo do título descontando o que as outras linhas deste mesmo
+// wizard já pretendem alocar nele.
+function _impSaldoDisponivel(tituloId, exI, exJ){
+  const t=_impTitulos.find(x=>String(x.id)===String(tituloId));
+  if(!t) return 0;
+  let usado=0;
+  _impEntradas.forEach((r,i)=>(r._allocs||[]).forEach((a,j)=>{
+    if(i===exI&&j===exJ) return;
+    if(String(a.titulo_id)===String(tituloId)) usado+=(+a.valor||0);
+  }));
+  return t._saldo-usado;
+}
+
+function _impTituloLabel(t){
+  const ev=_impAgMap[t.cod_evento]||t.cod_evento||"?";
+  const parcial=t._saldo<(+t.valor||0)-0.02;
+  return `${ev} — Parc.${t.parcela||"?"}/${t.num_parcela||"?"} (${fmt(t.valor)}${parcial?", saldo "+fmt(t._saldo):""})${t.vencimento?" "+fmtDate(t.vencimento):""}`;
+}
+
+function _impAllocCell(i){
+  const r=_impEntradas[i];
+  const allocs=r._allocs||[];
+  const alocado=allocs.reduce((a,x)=>a+(+x.valor||0),0);
+  const sobra=(r.entrada||0)-alocado;
+  const linhas=allocs.map((a,j)=>{
+    const opts=_impTitulos
+      .filter(t=>String(t.id)===String(a.titulo_id)||_impSaldoDisponivel(t.id,i,j)>0.02)
+      .map(t=>`<option value="${t.id}"${String(t.id)===String(a.titulo_id)?" selected":""}>${_esc(_impTituloLabel(t))}</option>`).join("");
+    return `<div style="display:flex;gap:5px;margin-bottom:4px;align-items:center;">
+      <select class="imp-sel" style="flex:1;min-width:180px;" onchange="_impAllocSel(${i},${j})" id="imp-al-t-${i}-${j}">
+        <option value="">— Escolha o título —</option>${opts}
+      </select>
+      <input class="imp-sel" style="width:92px;text-align:right;" id="imp-al-v-${i}-${j}" value="${a.valor?String((+a.valor).toFixed(2)).replace(".",","):""}" onchange="_impAllocVal(${i},${j})" placeholder="valor"/>
+      <button class="act-btn" title="Remover" onclick="_impAllocDel(${i},${j})">✕</button>
+    </div>`;
+  }).join("");
+  return `${linhas}
+    <div style="display:flex;gap:8px;align-items:center;font-size:11px;">
+      <button class="btn-cancel" style="padding:3px 10px;font-size:11px;" onclick="_impAllocAdd(${i})">+ título</button>
+      ${allocs.length?`<span style="color:${Math.abs(sobra)<0.02?"var(--dl)":(sobra<0?"var(--er)":"var(--wa)")};font-weight:600;">${sobra<-0.02?"excede em "+fmt(-sobra):(sobra>0.02?"sobra "+fmt(sobra):"fecha a entrada")}</span>`:""}
+    </div>`;
+}
+
+function _impAllocRefresh(i){
+  const el=document.getElementById("imp-alloc-"+i);
+  if(el) el.innerHTML=_impAllocCell(i);
+}
+function _impAllocAdd(i){
+  _impEntradas[i]._allocs=(_impEntradas[i]._allocs||[]).concat([{titulo_id:"",valor:0}]);
+  _impAllocRefresh(i);
+}
+function _impAllocDel(i,j){
+  _impEntradas[i]._allocs.splice(j,1);
+  _impAllocRefresh(i);
+}
+// Ao escolher o título, sugere o valor que fecha a conta: o menor entre
+// o que sobrou da entrada e o que falta no título.
+function _impAllocSel(i,j){
+  const sel=document.getElementById(`imp-al-t-${i}-${j}`);
+  const a=_impEntradas[i]._allocs[j];
+  a.titulo_id=sel?sel.value:"";
+  const outras=(_impEntradas[i]._allocs||[]).reduce((s,x,k)=>k===j?s:s+(+x.valor||0),0);
+  const sobra=Math.max(0,(_impEntradas[i].entrada||0)-outras);
+  a.valor=a.titulo_id?+Math.min(sobra,_impSaldoDisponivel(a.titulo_id,i,j)).toFixed(2):0;
+  _impAllocRefresh(i);
+}
+function _impAllocVal(i,j){
+  const inp=document.getElementById(`imp-al-v-${i}-${j}`);
+  _impEntradas[i]._allocs[j].valor=_ratNum(inp?inp.value:0);
+  _impAllocRefresh(i);
+}
+
+// Antes de sair do passo: nenhuma entrada pode ter mais rateio do que
+// entrou, e nenhum título pode receber mais do que deve.
+function _impValidaRateio(){
+  const erros=[];
+  const porTitulo={};
+  _impEntradas.forEach(r=>{
+    const allocs=(r._allocs||[]).filter(a=>a.titulo_id&&(+a.valor||0)>0);
+    const soma=allocs.reduce((a,x)=>a+(+x.valor||0),0);
+    if(soma>(r.entrada||0)+0.02) erros.push(`${fmtDate(r.data_lancamento)} — rateio de ${fmt(soma)} passa da entrada de ${fmt(r.entrada)}`);
+    allocs.forEach(a=>{ const k=String(a.titulo_id); porTitulo[k]=(porTitulo[k]||0)+(+a.valor||0); });
+  });
+  Object.keys(porTitulo).forEach(k=>{
+    const t=_impTitulos.find(x=>String(x.id)===k);
+    if(t&&porTitulo[k]>t._saldo+0.02) erros.push(`${_impTituloLabel(t)} — receberia ${fmt(porTitulo[k])}, mas só faltam ${fmt(t._saldo)}`);
+  });
+  return erros;
 }
 
 async function _renderImportStep2(){
-  // Capture selections from Step 1
-  _impEntradas.forEach((r,i)=>{
-    const sel=document.getElementById(`imp-ent-sel-${i}`);
-    r._selectedRecId=sel?sel.value||null:r._matchId||null;
-  });
+  const erros=_impValidaRateio();
+  if(erros.length){ alert("Corrija o rateio antes de avançar:\n\n• "+erros.join("\n• ")); return; }
   _impStep=2;
   _setImportStepsBar(2);
   document.getElementById("import-title").textContent=`Criar Títulos a Pagar para Saídas (${_impSaidas.length})`;
@@ -1089,7 +1382,11 @@ function _renderImportStep3(){
   _impStep=3;
   _setImportStepsBar(3);
   document.getElementById("import-title").textContent="Confirmar Importação";
-  const conciliadas=_impEntradas.filter(r=>r._selectedRecId).length;
+  const comRateio=_impEntradas.filter(r=>(r._allocs||[]).some(a=>a.titulo_id&&(+a.valor||0)>0));
+  const conciliadas=comRateio.length;
+  const titulosTocados=new Set();
+  let valorRateado=0;
+  comRateio.forEach(r=>(r._allocs||[]).forEach(a=>{ if(a.titulo_id&&(+a.valor||0)>0){ titulosTocados.add(String(a.titulo_id)); valorRateado+=+a.valor||0; } }));
   const semConcil=_impEntradas.length-conciliadas;
   const saidasCriar=_impSaidas.filter(r=>r._criar).length;
   const saidasIgn=_impSaidas.length-saidasCriar;
@@ -1098,6 +1395,7 @@ function _renderImportStep3(){
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px;">
       <div class="tot-card"><div class="tot-lbl">Lançamentos novos</div><div class="tot-val">${total}</div></div>
       <div class="tot-card"><div class="tot-lbl">Entradas conciliadas</div><div class="tot-val green">${conciliadas}</div></div>
+      <div class="tot-card"><div class="tot-lbl">Títulos alcançados</div><div class="tot-val green">${titulosTocados.size}</div><div class="tot-lbl">${fmt(valorRateado)}</div></div>
       <div class="tot-card"><div class="tot-lbl">Entradas sem conciliação</div><div class="tot-val">${semConcil}</div></div>
       <div class="tot-card"><div class="tot-lbl">A Pagar a criar</div><div class="tot-val red">${saidasCriar}</div></div>
       <div class="tot-card"><div class="tot-lbl">Saídas ignoradas</div><div class="tot-val">${saidasIgn}</div></div>
@@ -1116,11 +1414,15 @@ async function _executeImport(){
       await sbFetch("extrato_bancario",{method:"POST",body:_impRows.slice(i,i+PAGE),prefer:"return=minimal"});
     }
 
-    // 2. Conciliar entradas: PATCH contas_a_receber status=PAGO + vincular no extrato
-    const conciliadas=_impEntradas.filter(r=>r._selectedRecId);
-    for(const r of conciliadas){
-      await sbFetch(`contas_a_receber?id=eq.${r._selectedRecId}`,{method:"PATCH",body:{status:"PAGO",data_recebido:r.data_lancamento},prefer:"return=minimal"});
-      await sbFetch(`extrato_bancario?id_extrato_c6=eq.${encodeURIComponent(r.id_extrato_c6)}`,{method:"PATCH",body:{titulo_a_receber:r._selectedRecId},prefer:"return=minimal"});
+    // 2. Conciliar entradas: grava o rateio. status e data_recebido do
+    //    título são recalculados pelo banco a partir da soma alocada.
+    const alocacoes=[];
+    _impEntradas.forEach(r=>(r._allocs||[]).forEach(a=>{
+      if(a.titulo_id&&(+a.valor||0)>0) alocacoes.push({extrato_id:r.id_extrato_c6, titulo_id:parseInt(a.titulo_id,10), valor:+(+a.valor).toFixed(2)});
+    }));
+    const conciliadas=_impEntradas.filter(r=>(r._allocs||[]).some(a=>a.titulo_id&&(+a.valor||0)>0));
+    for(let i=0;i<alocacoes.length;i+=PAGE){
+      await sbFetch("conciliacao_receber",{method:"POST",body:alocacoes.slice(i,i+PAGE),prefer:"return=minimal"});
     }
 
     // 3. Criar contas_a_pagar para saídas marcadas e vincular no extrato
