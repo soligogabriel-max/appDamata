@@ -123,6 +123,13 @@
       width:100%;padding:48px;text-align:center;
       color:#8A9BA8;font-size:14px;
     }
+    #pdf-load-more{
+      display:none;margin:32px auto 0;padding:12px 32px;
+      background:#fff;border:2px solid #E8A52A;border-radius:32px;
+      color:#8B5E2A;font-size:14px;font-family:inherit;cursor:pointer;
+      transition:background .2s;letter-spacing:.02em;
+    }
+    #pdf-load-more:hover{background:#FEF3DD;}
 
     /* ── MÍDIA: CARROSSEL + VÍDEOS ───────────────── */
     #media-section{
@@ -294,6 +301,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <div id="pdf-frame">
     <div id="pdf-loading">Carregando informações…</div>
   </div>
+  <button id="pdf-load-more" onclick="window._renderPdfBatch()">Ver mais</button>
 </section>
 
 <footer id="footer">
@@ -321,7 +329,7 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     </a>
   </div>
   <div id="footer-copy">FAZENDA DAMATA · Mogi Mirim · SP</div>
-  <div id="ll-version" style="font-size:9px;color:rgba(255,255,255,.15);letter-spacing:1px;">v2026.07.31a</div>
+  <div id="ll-version" style="font-size:9px;color:rgba(255,255,255,.15);letter-spacing:1px;">v2026.08.31a</div>
 </footer>
 
 <!-- MODAL: FEEDBACK PÓS-VISITA -->
@@ -808,9 +816,23 @@ async function init() {
   pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER;
   loading.remove();
 
-  for (const entry of pdfList) {
-    renderPdf(entry, infoArea);
+  const _PDF_BATCH = 5;
+  let _pdfOffset = 0;
+  function _renderBatch() {
+    const batch = pdfList.slice(_pdfOffset, _pdfOffset + _PDF_BATCH);
+    batch.forEach(entry => renderPdf(entry, infoArea));
+    _pdfOffset += _PDF_BATCH;
+    const btn = document.getElementById("pdf-load-more");
+    const rem = pdfList.length - _pdfOffset;
+    if (rem > 0) {
+      btn.textContent = "Ver mais " + rem + " documento" + (rem !== 1 ? "s" : "");
+      btn.style.display = "block";
+    } else {
+      if (btn) btn.style.display = "none";
+    }
   }
+  window._renderPdfBatch = _renderBatch;
+  _renderBatch();
 }
 
 init().then(() => { _checkVisitaHash(); _checkFeedbackParam(); });
