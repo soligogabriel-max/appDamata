@@ -1,9 +1,8 @@
 // Supabase Edge Function: upload-landing-pdf
 // Aceita multipart/form-data (campo "file") ou JSON {file_b64, name, type, folder}.
-// Usa service role key (auto-injetada) para salvar no bucket landing-pdfs.
-// Requer JWT autenticado com papel admin ou equipe.
+// Salva no Cloudflare R2 (zero egress). Requer JWT com papel admin ou equipe.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { AwsClient } from "https://esm.sh/aws4fetch@1.0.20";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -37,11 +36,6 @@ Deno.serve(async (req) => {
   if (!token || token === anonKey) return json({ error: "Não autorizado." }, 401);
   const role = getRole(token);
   if (!["admin", "equipe"].includes(role ?? "")) return json({ error: "Acesso restrito à equipe." }, 403);
-
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
 
   let bytes: ArrayBuffer;
   let fileName: string;
@@ -82,15 +76,30 @@ Deno.serve(async (req) => {
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
   const objectPath = folder ? `${folder}/${Date.now()}_${safeName}` : `${Date.now()}_${safeName}`;
 
-  const { error } = await supabase.storage
-    .from("landing-pdfs")
-    .upload(objectPath, bytes, { contentType, upsert: true });
+  const accountId  = Deno.env.get("R2_ACCOUNT_ID")!;
+  const bucketName = Deno.env.get("R2_BUCKET_NAME")!;
+  const publicUrl  = Deno.env.get("R2_PUBLIC_URL")!;
 
-  if (error) return json({ error: "Falha ao salvar no Storage.", detail: error.message }, 502);
+  const r2 = new AwsClient({
+    accessKeyId:     Deno.env.get("R2_ACCESS_KEY_ID")!,
+    secretAccessKey: Deno.env.get("R2_SECRET_ACCESS_KEY")!,
+    service: "s3",
+    region:  "auto",
+  });
 
-  const { data: { publicUrl } } = supabase.storage
-    .from("landing-pdfs")
-    .getPublicUrl(objectPath);
+  const endpoint = `https://${accountId}.r2.cloudflarestorage.com/${bucketName}/${objectPath}`;
 
-  return json({ ok: true, url: publicUrl, name: fileName });
+  const uploadRes = await r2.fetch(endpoint, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: bytes,
+  });
+
+  if (!uploadRes.ok) {
+    const detail = await uploadRes.text();
+    return json({ error: "Falha ao salvar no R2.", detail }, 502);
+  }
+
+  const fileUrl = `${publicUrl}/${objectPath}`;
+  return json({ ok: true, url: fileUrl, name: fileName });
 });
