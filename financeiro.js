@@ -105,7 +105,31 @@ const _REC_BADGE={pago:'<span class="stbadge pago">Pago</span>',
                   atrasado:'<span class="stbadge atras">Atrasado</span>',
                   pendente:'<span class="stbadge pend">Pendente</span>'};
 
-let _recFiltrado=[], _recAgendaMap={}, _recConcilMap={}, _recConcilTituloMap={}, _recEstadoMap={};
+let _recFiltrado=[], _recAgendaMap={}, _recConcilMap={}, _recConcilTituloMap={}, _recEstadoMap={}, _recRateioItens={};
+
+// De onde veio o dinheiro de cada parcela: uma sub-linha por movimentação do
+// extrato alocada nela. A coluna "Título Extrato" só cabia os nomes colados e
+// truncados — não dava para ver data nem quanto daquela entrada foi para esta
+// parcela, que é o que importa quando a entrada pagou mais de um título.
+function _recLinhaEntradas(r){
+  const itens=_recRateioItens[String(r.id)]||[];
+  if(!itens.length) return "";
+  const linhas=itens.map(a=>{
+    const m=a.mov||{};
+    const sobrou=(+m.entrada||0)-a.valor>0.02;
+    return `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;flex-wrap:wrap;">
+      <span style="color:#2A6644;font-weight:700;white-space:nowrap;">📥 ${fmtDate(m.data_lancamento)}</span>
+      <span style="color:var(--dm);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_esc(m.titulo||m.descricao||a.extrato_id)}</span>
+      <span style="font-weight:700;color:#2A6644;white-space:nowrap;">${fmt(a.valor)}</span>
+      ${sobrou?`<span style="color:var(--dl);font-size:11px;white-space:nowrap;">de uma entrada de ${fmt(m.entrada)}</span>`:""}
+      <button class="act-btn" title="Abrir o rateio desta entrada" onclick="openRateio('${_esc(a.extrato_id)}',renderReceber)">🔗</button>
+    </div>`;
+  }).join("");
+  return `<tr style="background:var(--al);border-bottom:1px solid var(--br);">
+    <td></td>
+    <td colspan="9" style="padding:4px 12px 8px;font-size:12px;border-left:2px solid #2A6644;">${linhas}</td>
+  </tr>`;
+}
 
 async function renderReceber(){
   const wr=document.getElementById("rec-list"); wr.innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
@@ -121,18 +145,21 @@ async function renderReceber(){
       dbGetAll("contas_a_receber",q),
       getRateioReceber()
     ]);
-    const concilMap={}, concilTituloMap={}, estadoMap={};
+    const concilMap={}, concilTituloMap={}, estadoMap={}, itensMap={};
     rows.forEach(r=>{
       const al=_recAlocado(rateio.porTitulo,r.id);
       if(al>0){
         concilMap[String(r.id)]=al;
-        const t=(rateio.porTitulo[String(r.id)].itens||[])
-          .map(i=>(i.mov&&(i.mov.titulo||i.mov.descricao))||i.extrato_id)
+        const itens=(rateio.porTitulo[String(r.id)].itens||[]);
+        itensMap[String(r.id)]=itens.slice().sort((a,b)=>
+          String((a.mov&&a.mov.data_lancamento)||"").localeCompare(String((b.mov&&b.mov.data_lancamento)||"")));
+        const t=itens.map(i=>(i.mov&&(i.mov.titulo||i.mov.descricao))||i.extrato_id)
           .filter(Boolean).join(", ");
         if(t) concilTituloMap[String(r.id)]=t;
       }
       estadoMap[String(r.id)]=_recEstado(r,al);
     });
+    _recRateioItens=itensMap;
     let filtrado=rows.filter(r=>{
       if(_userEventIds != null && !_userEventIds.includes(r.cod_evento)) return false;
       if(st==="Atrasado") return _recVencida(r);
@@ -163,7 +190,7 @@ async function renderReceber(){
       <button class="btn-cancel" style="padding:5px 14px;font-size:12px;" onclick="_recClearSel()">Limpar seleção</button>
     </div>
     <div class="table-wrap"><table class="fin-table">
-      <thead><tr><th style="width:32px;"><input type="checkbox" id="rec-chk-all" onchange="_recToggleAll(this)" style="cursor:pointer;"/></th><th>Vencimento</th><th>Cód.</th><th>Evento</th><th>Natureza</th><th>Parcela</th><th>Valor</th><th>Conciliado</th><th>Título Extrato</th><th>Status</th><th></th></tr></thead>
+      <thead><tr><th style="width:32px;"><input type="checkbox" id="rec-chk-all" onchange="_recToggleAll(this)" style="cursor:pointer;"/></th><th>Vencimento</th><th>Cód.</th><th>Evento</th><th>Natureza</th><th>Parcela</th><th>Valor</th><th>Conciliado</th><th>Status</th><th></th></tr></thead>
       <tbody>${filtrado.map(r=>{
         const nomeEv=agendaMap[r.cod_evento]||"";
         const concil=concilMap[String(r.id)]||0;
@@ -172,7 +199,6 @@ async function renderReceber(){
         const badge=_REC_BADGE[estado];
         const falta=(r.valor||0)-concil;
         const rj=_esc(JSON.stringify(r));
-        const tituloExt=(_recConcilTituloMap||{})[String(r.id)]||"";
         return`<tr>
           <td><input type="checkbox" class="rec-chk" data-id="${r.id}" onchange="_recChkChange()" style="cursor:pointer;"/></td>
           <td>${fmtDate(r.vencimento)}</td>
@@ -182,10 +208,9 @@ async function renderReceber(){
           <td style="color:var(--dm);">${r.parcela||r.num_parcela||"—"}</td>
           <td style="font-weight:700;color:#1A4A7C;">${fmt(r.valor)}</td>
           <td style="font-weight:600;color:${concil>0?"#2A6644":"var(--dl)"};">${concil>0?fmt(concil):"—"}${estado==="parcial"?`<div style="font-size:10px;font-weight:600;color:var(--er);">faltam ${fmt(falta)}</div>`:""}</td>
-          <td style="font-size:11px;color:var(--dl);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(tituloExt)}">${tituloExt||"—"}</td>
           <td>${badge}</td>
           <td><div class="row-acts"><button class="act-btn" title="Editar" onclick='openCrud("contas_a_receber",JSON.parse(this.dataset.r),renderReceber)' data-r="${rj}">✏️</button>${isAtras?`<button class="act-btn" title="Lembrete WhatsApp" style="color:#25D366;" data-id="${r.id}" data-cod="${r.cod_evento||''}" onclick="_recEnviarLembrete(this)">📱</button>`:''}</div></td>
-        </tr>`;
+        </tr>${_recLinhaEntradas(r)}`;
       }).join("")}</tbody>
     </table></div>`;
   } catch(e){ wr.innerHTML='<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar: '+e.message+'</div>'; }
