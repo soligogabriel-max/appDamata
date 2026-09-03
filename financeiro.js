@@ -780,7 +780,9 @@ function _extRenderTable(rows,filtered){
       <td style="color:var(--dm);">${fmt(r.saldo_do_dia)}</td>
       <td style="font-size:11px;">${_extRateioCell(r)}</td>
       <td style="color:var(--dl);font-size:11px;">${r.titulo_a_pagar||"—"}</td>
-      <td><div class="row-acts">${(r.entrada||0)>0?`<button class="act-btn" title="Ratear entre títulos" onclick="openRateio('${_esc(r.id_extrato_c6)}',renderExtrato)">🔗</button>`:``}<button class="act-btn" title="Editar lançamento" onclick='openCrud("extrato_bancario",JSON.parse(this.dataset.r),renderExtrato)' data-r="${rj}">✏️</button></div></td>
+      <td><div class="row-acts">${(r.entrada||0)>0
+        ?`<button class="act-btn" title="Ratear entre títulos a receber" onclick="openRateio('${_esc(r.id_extrato_c6)}',renderExtrato)">🔗</button>`
+        :`<button class="act-btn" title="Associar título a pagar" onclick='openCrud("extrato_bancario",JSON.parse(this.dataset.r),renderExtrato)' data-r="${rj}">🔗</button>`}</div></td>
     </tr>`}).join("")}</tbody>
   </table></div>`;
 }
@@ -809,23 +811,20 @@ async function openRateio(idExtrato, after){
   document.getElementById("rateio-acts").innerHTML='<button class="btn-cancel" onclick="closeRateio()">Fechar</button>';
   document.getElementById("rateio-body").innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   try{
-    const COLS="select=id,cod_evento,parcela,num_parcela,valor,vencimento,status";
-    const [mov, alocs, todas, abertos, agMap]=await Promise.all([
+    // Todos os títulos, não só os NP: a maior parte do passivo é título
+    // baixado à mão que nunca foi amarrado a uma movimentação. Quem decide
+    // se ele ainda cabe aqui é o saldo (valor menos o que já foi rateado),
+    // não o status — e é o saldo que some quando o rateio fecha o título.
+    const COLS="select=id,cod_evento,parcela,num_parcela,valor,vencimento,data_recebido,status";
+    const [mov, alocs, todas, titulos, agMap]=await Promise.all([
       dbGet("extrato_bancario","id_extrato_c6=eq."+encodeURIComponent(idExtrato)+"&select=id_extrato_c6,data_lancamento,titulo,descricao,entrada&limit=1"),
       dbGet("conciliacao_receber","extrato_id=eq."+encodeURIComponent(idExtrato)+"&select=id,titulo_id,valor&order=id.asc"),
       dbGetAll("conciliacao_receber","select=titulo_id,valor"),
-      dbGetAll("contas_a_receber",COLS+"&status=eq.NP&valor=gt.0&order=vencimento.asc.nullslast"),
+      dbGetAll("contas_a_receber",COLS+"&valor=gt.0&order=vencimento.asc.nullslast"),
       getAgendaMap()
     ]);
     if(!mov.length){ document.getElementById("rateio-body").innerHTML='<div class="empty"><div class="eicon">⚠️</div>Movimentação não encontrada.</div>'; return; }
-    // Os títulos que esta movimentação já paga saíram do NP quando ficaram
-    // quitados — buscados à parte, senão a linha do rateio perde o nome.
-    const idsAloc=(alocs||[]).map(a=>a.titulo_id);
-    const faltando=idsAloc.filter(id=>!(abertos||[]).some(t=>String(t.id)===String(id)));
-    const jaPagos=faltando.length
-      ? await dbGet("contas_a_receber",COLS+"&id=in.("+faltando.join(",")+")&limit=200")
-      : [];
-    _ratMov=mov[0]; _ratAlocs=alocs||[]; _ratTitulos=(abertos||[]).concat(jaPagos||[]); _ratAgMap=agMap;
+    _ratMov=mov[0]; _ratAlocs=alocs||[]; _ratTitulos=titulos||[]; _ratAgMap=agMap;
     _ratAlocadoPorTitulo={};
     (todas||[]).forEach(a=>{ const k=String(a.titulo_id); _ratAlocadoPorTitulo[k]=(_ratAlocadoPorTitulo[k]||0)+(+a.valor||0); });
     _ratRender();
@@ -864,8 +863,20 @@ function _ratRender(){
     </tr>`;
   }).join("");
 
-  const disponiveis=_ratTitulos.filter(t=>(t.status||"").trim().toUpperCase()!=="PAGO"&&_ratSaldo(t)>0.02);
-  const opts=disponiveis.map(t=>`<option value="${t.id}" data-saldo="${_ratSaldo(t)}">${_esc(_ratLabel(t))}${_ratSaldo(t)<(+t.valor||0)-0.02?" — saldo "+fmt(_ratSaldo(t)):""}</option>`).join("");
+  // Em aberto primeiro; depois o já baixado, da baixa mais recente para a
+  // mais antiga. Título com status PAGO e saldo de sobra é o que foi baixado
+  // à mão sem vínculo — o rateio aqui só registra de onde veio o dinheiro.
+  const disponiveis=_ratTitulos.filter(t=>_ratSaldo(t)>0.02).sort((a,b)=>
+    ((_concTituloPago(a)?1:0)-(_concTituloPago(b)?1:0))
+    || (_concTituloPago(a)
+        ? String(b.data_recebido||"").localeCompare(String(a.data_recebido||""))
+        : String(a.vencimento||"").localeCompare(String(b.vencimento||""))));
+  const opts=disponiveis.map(t=>{
+    const parcial=_ratSaldo(t)<(+t.valor||0)-0.02;
+    return `<option value="${t.id}" data-saldo="${_ratSaldo(t)}">${_esc(_ratLabel(t))}`
+      +`${parcial?" — saldo "+fmt(_ratSaldo(t)):""}`
+      +`${_concTituloPago(t)?" · já baixado "+fmtDate(t.data_recebido):""}</option>`;
+  }).join("");
 
   document.getElementById("rateio-body").innerHTML=`
     ${linhas?`<div class="table-wrap" style="margin-bottom:14px;"><table class="fin-table">
@@ -873,6 +884,7 @@ function _ratRender(){
       <tbody>${linhas}</tbody></table></div>`:'<p style="font-size:13px;color:var(--dl);margin-bottom:14px;">Esta movimentação ainda não foi rateada.</p>'}
     <div style="border-top:1px solid var(--br);padding-top:12px;">
       <div style="font-size:11px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Adicionar título</div>
+      <input class="inp" id="rat-add-busca" placeholder="🔍 Filtrar por evento, parcela ou data..." style="margin-bottom:8px;" oninput="lkFilter(this,'rat-add-tit')"/>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">
         <select class="inp" id="rat-add-tit" style="flex:1;min-width:260px;margin-bottom:0;" onchange="_ratSugereValor()">
           <option value="">— Escolha o título —</option>${opts}
@@ -881,7 +893,7 @@ function _ratRender(){
         <button class="btn-confirm" style="padding:9px 16px;" onclick="_ratAdicionar()">Alocar</button>
       </div>
       <div id="rat-err" style="display:none;color:var(--er);font-size:12px;margin-top:8px;"></div>
-      ${disponiveis.length?"":'<p style="font-size:12px;color:var(--dl);margin-top:8px;">Nenhum título com saldo em aberto.</p>'}
+      ${disponiveis.length?`<p style="font-size:11px;color:var(--dl);margin-top:8px;">${disponiveis.length} título${disponiveis.length!==1?"s":""} com saldo — os em aberto vêm primeiro, os já baixados depois.</p>`:'<p style="font-size:12px;color:var(--dl);margin-top:8px;">Nenhum título com saldo.</p>'}
     </div>`;
   _ratSugereValor();
 }
