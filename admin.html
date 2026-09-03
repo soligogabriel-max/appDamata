@@ -624,7 +624,7 @@
             <button class="btn-cancel" style="font-size:12px;padding:5px 12px;" onclick="setTab('extrato')">🏦 Ver extrato</button>
           </div>
         </div>
-        <p style="font-size:12px;color:var(--dm);margin:0 0 14px;">Amarra cada lançamento do extrato ao seu título. Título em aberto é baixado na data do lançamento; título que já foi baixado só recebe o vínculo.</p>
+        <p style="font-size:12px;color:var(--dm);margin:0 0 14px;">Amarra cada lançamento do extrato aos títulos que ele pagou. Uma entrada pode ser dividida entre vários títulos e um título pode ser fechado por várias entradas — a entrada fica pendente aqui enquanto sobrar valor por alocar. O ✏️ abre o rateio à mão.</p>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
           <select class="inp inp-inline" id="conc-fil-tipo" onchange="renderConciliacao()" style="width:165px;margin-bottom:0;" title="Tipo de lançamento">
             <option value="entradas">Entradas (a receber)</option>
@@ -632,8 +632,8 @@
             <option value="todos">Entradas e saídas</option>
           </select>
           <select class="inp inp-inline" id="conc-fil-status" onchange="renderConciliacao()" style="width:155px;margin-bottom:0;" title="Situação">
-            <option value="pend">Não conciliados</option>
-            <option value="conc">Já conciliados</option>
+            <option value="pend">Falta alocar</option>
+            <option value="conc">Fechados</option>
             <option value="todos">Todos</option>
           </select>
           <input type="date" class="inp inp-inline" id="conc-fil-de" onchange="renderConciliacao()" style="width:145px;margin-bottom:0;" title="Lançamentos a partir de"/>
