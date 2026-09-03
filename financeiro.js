@@ -1826,3 +1826,322 @@ async function bulkDeletePagar(){
   toast(`${ids.length} título${ids.length!==1?"s":""} apagado${ids.length!==1?"s":""}`);
   renderPagar();
 }
+
+// ══════════════════════════════════════════
+// CONCILIAÇÃO BANCÁRIA
+// ══════════════════════════════════════════
+// A conciliação só existia dentro do wizard de importação do extrato: quem
+// pulasse o passo "Conciliar Entradas" ficava sem caminho — o vínculo tinha de
+// ser digitado na mão no CRUD do extrato. Esta tela faz o mesmo trabalho sobre
+// o que já está na base, a qualquer momento.
+//
+// Candidato aqui não é só título em aberto. Hoje 275 das 343 entradas sem
+// vínculo casam com título que já foi baixado na mão (PAGO) e nunca amarrado —
+// se a lista fosse só NP, o passivo continuaria sem saída. Título já baixado
+// entra como candidato e conciliar só grava o vínculo, sem mexer no status nem
+// na data de recebimento.
+
+let _concAllRows=[], _concRows=[], _concCands={rec:[],pag:[]}, _concOpts={rec:"",pag:""};
+let _concLbl={}, _concById={};
+
+function _concRefDate(c){ return c.data_recebido||c.vencimento_real||c.vencimento||null; }
+function _concIsEnt(r){ return (r.entrada||0)>0; }
+function _concValor(r){ return _concIsEnt(r)?(r.entrada||0):(r.saida||0); }
+function _concLinked(r){ return _concIsEnt(r)?(r.titulo_a_receber||null):(r.titulo_a_pagar||null); }
+function _concDias(a,b){ if(!a||!b) return null; return Math.abs(new Date(a)-new Date(b))/86400000; }
+function _concPago(t){ return (t.status||"").toUpperCase()==="PAGO"; }
+
+// Mesma regra do wizard: valor igual até o centavo e data de referência a no
+// máximo 45 dias do lançamento — parcela paga adiantada ou atrasada ainda casa.
+// Empate de data resolve pelo título em aberto: o já baixado só ganha quando
+// está mais perto (caso típico, data de baixa idêntica à do lançamento).
+function _concMatch(row){
+  const val=_concValor(row);
+  if(!val) return null;
+  const cands=(_concIsEnt(row)?_concCands.rec:_concCands.pag).filter(c=>Math.abs((c.valor||0)-val)<0.02);
+  if(!cands.length) return null;
+  const dist=c=>{ const d=_concDias(_concRefDate(c),row.data_lancamento); return d==null?9e9:d; };
+  cands.sort((a,b)=>(dist(a)-dist(b))||((_concPago(a)?1:0)-(_concPago(b)?1:0)));
+  const best=cands[0];
+  return dist(best)<=45?best:null;
+}
+
+// Um título só pode casar com um lançamento. Sem isto, três parcelas de mesmo
+// valor sugeririam o mesmo título e "conciliar selecionados" gravaria o vínculo
+// três vezes, deixando dois lançamentos apontando para um título já usado.
+function _concDedupSugestoes(rows){
+  const byId={};
+  rows.forEach(r=>{ if(r._sug){ const k=(_concIsEnt(r)?"r":"p")+r._sug.id; (byId[k]=byId[k]||[]).push(r); } });
+  Object.keys(byId).forEach(k=>{
+    const grp=byId[k];
+    if(grp.length<2) return;
+    grp.sort((a,b)=>{
+      const da=_concDias(_concRefDate(a._sug),a.data_lancamento), db=_concDias(_concRefDate(b._sug),b.data_lancamento);
+      return (da==null?9e9:da)-(db==null?9e9:db);
+    });
+    grp.slice(1).forEach(r=>{ r._sug=null; r._sugAmbigua=true; });
+  });
+}
+
+async function _concLoadCands(){
+  const [rec,pag,extLinks,agMap,fornMap]=await Promise.all([
+    dbGetAll("contas_a_receber","select=id,cod_evento,parcela,num_parcela,valor,vencimento,data_recebido,status&order=vencimento.asc"),
+    dbGetAll("contas_a_pagar","select=id,fornecedor_cod,obs,valor,vencimento,vencimento_real,status&order=vencimento_real.asc"),
+    dbGet("extrato_bancario","select=titulo_a_receber,titulo_a_pagar&limit=5000"),
+    getAgendaMap(), getFornecMap()
+  ]);
+  // Título já amarrado a outro lançamento sai da lista de candidatos.
+  const usedRec=new Set(), usedPag=new Set();
+  (extLinks||[]).forEach(e=>{
+    if(e.titulo_a_receber) usedRec.add(String(e.titulo_a_receber));
+    if(e.titulo_a_pagar)   usedPag.add(String(e.titulo_a_pagar));
+  });
+  _concLbl={}; _concById={};
+  const marca=t=>_concPago(t)?" · já baixado":"";
+  (rec||[]).forEach(t=>{
+    _concById["r"+t.id]=t;
+    _concLbl["r"+t.id]=`${agMap[t.cod_evento]||t.cod_evento||"?"} — Parc.${t.parcela||"?"}/${t.num_parcela||"?"} — ${fmt(t.valor)}`;
+    t._lbl=_concLbl["r"+t.id]+` — ${_concPago(t)?"baixado":"venc"} ${fmtDate(_concRefDate(t))}${marca(t)}`;
+  });
+  (pag||[]).forEach(t=>{
+    _concById["p"+t.id]=t;
+    _concLbl["p"+t.id]=`${fornMap[t.fornecedor_cod]||t.fornecedor_cod||"Sem fornecedor"} — ${fmt(t.valor)}`;
+    t._lbl=_concLbl["p"+t.id]+` — ${_concPago(t)?"baixado":"venc"} ${fmtDate(_concRefDate(t))}${t.obs?" — "+t.obs:""}${marca(t)}`;
+  });
+  _concCands.rec=(rec||[]).filter(t=>!usedRec.has(String(t.id)));
+  _concCands.pag=(pag||[]).filter(t=>!usedPag.has(String(t.id)));
+  // Em aberto primeiro na lista manual — é o que se procura no dia a dia.
+  const ordena=a=>a.slice().sort((x,y)=>((_concPago(x)?1:0)-(_concPago(y)?1:0))||(String(_concRefDate(y)||"")).localeCompare(String(_concRefDate(x)||"")));
+  _concOpts.rec=ordena(_concCands.rec).map(t=>`<option value="${t.id}">${_esc(t._lbl)}</option>`).join("");
+  _concOpts.pag=ordena(_concCands.pag).map(t=>`<option value="${t.id}">${_esc(t._lbl)}</option>`).join("");
+}
+
+async function renderConciliacao(){
+  const wr=document.getElementById("conc-list");
+  if(!wr) return;
+  wr.innerHTML='<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  const totWr=document.getElementById("conc-totais"); if(totWr) totWr.innerHTML="";
+  _concClearSel();
+
+  const de=(document.getElementById("conc-fil-de")||{}).value||"";
+  const ate=(document.getElementById("conc-fil-ate")||{}).value||"";
+  const tipo=(document.getElementById("conc-fil-tipo")||{}).value||"entradas";
+  const stat=(document.getElementById("conc-fil-status")||{}).value||"pend";
+
+  let q="order=data_lancamento.desc,id_extrato_c6.asc&limit=5000";
+  if(de)  q+="&data_lancamento=gte."+de;
+  if(ate) q+="&data_lancamento=lte."+ate;
+
+  try{
+    const [raw]=await Promise.all([dbGet("extrato_bancario",q),_concLoadCands()]);
+    const seen=new Set();
+    let rows=(raw||[]).filter(r=>{ if(seen.has(r.id_extrato_c6))return false; seen.add(r.id_extrato_c6); return true; });
+    rows=rows.filter(r=>{
+      const ent=_concIsEnt(r);
+      if(tipo==="entradas"&&!ent) return false;
+      if(tipo==="saidas"&&ent) return false;
+      const conc=!!_concLinked(r);
+      if(stat==="pend"&&conc) return false;
+      if(stat==="conc"&&!conc) return false;
+      return true;
+    });
+    rows.forEach(r=>{ r._sug=_concLinked(r)?null:_concMatch(r); r._sugAmbigua=false; });
+    _concDedupSugestoes(rows);
+    _concAllRows=rows;
+    _concApplyDescFilter();
+  }catch(e){ wr.innerHTML='<div class="empty"><div class="eicon">⚠️</div>Erro: '+e.message+'</div>'; }
+}
+
+function _concApplyDescFilter(){
+  const term=((document.getElementById("conc-fil-desc")||{}).value||"").trim().toLowerCase();
+  _concRows=term?_concAllRows.filter(r=>(r.titulo||r.descricao||"").toLowerCase().includes(term)):_concAllRows;
+  _concClearSel();
+  _concRenderTable(!!term);
+}
+
+function _concRenderTable(filtered){
+  const wr=document.getElementById("conc-list");
+  const totWr=document.getElementById("conc-totais");
+  const rows=_concRows;
+
+  const pend=rows.filter(r=>!_concLinked(r));
+  const comSug=pend.filter(r=>r._sug);
+  const conc=rows.filter(r=>_concLinked(r));
+  if(totWr) totWr.innerHTML=`
+    <div class="tot-card"><div class="tot-lbl">Não conciliados</div><div class="tot-val">${pend.length}</div></div>
+    <div class="tot-card"><div class="tot-lbl">Valor sem vínculo</div><div class="tot-val blue">${fmt(pend.reduce((a,r)=>a+_concValor(r),0))}</div></div>
+    <div class="tot-card"><div class="tot-lbl">Com sugestão</div><div class="tot-val green">${comSug.length}</div></div>
+    <div class="tot-card"><div class="tot-lbl">Conciliados</div><div class="tot-val">${conc.length}</div></div>`;
+
+  if(!rows.length){
+    wr.innerHTML='<div class="empty"><div class="eicon">🔗</div>'+(filtered?"Nenhum resultado para esse filtro.":"Nada para conciliar neste filtro.")+'</div>';
+    return;
+  }
+
+  const body=rows.map((r,i)=>{
+    const ent=_concIsEnt(r);
+    const lig=_concLinked(r);
+    const desc=r.titulo||r.descricao||"—";
+    const valTd=ent
+      ? `<td style="color:#2A6644;font-weight:700;white-space:nowrap;">+ ${fmt(r.entrada)}</td>`
+      : `<td style="color:var(--er);font-weight:700;white-space:nowrap;">- ${fmt(r.saida)}</td>`;
+    if(lig){
+      const lbl=_concLbl[(ent?"r":"p")+lig];
+      return `<tr>
+        <td></td>
+        <td style="white-space:nowrap;font-size:12px;">${fmtDate(r.data_lancamento)}</td>
+        <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(desc)}">${_esc(desc)}</td>
+        ${valTd}
+        <td><span class="imp-badge-match">🔗 Conciliado</span></td>
+        <td style="font-size:12px;color:var(--dm);">${_esc(lbl||(ent?"A receber":"A pagar"))} <span style="color:var(--dl);">#${_esc(lig)}</span></td>
+        <td><button class="btn-cancel" style="padding:3px 10px;font-size:11px;" onclick="concDesconciliar(${i})">✕ Desfazer</button></td>
+      </tr>`;
+    }
+    const badge=r._sug
+      ? (_concPago(r._sug)?`<span class="imp-badge-hist">✓ Já baixado</span>`:`<span class="imp-badge-match">✓ Sugerido</span>`)
+      : (r._sugAmbigua?`<span class="imp-badge-new">⚠ Valor repetido</span>`:`<span class="imp-badge-no">Sem sugestão</span>`);
+    const sugOpt=r._sug?`<option value="${r._sug.id}" selected>${_esc(r._sug._lbl)}</option>`:"";
+    return `<tr>
+      <td><input type="checkbox" class="conc-chk" data-i="${i}" onchange="_concChkChange()" style="cursor:pointer;"${r._sug?" checked":""}/></td>
+      <td style="white-space:nowrap;font-size:12px;">${fmtDate(r.data_lancamento)}</td>
+      <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${_esc(desc)}">${_esc(desc)}</td>
+      ${valTd}
+      <td>${badge}</td>
+      <td style="min-width:240px;">
+        <select class="imp-sel" id="conc-sel-${i}" data-kind="${ent?"rec":"pag"}" onfocus="_concFillSel(this)" onmousedown="_concFillSel(this)">
+          <option value="">— Não conciliar —</option>
+          ${sugOpt}
+        </select>
+      </td>
+      <td><button class="btn-a" style="padding:3px 10px;font-size:11px;" onclick="concConciliarRow(${i})">🔗 Conciliar</button></td>
+    </tr>`;
+  }).join("");
+
+  wr.innerHTML=`<div class="table-wrap"><table class="imp-table">
+    <thead><tr>
+      <th style="width:32px;">${pend.length?'<input type="checkbox" id="conc-chk-all" onchange="_concToggleAll(this)" style="cursor:pointer;"/>':""}</th>
+      <th>Data</th><th>Descrição</th><th>Valor</th><th>Situação</th><th>Título</th><th></th>
+    </tr></thead>
+    <tbody>${body}</tbody>
+  </table></div>`;
+  _concChkChange();
+}
+
+// A lista de títulos passa de dois mil; montar um <select> completo por linha
+// estoura o DOM. Cada select nasce só com a sugestão e é preenchido no primeiro
+// foco/clique.
+function _concFillSel(sel){
+  if(sel.dataset.full==="1") return;
+  const cur=sel.value;
+  sel.insertAdjacentHTML("beforeend",_concOpts[sel.dataset.kind]||"");
+  const seen=new Set();
+  Array.from(sel.options).forEach(o=>{ if(o.value&&seen.has(o.value)) o.remove(); else seen.add(o.value); });
+  sel.value=cur;
+  sel.dataset.full="1";
+}
+
+function _concChkChange(){
+  const chks=document.querySelectorAll(".conc-chk");
+  const sel=Array.from(chks).filter(c=>c.checked);
+  const bar=document.getElementById("conc-bulk-bar");
+  if(bar) bar.style.display=sel.length?"flex":"none";
+  const ct=document.getElementById("conc-bulk-count");
+  if(ct) ct.textContent=`${sel.length} lançamento${sel.length!==1?"s":""} selecionado${sel.length!==1?"s":""}`;
+  const all=document.getElementById("conc-chk-all");
+  if(all){ all.indeterminate=sel.length>0&&sel.length<chks.length; all.checked=chks.length>0&&sel.length===chks.length; }
+}
+function _concToggleAll(chkAll){
+  document.querySelectorAll(".conc-chk").forEach(c=>c.checked=chkAll.checked);
+  _concChkChange();
+}
+function _concClearSel(){
+  document.querySelectorAll(".conc-chk").forEach(c=>c.checked=false);
+  const all=document.getElementById("conc-chk-all"); if(all){ all.checked=false; all.indeterminate=false; }
+  _concChkChange();
+}
+
+// Conciliar = gravar o vínculo no extrato e, se o título ainda estava em aberto,
+// baixá-lo na data do lançamento (as mesmas escritas do wizard de importação).
+// Título já baixado só recebe o vínculo — mexer no status reescreveria uma baixa
+// que já foi conferida.
+async function _concLink(row, tituloId){
+  const ent=_concIsEnt(row);
+  const t=_concById[(ent?"r":"p")+tituloId];
+  const jaPago=t?_concPago(t):false;
+  if(ent){
+    if(!jaPago) await sbFetch(`contas_a_receber?id=eq.${encodeURIComponent(tituloId)}`,{method:"PATCH",body:{status:"PAGO",data_recebido:row.data_lancamento},prefer:"return=minimal"});
+    await sbFetch(`extrato_bancario?id_extrato_c6=eq.${encodeURIComponent(row.id_extrato_c6)}`,{method:"PATCH",body:{titulo_a_receber:String(tituloId)},prefer:"return=minimal"});
+  } else {
+    if(!jaPago) await sbFetch(`contas_a_pagar?id=eq.${encodeURIComponent(tituloId)}`,{method:"PATCH",body:{status:"Pago",vencimento_real:row.data_lancamento},prefer:"return=minimal"});
+    await sbFetch(`extrato_bancario?id_extrato_c6=eq.${encodeURIComponent(row.id_extrato_c6)}`,{method:"PATCH",body:{titulo_a_pagar:String(tituloId)},prefer:"return=minimal"});
+  }
+}
+
+async function concConciliarRow(i){
+  const r=_concRows[i]; if(!r) return;
+  const sel=document.getElementById("conc-sel-"+i);
+  const id=sel?sel.value:"";
+  if(!id){ toast("Selecione o título antes de conciliar."); return; }
+  try{
+    await _concLink(r,id);
+    toast("Lançamento conciliado");
+    renderConciliacao();
+  }catch(e){ alert("Erro ao conciliar: "+e.message); }
+}
+
+async function concConciliarSel(){
+  const chks=Array.from(document.querySelectorAll(".conc-chk:checked"));
+  if(!chks.length){ toast("Selecione ao menos um lançamento."); return; }
+  const alvos=[], usados=new Set(), semTitulo=[], repetidos=[];
+  for(const c of chks){
+    const i=+c.dataset.i;
+    const r=_concRows[i]; if(!r) continue;
+    const sel=document.getElementById("conc-sel-"+i);
+    const id=sel?sel.value:"";
+    if(!id){ semTitulo.push(i); continue; }
+    const key=(_concIsEnt(r)?"r":"p")+id;
+    if(usados.has(key)){ repetidos.push(i); continue; }
+    usados.add(key);
+    alvos.push({row:r,id:id});
+  }
+  if(!alvos.length){ alert("Nenhum dos lançamentos selecionados tem título escolhido."); return; }
+  const baixar=alvos.filter(a=>{ const t=_concById[(_concIsEnt(a.row)?"r":"p")+a.id]; return !t||!_concPago(t); }).length;
+  let aviso="";
+  if(baixar) aviso+=`\n${baixar} título${baixar!==1?"s":""} em aberto ${baixar!==1?"serão baixados":"será baixado"} na data do lançamento.`;
+  if(alvos.length-baixar) aviso+=`\n${alvos.length-baixar} já ${alvos.length-baixar!==1?"estão baixados":"está baixado"} — só recebe${alvos.length-baixar!==1?"m":""} o vínculo.`;
+  if(semTitulo.length) aviso+=`\n${semTitulo.length} sem título escolhido ${semTitulo.length===1?"será ignorado":"serão ignorados"}.`;
+  if(repetidos.length) aviso+=`\n${repetidos.length} ${repetidos.length===1?"aponta":"apontam"} para título já usado nesta seleção e ${repetidos.length===1?"será ignorado":"serão ignorados"}.`;
+  if(!confirm(`Conciliar ${alvos.length} lançamento${alvos.length!==1?"s":""}?\n${aviso}`)) return;
+
+  const btn=document.getElementById("conc-btn-bulk");
+  if(btn){ btn.disabled=true; btn.textContent="Conciliando..."; }
+  let ok=0; const erros=[];
+  for(const a of alvos){
+    try{ await _concLink(a.row,a.id); ok++; }
+    catch(e){ erros.push(`${fmtDate(a.row.data_lancamento)} ${fmt(_concValor(a.row))}: ${e.message}`); }
+  }
+  if(btn){ btn.disabled=false; btn.innerHTML="🔗 Conciliar selecionados"; }
+  if(erros.length) alert(`${ok} conciliado${ok!==1?"s":""}, ${erros.length} com erro:\n\n`+erros.slice(0,10).join("\n"));
+  else toast(`✅ ${ok} lançamento${ok!==1?"s":""} conciliado${ok!==1?"s":""}`);
+  renderConciliacao();
+}
+
+// Desfazer devolve o título para em aberto. Quem só amarrou um título que já
+// estava baixado não quer isso — por isso a pergunta separada.
+async function concDesconciliar(i){
+  const r=_concRows[i]; if(!r) return;
+  const ent=_concIsEnt(r);
+  const id=_concLinked(r);
+  if(!id) return;
+  if(!confirm(`Desfazer a conciliação do lançamento de ${fmtDate(r.data_lancamento)} (${fmt(_concValor(r))})?\n\nO vínculo com o título ${ent?"a receber":"a pagar"} #${id} será apagado.`)) return;
+  const voltar=confirm(`Devolver o título #${id} para NP (em aberto)?\n\nOK = volta para em aberto.\nCancelar = mantém como pago, só desfaz o vínculo.`);
+  try{
+    await sbFetch(`extrato_bancario?id_extrato_c6=eq.${encodeURIComponent(r.id_extrato_c6)}`,{method:"PATCH",body:ent?{titulo_a_receber:null}:{titulo_a_pagar:null},prefer:"return=minimal"});
+    if(voltar){
+      if(ent) await sbFetch(`contas_a_receber?id=eq.${encodeURIComponent(id)}`,{method:"PATCH",body:{status:"NP",data_recebido:null},prefer:"return=minimal"});
+      else    await sbFetch(`contas_a_pagar?id=eq.${encodeURIComponent(id)}`,{method:"PATCH",body:{status:"NP"},prefer:"return=minimal"});
+    }
+    toast("Conciliação desfeita");
+    renderConciliacao();
+  }catch(e){ alert("Erro ao desconciliar: "+e.message); }
+}
