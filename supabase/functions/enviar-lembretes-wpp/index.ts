@@ -91,6 +91,24 @@ Deno.serve(async (req) => {
   const sbH = { apikey: SB_SR, Authorization: "Bearer " + SB_SR, "Content-Type": "application/json" };
   const META_URL = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
 
+  // Uma parcela pode já ter recebido parte (rateio das entradas do
+  // extrato em conciliacao_receber). O lembrete cobra o que falta, não o
+  // valor cheio do título.
+  const jaRecebido = async (ids: Array<string | number>): Promise<Record<string, number>> => {
+    const out: Record<string, number> = {};
+    if (!ids.length) return out;
+    const res = await fetch(
+      `${SB_URL}/rest/v1/conciliacao_receber?titulo_id=in.(${ids.join(",")})&select=titulo_id,valor&limit=5000`,
+      { headers: sbH },
+    );
+    const rows = await res.json();
+    if (Array.isArray(rows)) rows.forEach((a: { titulo_id: number; valor: number }) => {
+      const k = String(a.titulo_id);
+      out[k] = (out[k] ?? 0) + (Number(a.valor) || 0);
+    });
+    return out;
+  };
+
   // ── Modo individual: botão inline por título ──
   if (payload.parcela_id) {
     const pRes = await fetch(
@@ -99,6 +117,10 @@ Deno.serve(async (req) => {
     );
     const [p] = await pRes.json();
     if (!p) return json({ error: "Parcela não encontrada." }, 404);
+
+    const recebido = (await jaRecebido([p.id]))[String(p.id)] ?? 0;
+    p.valor = Math.max(0, (Number(p.valor) || 0) - recebido);
+    if (p.valor <= 0.02) return json({ ok: false, enviados: 0, msg: "Parcela já recebida." });
 
     const cod = p.cod_evento;
 
@@ -172,6 +194,17 @@ Deno.serve(async (req) => {
     await recRes.json();
 
   if (!Array.isArray(parcelas) || !parcelas.length) {
+    return json({ ok: true, enviados: 0, msg: "Nenhuma parcela pendente no período.", periodo: { de: inicio, ate: fim } });
+  }
+
+  // Desconta o que já entrou por rateio e tira de cena o que ficou quitado
+  const recebidoMap = await jaRecebido(parcelas.map((p) => p.id));
+  const emAberto = parcelas
+    .map((p) => ({ ...p, valor: Math.max(0, (Number(p.valor) || 0) - (recebidoMap[String(p.id)] ?? 0)) }))
+    .filter((p) => p.valor > 0.02);
+  parcelas.length = 0;
+  parcelas.push(...emAberto);
+  if (!parcelas.length) {
     return json({ ok: true, enviados: 0, msg: "Nenhuma parcela pendente no período.", periodo: { de: inicio, ate: fim } });
   }
 

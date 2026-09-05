@@ -68,9 +68,10 @@ const CRUD_CFG = {
     ]
   },
   extrato_bancario: {
+    // Entrada não entra aqui: uma movimentação pode pagar vários títulos,
+    // então o vínculo a receber é rateio, feito em openRateio().
     title:"Associar Título ao Extrato", pk:"id_extrato_c6",
     fields:[
-      {n:"titulo_a_receber", l:"Título a Receber (entrada)", t:"lookup", src:"_receber_label", vf:"id", df:"_label", nullable:true, statusFilter:true},
       {n:"titulo_a_pagar",   l:"Título a Pagar (saída)",    t:"lookup", src:"_pagar_label",   vf:"id", df:"_label", nullable:true, statusFilter:true},
     ]
   }
@@ -89,20 +90,7 @@ async function _loadLkSrc(src) {
   else if(src==="fornecedores")rows = await dbGet("fornecedores","select=codigo,nome&order=nome.asc&limit=500");
   else if(src==="naturezas")   rows = await dbGet("naturezas","select=cod,descricao&order=descricao.asc&limit=500");
   else if(src==="centros_de_custo") rows = await dbGet("centros_de_custo","select=codigo,nome&order=nome.asc&limit=200");
-  else if(src==="_receber_label") {
-    // Busca títulos não conciliados (valor>0, sem vínculo no extrato) + mapa de agenda
-    const [recs, am, conciliados] = await Promise.all([
-      dbGetAll("contas_a_receber","select=id,cod_evento,parcela,num_parcela,valor,status&valor=gt.0&status=eq.NP&order=cod_evento.asc"),
-      getAgendaMap(),
-      sbFetch("extrato_bancario?select=titulo_a_receber&titulo_a_receber=not.is.null&limit=5000")
-    ]);
-    const concilSet = new Set((conciliados||[]).map(e=>String(e.titulo_a_receber)));
-    // Inclui o registro atualmente vinculado no extrato sendo editado (para não sumir da lista)
-    const currentVal = _crudRec ? String(_crudRec["titulo_a_receber"]||"") : "";
-    rows = recs
-      .filter(r=>!concilSet.has(String(r.id)) || String(r.id)===currentVal)
-      .map(r=>({id:r.id, _label:`${am[r.cod_evento]||r.cod_evento||"?"} — Parc. ${r.parcela||"?"}/${r.num_parcela||"?"} — ${fmt(r.valor||0)}`}));
-  } else if(src==="_pagar_label") {
+  else if(src==="_pagar_label") {
     const [pags, conciliados, fornecMap] = await Promise.all([
       dbGetAll("contas_a_pagar","select=id,fornecedor_cod,natureza,valor,vencimento_real,status&valor=gt.0&order=fornecedor_cod.asc,vencimento_real.asc"),
       sbFetch("extrato_bancario?select=titulo_a_pagar&titulo_a_pagar=not.is.null&limit=5000"),
@@ -204,22 +192,8 @@ async function _reloadLkStatus(fName, src, vf, df, nullable) {
   sel.innerHTML = '<option value="">— carregando... —</option>';
 
   let rows = [];
-  const agMap = await getAgendaMap();
 
-  if(src === "_receber_label") {
-    let q = "select=id,cod_evento,parcela,num_parcela,valor,status&valor=gt.0&order=cod_evento.asc";
-    const statuses = [showNP?"NP":null, showPago?"PAGO":null].filter(Boolean);
-    if(statuses.length === 1) q += `&status=eq.${statuses[0]}`;
-    else if(statuses.length === 0) { sel.innerHTML = nullable?'<option value="">— Nenhum —</option>':''; return; }
-    const recs = await dbGetAll("contas_a_receber", q);
-    const conciliados = await sbFetch("extrato_bancario?select=titulo_a_receber&titulo_a_receber=not.is.null&limit=5000");
-    const concilSet = new Set((conciliados||[]).map(e=>String(e.titulo_a_receber)));
-    const currentVal = _crudRec ? String(_crudRec["titulo_a_receber"]||"") : "";
-    rows = recs
-      .filter(r=>!concilSet.has(String(r.id)) || String(r.id)===currentVal)
-      .map(r=>({id:r.id, _label:`${agMap[r.cod_evento]||r.cod_evento||"?"} — Parc. ${r.parcela||"?"}/${r.num_parcela||"?"} — ${fmt(r.valor||0)} [${r.status}]`}));
-
-  } else if(src === "_pagar_label") {
+  if(src === "_pagar_label") {
     let q = "select=id,fornecedor_cod,natureza,valor,vencimento_real,status&valor=gt.0&order=fornecedor_cod.asc,vencimento_real.asc";
     const statuses = [showNP?"NP":null, showPago?"Pago":null].filter(Boolean);
     if(statuses.length === 1) q += `&status=eq.${statuses[0]}`;
@@ -303,7 +277,6 @@ async function saveCrud() {
           registros.push(rec);
         }
         await sbFetch(_crudTable, {method:"POST", body:registros, prefer:"return=minimal"});
-        if(_crudTable==="contas_a_receber") _lkCache["_receber_label"]=null;
         const t=_crudTable, cb=_crudAfterSave;
         closeCrud();
         toast(`✅ ${repeatN} títulos criados`);
@@ -316,7 +289,6 @@ async function saveCrud() {
     if(_crudTable==="fornecedores") { _fornecMap=null; _lkCache["fornecedores"]=null; }
     if(_crudTable==="naturezas")   { _naturezaMap=null; _lkCache["naturezas"]=null; }
     if(_crudTable==="inventario") { /* reset inventario cache */ }
-    if(_crudTable==="contas_a_receber") _lkCache["_receber_label"]=null;
     const t=_crudTable, cb=_crudAfterSave;
     closeCrud();
     if(cb) cb();
