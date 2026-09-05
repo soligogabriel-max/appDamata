@@ -186,6 +186,23 @@ Deno.serve(async (req) => {
   // cliente_json vence sobre personal: é o que o próprio cliente já digitou.
   const cj = (ev.cliente_json || {}) as Record<string, string>;
 
+  // A ficha do evento e alimentada pelo proprio POST daqui e pelo admin;
+  // serve de segunda fonte quando cliente_json ainda esta vazio.
+  let ficha: Record<string, string> = {};
+  try {
+    const fRes = await fetch(
+      `${SB_URL}/rest/v1/ficha_do_evento?cod=eq.${encodeURIComponent(ev.cod)}&select=*&limit=1`,
+      { headers: sbH },
+    );
+    const [f] = await fRes.json();
+    if (f) ficha = f;
+  } catch (_) { /* segue sem ela */ }
+
+  const pick = (...vs: unknown[]) => {
+    for (const v of vs) { if (v !== null && v !== undefined && String(v).trim() !== "") return String(v); }
+    return "";
+  };
+
   const pmts = parseJson(ev.payments_json, []) as Array<Record<string, unknown>>;
   const extras = parseJson(ev.spaces_json, {}) as Record<string, unknown>;
   const tipo = String(ev.tipo_evento || "").toLowerCase();
@@ -200,17 +217,26 @@ Deno.serve(async (req) => {
     cout: ev.cout || "14:00",
     total: ev.valor_locacao ?? "",
     payments: (Array.isArray(pmts) ? pmts : []).map((p) => ({ desc: p.desc, date: p.date, value: p.value })),
-    clientName: cj.nome || personal.name || "",
-    clientNat: personal.nat || "brasileira",
-    clientProf: personal.prof || "",
-    clientRg: cj.rg || personal.rg || "",
-    clientCpf: cj.cpf || personal.cpf || "",
-    clientAddr: cj.endereco || personal.addr || "",
-    clientPhone: cj.whatsapp || personal.phone || "",
-    clientEmail: cj.email || personal.email || "",
-    w2Name: personal.w2name || "",
-    w2Cpf: personal.w2cpf || "",
-    w2Email: personal.w2email || "",
+    // cliente_json vence, depois a ficha do evento, depois o cadastro. Antes
+    // daqui, nacionalidade, profissao e os tres campos da testemunha so eram
+    // lidos de app_users.personal — o que o proprio cliente tinha digitado no
+    // link era gravado e nunca mais devolvido, e ele redigitava tudo a cada
+    // vez que reabria.
+    clientName: pick(cj.nome, ficha.nome_contratante, personal.name),
+    clientNat: pick(cj.nacionalidade, ficha.nacionalidade, personal.nat, "brasileira"),
+    clientProf: pick(cj.profissao, ficha.profissao, personal.prof),
+    clientRg: pick(cj.rg, ficha.rg, personal.rg),
+    clientCpf: pick(cj.cpf, ficha.cpf, personal.cpf),
+    clientAddr: pick(cj.endereco, ficha.endereco, personal.addr),
+    clientPhone: pick(cj.whatsapp, ficha.celular, personal.phone),
+    clientEmail: pick(cj.email, ficha.email, personal.email),
+    razaoSocial: pick(cj.razaoSocial),
+    cnpj: pick(cj.cnpj),
+    enderecoEmpresa: pick(cj.enderecoEmpresa),
+    w2Name: pick(cj.testemunhaNome, ficha.nome_testemunha, personal.w2name),
+    w2Cpf: pick(cj.testemunhaCpf, ficha.cpf_testemunha, personal.w2cpf),
+    w2Email: pick(cj.testemunhaEmail, ficha.email_testemunha, personal.w2email),
+    w2Phone: pick(cj.testemunhaWhatsapp),
     isCorporativo: tipo === "corporativo",
     contratoToken: token,   // o template usa para gravar antes de assinar
   };

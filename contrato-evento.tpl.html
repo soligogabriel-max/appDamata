@@ -655,6 +655,22 @@ function applyPreset(){
   tx('s-accoms',ac.length?ac.join(', '):'Nenhuma');
   if(p.total)tx('s-total','R$ '+fc(p.total));
   g('evt-summary').style.display='block';
+
+  // Devolve ao formulario o que o cliente ja informou. Ate aqui applyPreset()
+  // so preenchia o resumo somente-leitura: contrato-publico mandava os dados
+  // e a pagina os descartava, entao quem reabria o link encontrava tudo em
+  // branco e redigitava nome, CPF, endereco e testemunha do zero.
+  var set=function(id,v){var e=g(id); if(e&&v) e.value=v;};
+  set('f-name',p.clientName); set('f-nat',p.clientNat); set('f-prof',p.clientProf);
+  set('f-rg',p.clientRg); set('f-cpf',p.clientCpf); set('f-addr',p.clientAddr);
+  set('f-phone',p.clientPhone); set('f-phone2',p.clientPhone); set('f-email',p.clientEmail);
+  set('f-razao',p.razaoSocial); set('f-cnpj',p.cnpj); set('f-addr-empresa',p.enderecoEmpresa);
+  set('w-name',p.w2Name); set('w-cpf',p.w2Cpf); set('w-email',p.w2Email);
+  set('w-phone',p.w2Phone); set('w-phone2',p.w2Phone);
+  ['f-phone','f-phone2','w-phone','w-phone2'].forEach(function(id){
+    var e=g(id); if(e&&e.value) maskPhone(e);
+  });
+  renderContract();
 }
 
 applyPreset();
