@@ -9,6 +9,11 @@
 
 const AUTENTIQUE_URL = "https://api.autentique.com.br/v2/graphql";
 
+// Teto do PDF aceito para assinatura. O documento vai como upload multipart
+// para o Autentique; acima disto ele recusa e a recusa chegava aqui sem
+// explicacao nenhuma.
+const MAX_PDF_BYTES = 9 * 1024 * 1024;
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -55,6 +60,21 @@ Deno.serve(async (req) => {
   const { cod, aditivoId, signerName, signerPhone, signerEmail, witnessName, witnessPhone, witnessEmail, pdfBase64, filename, docName } = payload || {};
   if (!pdfBase64 || !signerName || !signerPhone) {
     return json({ error: "Campos obrigatórios: pdfBase64, signerName, signerPhone." }, 400);
+  }
+
+  // O PDF sai do navegador do cliente como base64 (~33% maior que o binario).
+  // Registrar o tamanho e recusar cedo o que o Autentique nao aceitaria: sem
+  // isto, um contrato grande demais voltava como "Autentique retornou erro",
+  // sem dizer o que era.
+  const pdfBytes = Math.floor((pdfBase64.length * 3) / 4);
+  const pdfMB = (pdfBytes / 1048576).toFixed(2);
+  console.log(`[assinar-contrato] ${cod || "aditivo:" + aditivoId} pdf=${pdfMB}MB`);
+  if (pdfBytes > MAX_PDF_BYTES) {
+    console.error(`[assinar-contrato] PDF acima do limite: ${pdfMB}MB`);
+    return json({
+      error: `O contrato gerado ficou grande demais para a assinatura (${pdfMB} MB, limite ${(MAX_PDF_BYTES / 1048576).toFixed(0)} MB).`,
+      detail: { pdfMB, limiteMB: (MAX_PDF_BYTES / 1048576).toFixed(0) },
+    }, 413);
   }
 
   // 1) Monta a requisição GraphQL multipart do Autentique
@@ -118,11 +138,21 @@ Deno.serve(async (req) => {
     });
     auteData = await res.json();
   } catch (e) {
-    return json({ error: "Falha ao chamar o Autentique.", detail: String(e) }, 502);
+    console.error("[assinar-contrato] falha na chamada ao Autentique:", String(e));
+    return json({ error: "Falha ao chamar o Autentique: " + String(e), detail: String(e) }, 502);
   }
 
   if (auteData.errors) {
-    return json({ error: "Autentique retornou erro.", detail: auteData.errors }, 502);
+    // Antes so voltava "Autentique retornou erro." e o motivo morria no detail,
+    // que a pagina do cliente nao mostra — ninguem conseguia diagnosticar.
+    console.error("[assinar-contrato] Autentique recusou:", JSON.stringify(auteData.errors));
+    const msg = (Array.isArray(auteData.errors) ? auteData.errors : [auteData.errors])
+      .map((e: any) => e?.message || e?.debugMessage || (typeof e === "string" ? e : ""))
+      .filter(Boolean).join(" · ");
+    return json({
+      error: msg ? "Autentique recusou o documento: " + msg : "Autentique retornou erro.",
+      detail: auteData.errors,
+    }, 502);
   }
 
   const doc = auteData?.data?.createDocument;

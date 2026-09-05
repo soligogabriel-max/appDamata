@@ -14,7 +14,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9}
 body:has(#tab-preview:target) #tab-form{display:none}
 body:has(#tab-form:target) #tab-preview{display:none}
 body:has(#tab-form:target) #tab-form{display:block}
-.cp{font-size:10.5pt;line-height:1.7;text-align:justify;margin-bottom:8px}
+.cp{font-size:10.5pt;line-height:1.7;text-align:justify;margin-bottom:8px;page-break-inside:avoid}
+.tb{page-break-inside:avoid}
+.tb tr{page-break-inside:avoid}
 .ct{font-size:11pt;font-weight:700;text-transform:uppercase;margin:18px 0 8px}
 .sub{padding-left:20px}
 .tb{border-collapse:collapse;width:100%;margin-bottom:10px}
@@ -413,10 +415,15 @@ async function assinarWhatsApp(){
   _amsg("Gerando o termo aditivo e enviando para assinatura…",true);
   try{
     var el=document.querySelector(".cp-wrap");
-    var opt={margin:[10,12,10,12],filename:"aditivo.pdf",image:{type:"jpeg",quality:.95},
-      html2canvas:{scale:2,useCORS:true},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"}};
+    // Mesmos parametros do contrato: o html2pdf rasteriza cada pagina como
+    // JPEG e o peso cresce com o quadrado do scale. Ver comentario em
+    // contrato-evento.tpl.html.
+    var opt={margin:[10,12,10,12],filename:"aditivo.pdf",image:{type:"jpeg",quality:.85},
+      html2canvas:{scale:1.7,useCORS:true},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
+      pagebreak:{mode:["css","legacy"],avoid:["tr","table",".cp",".ct"]}};
     var dataUri=await html2pdf().set(opt).from(el).outputPdf("datauristring");
     var b64=dataUri.split(",")[1];
+    console.log("[aditivo] PDF gerado:",(b64.length*3/4/1048576).toFixed(2),"MB");
     var code=(PRESET&&PRESET.code)||"", num=(PRESET&&PRESET.numero)||"";
     var res=await fetch(ASSINAR_URL,{
       method:"POST",
@@ -437,7 +444,9 @@ async function assinarWhatsApp(){
       _amsg("✅ Termo aditivo enviado! Você receberá o link de assinatura no WhatsApp <strong>"+fone+"</strong> em instantes.",true);
       btn.style.display="none";
     } else {
-      _amsg("Não foi possível enviar para assinatura. "+(j.error||"Tente novamente."),false);
+      _amsg("Não foi possível enviar para assinatura.<br><span style=\"font-size:12px\">"+
+            esc(j.error||"Tente novamente em instantes.")+
+            "</span><br><span style=\"font-size:12px\">Se persistir, fale com a nossa equipe — o aditivo já está salvo.</span>",false);
       btn.disabled=false; btn.innerHTML=_o;
     }
   } catch(e){

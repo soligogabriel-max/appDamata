@@ -591,11 +591,18 @@ async function assinarWhatsApp(){
     var el=document.querySelector(".cp-wrap");
     // pagebreak: sem isto o html2pdf ignora as regras de page-break do CSS e
     // corta onde a altura da folha acabar, no meio de tabelas e clausulas.
-    var opt={margin:[10,12,10,12],filename:"contrato.pdf",image:{type:"jpeg",quality:.95},
-      html2canvas:{scale:2,useCORS:true},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
+    // scale 1.7 e quality .85 no lugar de 2 e .95: o html2pdf rasteriza cada
+    // pagina como JPEG, entao o peso cresce com o quadrado do scale. Depois da
+    // revisao juridica o contrato quase dobrou de texto e ganhou o Anexo 1 em
+    // pagina propria — o PDF passou do que o Autentique aceita. A 1.7 o
+    // documento ainda sai em ~163 dpi, acima do necessario para leitura e
+    // impressao do texto.
+    var opt={margin:[10,12,10,12],filename:"contrato.pdf",image:{type:"jpeg",quality:.85},
+      html2canvas:{scale:1.7,useCORS:true},jsPDF:{unit:"mm",format:"a4",orientation:"portrait"},
       pagebreak:{mode:["css","legacy"],avoid:["tr","table",".cp",".ct"]}};
     var dataUri=await html2pdf().set(opt).from(el).outputPdf("datauristring");
     var b64=dataUri.split(",")[1];
+    console.log("[contrato] PDF gerado:",(b64.length*3/4/1048576).toFixed(2),"MB");
     var code=(PRESET&&PRESET.code)||"";
     var res=await fetch(ASSINAR_URL,{
       method:"POST",
@@ -618,7 +625,11 @@ async function assinarWhatsApp(){
       _amsg("✅ Contrato enviado! Você receberá o link de assinatura no WhatsApp <strong>"+fone+"</strong> em instantes.",true);
       btn.style.display="none";
     } else {
-      _amsg("Não foi possível enviar para assinatura. "+(j.error||"Tente novamente."),false);
+      // Mostra o motivo que a funcao devolveu. Sem isto, qualquer recusa do
+      // Autentique virava a mesma frase generica e ninguem sabia o que fazer.
+      _amsg("Não foi possível enviar para assinatura.<br><span style=\"font-size:12px\">"+
+            esc(j.error||"Tente novamente em instantes.")+
+            "</span><br><span style=\"font-size:12px\">Se persistir, fale com a nossa equipe — o contrato já está salvo.</span>",false);
       btn.disabled=false; btn.innerHTML=_o;
     }
   } catch(e){
