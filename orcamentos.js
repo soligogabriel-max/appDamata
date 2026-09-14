@@ -1268,7 +1268,7 @@ function _orcAbrirPDF(){
   </tbody>
 </table>
 ${simPDF}
-<div class="footer">Fazenda Damata · fazendadamata.com · (19) 99638-3386<br>Este orçamento é válido por 7 dias a partir da data de emissão. Os valores poderão ser reajustados após o prazo.</div>
+<div class="footer">Fazenda Damata · fazendadamata.com · (19) 99678-4361<br>Este orçamento é válido por 7 dias a partir da data de emissão. Os valores poderão ser reajustados após o prazo.</div>
 <script>window.onload=function(){window.print();}<\/script>
 
 <!-- MODAL BIOMETRIA -->
