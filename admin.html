@@ -16,6 +16,22 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.51/dist/zip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<!-- Meta Pixel — só nos fluxos públicos (?orcamento / ?visita).
+     O app logado fica de fora de propósito: a equipe abrindo o admin não é
+     audiência de anúncio e sujaria o público de remarketing. -->
+<script>
+(function(){
+  if(!/[?#&](orcamento|visita)\b/.test(location.search + location.hash)) return;
+  !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+  n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+  document,'script','https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init','4413636802209860');
+  fbq('track','PageView');
+})();
+</script>
+<!-- End Meta Pixel -->
 <link rel="stylesheet" href="admin.css"/>
 </head>
 <body>
@@ -89,7 +105,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.14a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.16a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">

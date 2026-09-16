@@ -494,6 +494,25 @@ function _orcVisitorId(){
   return v;
 }
 
+/* ── Meta Pixel: eventos de conversão ───────────────────────────────────────
+   O pixel só disparava PageView, então para a Meta um clique perdido e um lead
+   real eram o mesmo evento — daí a campanha só poder rodar em objetivo Tráfego.
+   O eventID já vai junto para a Conversions API deduplicar quando o envio
+   server-side entrar; sem ele o mesmo lead contaria duas vezes.
+   Orçamento aberto pelo admin não dispara: seria a equipe poluindo o sinal. */
+function _orcFbEvent(nome, params){
+  if(_orcAdmin()) return;
+  if(typeof fbq !== "function") return;   // fora do fluxo público, ou bloqueador
+  _orc._fbSent = _orc._fbSent || {};
+  if(_orc._fbSent[nome]) return;          // voltar e avançar no wizard não reconta
+  const eventID = (self.crypto && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : (Date.now() + "-" + Math.random().toString(16).slice(2));
+  _orc._fbSent[nome] = eventID;
+  try{ fbq("track", nome, params || {}, {eventID: eventID}); }
+  catch(e){ console.warn("[pixel] falha ao enviar " + nome + ":", e); }
+}
+
 // Insere o orçamento na 1ª passagem e atualiza nas seguintes (captura de lead)
 async function _orcUpsertLead(){
   const validade=new Date(); validade.setDate(validade.getDate()+7);
@@ -726,6 +745,7 @@ async function _orcNext1(){
   // Grava o lead já ao sair da fase 1 (captura mesmo quem desistir adiante)
   _orc._stage="lead";
   await _orcUpsertLead();
+  _orcFbEvent("Lead", {content_category: _orc.tipo_evento || "", content_name: "Orçamento — contato capturado"});
   _orc.step=2; _orcStep();
 }
 
@@ -1184,6 +1204,7 @@ async function _orcSalvar(){
   btn.disabled=true; btn.textContent="Gerando PDF…";
   _orc._stage="pendente";
   await _orcUpsertLead();
+  _orcFbEvent("SubmitApplication", {value: _orc.valor_total || 0, currency: "BRL", content_category: _orc.tipo_evento || ""});
   _orcAbrirPDF();
   btn.disabled=false; btn.textContent="Salvar orçamento em PDF";
   // Envia orçamento via WhatsApp em background (silencioso)
