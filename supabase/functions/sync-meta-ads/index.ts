@@ -11,8 +11,9 @@
 // alguns dias depois do fato, então gravar uma vez só deixaria número velho.
 // Aceita ?preset= para carga histórica (last_90d no primeiro disparo).
 //
-// Protegida pela service role key no Authorization — a função é verify_jwt:false
-// e sem isso qualquer um dispararia uma ressincronização, queimando cota da Meta.
+// Protegida por chave secreta do projeto no Authorization (service role legada ou
+// sb_secret_ nova) — a função é verify_jwt:false e sem isso qualquer um dispararia
+// uma ressincronização, queimando cota da Meta.
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -117,8 +118,16 @@ Deno.serve(async (req) => {
   if (!TOKEN || !CONTA) return json({ error: "META_ADS_TOKEN ou META_AD_ACCOUNT_ID ausente." }, 500);
   if (!SB_URL || !SB_KEY) return json({ error: "Credenciais do Supabase ausentes." }, 500);
 
-  const auth = req.headers.get("authorization") || "";
-  if (auth !== `Bearer ${SB_KEY}`) return json({ error: "Não autorizado." }, 401);
+  // Aceita a service role legada (JWT) ou uma secret key nova (sb_secret_...):
+  // o dashboard mostra as duas e não é óbvio qual copiar. A publishable/anon
+  // continua recusada — é pública, está no HTML do site.
+  const auth = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  const SECRET_KEYS = Deno.env.get("SUPABASE_SECRET_KEYS") || "";
+  const autorizado = auth.length > 20 && (
+    auth === SB_KEY ||
+    (auth.startsWith("sb_secret_") && SECRET_KEYS.includes(auth))
+  );
+  if (!autorizado) return json({ error: "Não autorizado." }, 401);
 
   const preset = new URL(req.url).searchParams.get("preset") || "last_7d";
   if (!PRESETS_OK.has(preset)) {
