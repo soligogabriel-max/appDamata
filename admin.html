@@ -105,7 +105,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.16a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.21a</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -4382,6 +4382,8 @@ async function _vcLoadAgendadas() {
   }
 }
 
+const _vcAttr = t => String(t ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
 async function vcAbrirEdicao(vcId) {
   let m = document.getElementById("m-vc-edit");
   if (!m) {
@@ -4422,8 +4424,12 @@ async function vcAbrirEdicao(vcId) {
       <input type="hidden" id="vce-gcal"  value="${v.gcal_event_id || ''}">
       <input type="hidden" id="vce-slot0" value="${v.slot_id || ''}">
       <input type="hidden" id="vce-desf0" value="${v.desfecho || ''}">
-      <input type="hidden" id="vce-nome"  value="${(v.nome||'').replace(/"/g,'&quot;')}">
-      <input type="hidden" id="vce-wpp"   value="${v.whatsapp||''}">
+      <input type="hidden" id="vce-nome0" value="${_vcAttr(v.nome)}">
+      <input type="hidden" id="vce-wpp0"  value="${_vcAttr(v.whatsapp)}">
+      <label class="lbl">Cliente</label>
+      <input type="text" id="vce-nome" class="inp" value="${_vcAttr(v.nome)}" placeholder="Nome do cliente">
+      <label class="lbl">WhatsApp</label>
+      <input type="tel" id="vce-wpp" class="inp" value="${_vcAttr(v.whatsapp)}" placeholder="(11) 91234-5678">
       <label class="lbl">Data e horário</label>
       <select id="vce-slot" class="inp">
         ${!v.slot_id ? '<option value="">— sem horário —</option>' : ''}
@@ -4457,14 +4463,17 @@ async function vcSalvarEdicao() {
   const slotId = document.getElementById("vce-slot").value;
   const status = document.getElementById("vce-status").value;
   const obs    = (document.getElementById("vce-obs").value || "").trim();
+  const nome   = (document.getElementById("vce-nome").value || "").trim();
+  const wpp    = (document.getElementById("vce-wpp").value  || "").trim();
   const btn    = document.getElementById("vce-btn");
   const err    = document.getElementById("vce-err");
+  if (!nome) { err.textContent = "O nome do cliente não pode ficar em branco."; err.style.display = ""; return; }
   btn.disabled = true; btn.textContent = "Salvando…";
   err.style.display = "none";
   try {
     const desfecho  = document.getElementById("vce-desfecho").value || null;
     const desfecho0 = document.getElementById("vce-desf0").value || null;
-    const patch = { status, obs: obs || null, desfecho };
+    const patch = { status, obs: obs || null, desfecho, nome, whatsapp: wpp || null };
     if (slotId) patch.slot_id = slotId;
     if (desfecho !== desfecho0) patch.desfecho_em = desfecho ? new Date().toISOString() : null;
     if (["visitado_alta","visitado_baixa"].includes(status) && !VC_DESFECHOS_FINAIS.includes(desfecho)) {
@@ -4483,7 +4492,10 @@ async function vcSalvarEdicao() {
     // Remarcou: o evento tem que andar junto. Roda depois do PATCH porque a
     // function le a data nova direto do banco.
     const slot0 = document.getElementById("vce-slot0")?.value || "";
-    if (status !== "cancelada" && slotId && slotId !== slot0) {
+    const nome0 = document.getElementById("vce-nome0")?.value || "";
+    const wpp0  = document.getElementById("vce-wpp0")?.value  || "";
+    const mudouEvento = (slotId && slotId !== slot0) || nome !== nome0 || wpp !== wpp0;
+    if (status !== "cancelada" && mudouEvento && slotId) {
       try { await _syncVCGoogleCal(vcId); }
       catch(e) { toast("⚠️ Visita salva, mas o Google Calendar não atualizou: " + e.message, 5000); }
     }
@@ -4491,8 +4503,6 @@ async function vcSalvarEdicao() {
     _vcLoadAgendadas();
     toast("✅ Visita atualizada.");
     if (["visitado_alta","visitado_baixa"].includes(status) && !VC_DESFECHOS_FINAIS.includes(desfecho)) {
-      const nome = document.getElementById("vce-nome")?.value || "";
-      const wpp  = document.getElementById("vce-wpp")?.value  || "";
       vcAbrirFollowUp(vcId, nome, wpp);
     }
   } catch(e) {
