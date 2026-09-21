@@ -11,9 +11,10 @@
 // alguns dias depois do fato, então gravar uma vez só deixaria número velho.
 // Aceita ?preset= para carga histórica (last_90d no primeiro disparo).
 //
-// Protegida por chave secreta do projeto no Authorization (service role legada ou
-// sb_secret_ nova) — a função é verify_jwt:false e sem isso qualquer um dispararia
-// uma ressincronização, queimando cota da Meta.
+// Protegida no Authorization por uma de três credenciais: service role legada,
+// sb_secret_ nova, ou o segredo do cron (app.sync_meta_ads_secret, conferido por
+// RPC). A função é verify_jwt:false e sem isso qualquer um dispararia uma
+// ressincronização, queimando cota da Meta.
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -61,6 +62,23 @@ async function buscarInsights(conta: string, token: string, preset: string) {
     url = d.paging?.next || "";
   }
   return linhas;
+}
+
+// O cron manda um segredo que vive só no Postgres (app.sync_meta_ads_secret) e a
+// função confere por RPC — ela nunca precisa saber o valor, e o job não carrega
+// chave nenhuma no texto, ao contrário dos jobs antigos.
+async function segredoDoCronConfere(sbUrl: string, sbKey: string, token: string) {
+  const res = await fetch(`${sbUrl}/rest/v1/rpc/sync_meta_ads_auth`, {
+    method: "POST",
+    headers: {
+      apikey: sbKey,
+      Authorization: `Bearer ${sbKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ p_token: token }),
+  });
+  if (!res.ok) return false;
+  return (await res.json()) === true;
 }
 
 async function gravar(sbUrl: string, sbKey: string, conta: string, linhas: any[]) {
@@ -125,7 +143,8 @@ Deno.serve(async (req) => {
   const SECRET_KEYS = Deno.env.get("SUPABASE_SECRET_KEYS") || "";
   const autorizado = auth.length > 20 && (
     auth === SB_KEY ||
-    (auth.startsWith("sb_secret_") && SECRET_KEYS.includes(auth))
+    (auth.startsWith("sb_secret_") && SECRET_KEYS.includes(auth)) ||
+    await segredoDoCronConfere(SB_URL, SB_KEY, auth)
   );
   if (!autorizado) return json({ error: "Não autorizado." }, 401);
 
