@@ -39,19 +39,32 @@ create policy ads_insights_admin on ads_insights
 revoke all on ads_insights from anon;
 
 -- Autenticação do cron para a função sync-meta-ads.
--- O segredo em si NÃO fica aqui: é gerado dentro do banco e gravado como
--- setting de database (app.sync_meta_ads_secret), para que nem o job do cron
--- nem o repositório carreguem o valor. Para (re)gerar:
---   do $$ declare s text; begin
---     s := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
---     execute format('alter database postgres set app.sync_meta_ads_secret = %L', s);
---   end $$;
+-- O segredo vive no Vault (nome 'sync_meta_ads') e é gerado dentro do banco:
+--   select vault.create_secret(
+--     replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
+--     'sync_meta_ads');
+-- Nem o job do cron nem o repositório carregam o valor. Não é ALTER DATABASE SET
+-- porque no Supabase o papel postgres não é superusuário e isso é negado.
+-- security definer: só o dono (postgres) enxerga vault.decrypted_secrets.
 create or replace function public.sync_meta_ads_auth(p_token text)
-returns boolean language sql stable set search_path = public as $f$
+returns boolean language sql stable security definer
+set search_path = public, vault as $f$
   select p_token is not null
      and length(p_token) > 20
-     and p_token = current_setting('app.sync_meta_ads_secret', true)
+     and exists (
+       select 1 from vault.decrypted_secrets v
+        where v.name = 'sync_meta_ads' and v.decrypted_secret = p_token)
 $f$;
 
 revoke all on function public.sync_meta_ads_auth(text) from public, anon, authenticated;
 grant execute on function public.sync_meta_ads_auth(text) to service_role;
+
+-- Job diário, 8h de Brasília. O segredo é lido do Vault na hora do disparo.
+select cron.schedule('sync-meta-ads-diario', '0 11 * * *', $job$
+  select net.http_post(
+    url     := 'https://wwnndsprpofmgbklqdgg.supabase.co/functions/v1/sync-meta-ads',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets
+                                      where name = 'sync_meta_ads' limit 1)))
+$job$);
