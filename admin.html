@@ -105,7 +105,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.22b</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.22c</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1944,7 +1944,7 @@ function _applyNavForRole(role){
     allSubTabs.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     document.getElementById("t-pedidos-eq").style.display="none";
     // desfaz o que a simulação de "trafego" esconde
-    ["t-leads","t-relatorio","t-relorc","t-whatsapp","t-visitas"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
+    ["t-leads","t-relatorio","t-relorc","t-whatsapp","t-visitas","t-agenda"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     var wrapA=document.querySelector("#p-visitas .uwrap");
     if(wrapA) Array.from(wrapA.children).forEach(c=>{ c.style.display=""; c.style.borderTop=""; c.style.marginTop=""; });
   } else if(role==="trafego"){
@@ -1954,6 +1954,7 @@ function _applyNavForRole(role){
     var gr=document.getElementById("grp-relatorios"); if(gr) gr.style.display="";
     ["t-dashboard","t-leads","t-relatorio","t-relorc","t-whatsapp"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     var tv=document.getElementById("t-visitas"); if(tv) tv.style.display="";
+    var ta=document.getElementById("t-agenda"); if(ta) ta.style.display="none";
     document.getElementById("t-pedidos-eq").style.display="none";
     var wrapT=document.querySelector("#p-visitas .uwrap");
     if(wrapT) Array.from(wrapT.children).forEach(c=>{
