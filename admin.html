@@ -105,7 +105,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.22d</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.22e</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -979,8 +979,12 @@
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
             <div class="sec-t" style="font-size:15px;margin:0;">📣 Anúncios Meta — custo por orçamento</div>
             <div style="margin-left:auto;display:flex;background:var(--bg2);border:1px solid var(--br);border-radius:8px;overflow:hidden;">
-              <button id="ads-btn-30" onclick="setAdsPeriodo(30)" style="padding:4px 12px;border:none;cursor:pointer;font-size:12px;background:transparent;color:var(--dl);">30 dias</button>
-              <button id="ads-btn-90" onclick="setAdsPeriodo(90)" style="padding:4px 12px;border:none;cursor:pointer;font-size:12px;background:var(--a);color:#fff;font-weight:600;">90 dias</button>
+              <button id="ads-btn-7" onclick="setAdsPeriodo(7)" style="padding:4px 10px;border:none;cursor:pointer;font-size:12px;background:transparent;color:var(--dl);">7d</button>
+              <button id="ads-btn-14" onclick="setAdsPeriodo(14)" style="padding:4px 10px;border:none;cursor:pointer;font-size:12px;background:transparent;color:var(--dl);">14d</button>
+              <button id="ads-btn-21" onclick="setAdsPeriodo(21)" style="padding:4px 10px;border:none;cursor:pointer;font-size:12px;background:transparent;color:var(--dl);">21d</button>
+              <button id="ads-btn-28" onclick="setAdsPeriodo(28)" style="padding:4px 10px;border:none;cursor:pointer;font-size:12px;background:transparent;color:var(--dl);">28d</button>
+              <button id="ads-btn-60" onclick="setAdsPeriodo(60)" style="padding:4px 10px;border:none;cursor:pointer;font-size:12px;background:transparent;color:var(--dl);">60d</button>
+              <button id="ads-btn-90" onclick="setAdsPeriodo(90)" style="padding:4px 10px;border:none;cursor:pointer;font-size:12px;background:var(--a);color:#fff;font-weight:600;">90d</button>
             </div>
           </div>
           <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
@@ -5140,7 +5144,7 @@ let _adsDias = 90;
 
 function setAdsPeriodo(d){
   _adsDias = d;
-  [30,90].forEach(n=>{
+  [7,14,21,28,60,90].forEach(n=>{
     const b=document.getElementById("ads-btn-"+n); if(!b) return;
     const on = n===d;
     b.style.background = on?"var(--a)":"transparent";
