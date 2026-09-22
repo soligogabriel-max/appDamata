@@ -137,7 +137,9 @@ Deno.serve(async (req) => {
   const ics = montarIcs((eventos ?? []) as Evento[], new Date());
 
   const { error: upErr } = await sb.storage.from(BUCKET).upload(OBJETO, new TextEncoder().encode(ics), {
-    contentType: "text/calendar; charset=utf-8",
+    // Sem "; charset=utf-8": o bucket restringe o mime e o Storage compara a
+    // string inteira. iCalendar já é UTF-8 por padrão (RFC 5545).
+    contentType: "text/calendar",
     cacheControl: "600",
     upsert: true,
   });
