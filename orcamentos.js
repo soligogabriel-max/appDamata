@@ -495,6 +495,10 @@ function _orcVisitorId(){
 }
 
 /* ── Meta Pixel: eventos de conversão ───────────────────────────────────────
+   Três momentos, do mais cedo ao mais tarde:
+     Lead             — "Próximo →" da fase 1: contato capturado (mais volume)
+     InitiateCheckout — "Ver resumo →": itens escolhidos, vai ver o valor
+     SubmitApplication— "Salvar orçamento em PDF": orçamento fechado, com valor
    O pixel só disparava PageView, então para a Meta um clique perdido e um lead
    real eram o mesmo evento — daí a campanha só poder rodar em objetivo Tráfego.
    O eventID já vai junto para a Conversions API deduplicar quando o envio
@@ -980,6 +984,7 @@ async function _orcNext2(){
   // Atualiza a gravação com os itens/valor ao passar da fase 2 para a 3
   _orc._stage="orcado";
   await _orcUpsertLead();
+  _orcFbEvent("InitiateCheckout", {value: _orc.valor_total || 0, currency: "BRL", content_category: _orc.tipo_evento || ""});
   _orc.step=3;_orcStep();
 }
 
@@ -1064,6 +1069,7 @@ function _orcNext3(){
   _orc.pacote_valor=subtotal-bestDiscount;
   _orc.valor_total=_orc.pacote_valor;
   _orc.pacote_itens_desc=selectedItems.map(i=>_orcDesc(i)+(i.qty>1?' × '+i.qty:'')).join(", ");
+  _orcFbEvent("InitiateCheckout", {value: _orc.valor_total || 0, currency: "BRL", content_category: _orc.tipo_evento || ""});
   _orc.step=4;_orcStep();
 }
 
