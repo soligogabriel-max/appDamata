@@ -105,7 +105,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.22e</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.22f</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3133,6 +3133,8 @@ async function deleteEventCascade() {
       await sbFetch(`agenda?cod=eq.${encodeURIComponent(cod)}`, {method:"PATCH", body:{deleted_at: new Date().toISOString()}, prefer:"return=minimal"});
     }
 
+    _refreshIcalAirbnb();
+
     // Invalida caches e atualiza tela
     cachedEvts = null;
     _agendaMap = null;
@@ -3415,6 +3417,7 @@ async function saveEvent(){
     }
     // Sincroniza com Google Calendar em background (não bloqueia a UI)
     _syncGoogleCal({ ...evData, google_cal_id: googleCalId });
+    _refreshIcalAirbnb();
   } catch(e) {
     toast("Erro ao salvar: "+e.message);
     console.error(e);
@@ -3522,6 +3525,17 @@ async function runGCalSync() {
     prog.textContent = `✅ ${ok} evento(s) sincronizado(s) com sucesso!`;
     setTimeout(() => { closeGCalSync(); toast(`📅 ${ok} evento(s) sincronizado(s) com sucesso!`); }, 1800);
   }
+}
+
+// Regenera o feed iCal que o Airbnb importa. O anuncio vende uso exclusivo do
+// espaco, entao qualquer evento da agenda bloqueia as datas la. Em background:
+// o Airbnb so le o feed de 1 em 1 a 3 horas, nada aqui precisa esperar.
+function _refreshIcalAirbnb() {
+  return fetch(SB_URL + "/functions/v1/agenda-ical", {
+    method: "POST",
+    headers: { "apikey": SB_KEY, "Authorization": "Bearer " + _authToken, "Content-Type": "application/json" },
+    body: "{}",
+  }).catch(() => {});
 }
 
 async function _syncGoogleCal(evData) {
