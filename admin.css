@@ -55,6 +55,14 @@ button{cursor:pointer;}
 .vc-subtab-btn{padding:7px 18px;border:none;background:transparent;font-size:13px;font-weight:600;color:var(--dl);border-bottom:2px solid transparent;cursor:pointer;transition:all .15s;}
 .vc-subtab-btn.on{color:var(--a);border-bottom-color:var(--a);}
 
+/* Filtro por status dentro de Agendadas. Pilula, e nao sublinhado, para nao
+   competir visualmente com as sub-abas acima (Disponibilidade / Agendadas). */
+.vc-stab{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border:1px solid var(--br);background:transparent;border-radius:999px;font-size:12px;font-weight:600;color:var(--dl);cursor:pointer;transition:all .15s;}
+.vc-stab:hover{border-color:var(--a);color:var(--a);}
+.vc-stab.on{background:var(--a);border-color:var(--a);color:#fff;}
+.vc-stab-n{font-size:11px;font-weight:700;background:rgba(0,0,0,.08);border-radius:999px;padding:0 6px;min-width:18px;text-align:center;}
+.vc-stab.on .vc-stab-n{background:rgba(255,255,255,.25);}
+
 .dash-card{background:var(--bg2);border:1px solid var(--br);border-radius:14px;padding:20px 18px;transition:box-shadow .15s;}
 .dash-card:hover{box-shadow:0 4px 18px rgba(0,0,0,.10);}
 .dc-icon{font-size:22px;margin-bottom:6px;}

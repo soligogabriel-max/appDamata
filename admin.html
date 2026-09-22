@@ -105,7 +105,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.22g</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.22h</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -4418,6 +4418,20 @@ async function _bloqueiosAirbnb() {
 }
 const _dataNoAirbnb = (data, blocos) => (blocos||[]).some(b => data >= b.data_ini && data <= b.data_fim);
 
+// Sub-abas por status dentro de Agendadas. Os grupos sao exaustivos e "Todas"
+// existe para que status legado (realizada, nao_compareceu) ou algum novo nunca
+// fique invisivel.
+const VC_GRUPOS = [
+  { g:"agendadas",  l:"🟡 Agendadas",  st:["agendada"] },
+  { g:"visitadas",  l:"🌟 Visitadas",  st:["visitado_alta","visitado_baixa","realizada"] },
+  { g:"canceladas", l:"❌ Canceladas", st:["cancelada","nao_compareceu"] },
+  { g:"todas",      l:"📋 Todas",      st:null }
+];
+let _vcGrupo = "agendadas";
+let _vcAgCache = null;   // { visitas, slotMap } — troca de aba nao volta ao banco
+
+function vcFiltroStatus(g) { _vcGrupo = g; _vcRenderAgendadas(); }
+
 async function _vcLoadAgendadas() {
   const el = document.getElementById("vc-ag-lista");
   el.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
@@ -4428,7 +4442,6 @@ async function _vcLoadAgendadas() {
       dbGet("slots_visita", "select=id,data,hora")
     ]);
     const slotMap = {}; slots.forEach(s => slotMap[s.id] = s);
-    if(!visitas.length) { el.innerHTML = '<div class="empty"><div class="eicon">📅</div>Nenhuma visita agendada.</div>'; return; }
     // ordem cronologica pela data do slot (nao pela de criacao):
     // proximas em ordem crescente no topo, depois as passadas da mais recente para a mais antiga.
     // visita sem slot vai para o fim, mantendo a ordem de criacao entre elas.
@@ -4439,9 +4452,41 @@ async function _vcLoadAgendadas() {
       if (fa !== fb) return fa ? -1 : 1;
       return fa ? a.k.localeCompare(b.k) : b.k.localeCompare(a.k);
     }).map(x => x.v);
-    const statusLabel = { agendada:"🟡 Agendada", realizada:"✅ Realizada", cancelada:"❌ Cancelada", nao_compareceu:"⚠️ Não compareceu", visitado_alta:"🌟 Visitado · Alta", visitado_baixa:"👍 Visitado · Baixa" };
-    const fmtSlot = id => { const s=slotMap[id]; return s ? new Date(s.data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"})+" às "+s.hora.slice(0,5) : "—"; };
-    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    _vcAgCache = { visitas, slotMap };
+    // Abre em Agendadas, que e' o que se olha no dia a dia. Se nao houver
+    // nenhuma, cai em Todas para a tela nao parecer vazia sem motivo.
+    if (_vcGrupo === "agendadas" && visitas.length && !visitas.some(v => v.status === "agendada")) _vcGrupo = "todas";
+    _vcRenderAgendadas();
+  } catch(e) {
+    el.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro: '+e.message+'</div>';
+  }
+}
+
+function _vcRenderAgendadas() {
+  const el = document.getElementById("vc-ag-lista");
+  if (!_vcAgCache) return;
+  const { visitas, slotMap } = _vcAgCache;
+  if (!visitas.length) { el.innerHTML = '<div class="empty"><div class="eicon">📅</div>Nenhuma visita agendada.</div>'; return; }
+
+  const doGrupo = g => {
+    const o = VC_GRUPOS.find(x => x.g === g);
+    return o && o.st ? visitas.filter(v => o.st.includes(v.status)) : visitas;
+  };
+  const lista = doGrupo(_vcGrupo);
+  const abas = `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;">` +
+    VC_GRUPOS.map(o => {
+      const n = doGrupo(o.g).length;
+      return `<button class="vc-stab${o.g === _vcGrupo ? " on" : ""}" onclick="vcFiltroStatus('${o.g}')">${o.l}<span class="vc-stab-n">${n}</span></button>`;
+    }).join("") + `</div>`;
+
+  if (!lista.length) {
+    el.innerHTML = abas + '<div class="empty"><div class="eicon">📭</div>Nenhuma visita neste status.</div>';
+    return;
+  }
+
+  const statusLabel = { agendada:"🟡 Agendada", realizada:"✅ Realizada", cancelada:"❌ Cancelada", nao_compareceu:"⚠️ Não compareceu", visitado_alta:"🌟 Visitado · Alta", visitado_baixa:"👍 Visitado · Baixa" };
+  const fmtSlot = id => { const s=slotMap[id]; return s ? new Date(s.data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"})+" às "+s.hora.slice(0,5) : "—"; };
+  const tabela = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead><tr style="background:var(--bg2);color:var(--dl);">
         <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--br);">Data / Hora</th>
         <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--br);">Cliente</th>
@@ -4449,7 +4494,7 @@ async function _vcLoadAgendadas() {
         <th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--br);">Status</th>
         <th style="padding:8px 10px;border-bottom:1px solid var(--br);"></th>
       </tr></thead>
-      <tbody>${visitas.map((v,i)=>`<tr style="background:${i%2?"var(--bg2)":"transparent"}">
+      <tbody>${lista.map((v,i)=>`<tr style="background:${i%2?"var(--bg2)":"transparent"}">
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);font-weight:600;">${fmtSlot(v.slot_id)}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.nome ? `<button onclick='abrirHistoricoVisitante(${JSON.stringify(v.visitor_id||null)},${JSON.stringify(v.nome||"")},${JSON.stringify(v.whatsapp||null)})' style='background:none;border:none;cursor:pointer;color:var(--a);font-weight:600;font-size:13px;text-decoration:underline;text-underline-offset:2px;padding:0;'>${v.nome}</button>` : "—"}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.whatsapp?`<a href="https://wa.me/55${v.whatsapp.replace(/\D/g,'')}" target="_blank" style="color:var(--a);">${v.whatsapp}</a>`:"—"}</td>
@@ -4463,9 +4508,7 @@ async function _vcLoadAgendadas() {
         </td>
       </tr>`).join("")}</tbody>
     </table>`;
-  } catch(e) {
-    el.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro: '+e.message+'</div>';
-  }
+  el.innerHTML = abas + tabela;
 }
 
 const _vcAttr = t => String(t ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
