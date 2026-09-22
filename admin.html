@@ -105,7 +105,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.22a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.22b</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -975,7 +975,7 @@
             <div id="vis-origem-legenda" style="display:flex;flex-direction:column;gap:8px;"></div>
           </div>
         </div>
-        <div style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px;">
+        <div id="ads-bloco" style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px;">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
             <div class="sec-t" style="font-size:15px;margin:0;">📣 Anúncios Meta — custo por orçamento</div>
             <div style="margin-left:auto;display:flex;background:var(--bg2);border:1px solid var(--br);border-radius:8px;overflow:hidden;">
@@ -1663,6 +1663,7 @@
     <div class="ropt" onclick="pickRole('fornecedor',this)"><span class="ropt-i">🤝</span><div><div class="ropt-l">Fornecedor</div><div class="ropt-d">Vê apenas eventos vinculados</div></div></div>
     <div class="ropt" onclick="pickRole('assessoria',this)"><span class="ropt-i">🎗</span><div><div class="ropt-l">Assessoria</div><div class="ropt-d">Agenda, pedidos, contratos e a receber</div></div></div>
     <div class="ropt" onclick="pickRole('cliente',this)"><span class="ropt-i">💍</span><div><div class="ropt-l">Cliente</div><div class="ropt-d">Vê apenas o próprio evento</div></div></div>
+    <div class="ropt" onclick="pickRole('trafego',this)"><span class="ropt-i">📣</span><div><div class="ropt-l">Tráfego pago</div><div class="ropt-d">Só o relatório de anúncios — sem dados de clientes</div></div></div>
     <div class="eswrap" id="eswrap">
       <span class="eslbl" id="eslbl">Vincular ao evento</span>
       <div class="esl" id="esl"></div>
@@ -1920,7 +1921,7 @@ const MONTHS=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Ago
 const WD=["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
 const ET={casamento:{label:"Casamento",color:"#2E3C44",bg:"#E8EEF0"},aniversario:{label:"Aniversário",color:"#7A5C1A",bg:"#FDF0CC"},corporativo:{label:"Corporativo",color:"#2A4A3A",bg:"#D8EDE2"},hospedagem:{label:"Hospedagem",color:"#1A4A5C",bg:"#D8EAF0"},festa:{label:"Festa",color:"#5C2A6A",bg:"#EDE0F5"},outro:{label:"Outro",color:"#4A4A4A",bg:"#EBEBEB"}};
 const SM={confirmado:{label:"Confirmado",color:"#2A6644"},proposta:{label:"Proposta",color:"#C08820"},cancelado:{label:"Cancelado",color:"#A03030"}};
-const RL={admin:"Admin",equipe:"Equipe",fornecedor:"Fornecedor",cliente:"Cliente",assessoria:"Assessoria"};
+const RL={admin:"Admin",equipe:"Equipe",fornecedor:"Fornecedor",cliente:"Cliente",assessoria:"Assessoria",trafego:"Tráfego pago"};
 function isAdmin(u){ return u && u.role==="admin"; }
 
 // ══════════════════════════════════════════
@@ -1942,6 +1943,23 @@ function _applyNavForRole(role){
     allGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     allSubTabs.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     document.getElementById("t-pedidos-eq").style.display="none";
+    // desfaz o que a simulação de "trafego" esconde
+    ["t-leads","t-relatorio","t-relorc","t-whatsapp","t-visitas"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
+    var wrapA=document.querySelector("#p-visitas .uwrap");
+    if(wrapA) Array.from(wrapA.children).forEach(c=>{ c.style.display=""; c.style.borderTop=""; c.style.marginTop=""; });
+  } else if(role==="trafego"){
+    // tráfego pago vê só Relatórios → Visitas do Site, e dentro dela só o bloco
+    // de anúncios — que é alimentado por RPC agregada, sem dado de cliente.
+    allGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    var gr=document.getElementById("grp-relatorios"); if(gr) gr.style.display="";
+    ["t-dashboard","t-leads","t-relatorio","t-relorc","t-whatsapp"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    var tv=document.getElementById("t-visitas"); if(tv) tv.style.display="";
+    document.getElementById("t-pedidos-eq").style.display="none";
+    var wrapT=document.querySelector("#p-visitas .uwrap");
+    if(wrapT) Array.from(wrapT.children).forEach(c=>{
+      if(c.id==="ads-bloco"){ c.style.display=""; c.style.borderTop="none"; c.style.marginTop="0"; }
+      else c.style.display="none";
+    });
   } else if(role==="equipe"){
     allGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     document.getElementById("t-pedidos-eq").style.display="";
@@ -1964,9 +1982,9 @@ function _applyNavForRole(role){
 
 async function openSimModal(){
   if(!isAdmin(getCU())) return;
-  var r=prompt("Simular perfil:\n1 = Equipe\n2 = Fornecedor\n3 = Assessoria\n(ESC para cancelar)","1");
+  var r=prompt("Simular perfil:\n1 = Equipe\n2 = Fornecedor\n3 = Assessoria\n4 = Tráfego pago\n(ESC para cancelar)","1");
   if(r===null) return;
-  var map={"1":"equipe","equipe":"equipe","2":"fornecedor","fornecedor":"fornecedor","3":"assessoria","assessoria":"assessoria"};
+  var map={"1":"equipe","equipe":"equipe","2":"fornecedor","fornecedor":"fornecedor","3":"assessoria","assessoria":"assessoria","4":"trafego","trafego":"trafego"};
   var picked=map[r.trim().toLowerCase()];
   if(!picked){alert("Perfil inválido.");return;}
 
@@ -2307,6 +2325,10 @@ async function _setupUserAccess(u){
     _userEventIds=u.event_ids||[];
     _applyNavForRole("assessoria");
     setTab("agenda"); renderCal(u.assessoria_cod?_userEventIds:null);
+  } else if(u.role==="trafego"){
+    _userEventIds=null;
+    _applyNavForRole("trafego");
+    setTab("visitas");
   }
 }
 
@@ -2392,7 +2414,7 @@ function setTab(t) {
   if(t==="contratos") renderContratos();
   if(t==="naturezas") renderNaturezas();
   if(t==="socios") renderContaSocios();
-  if(t==="visitas"){ renderVisitas(); renderAnuncios(); }
+  if(t==="visitas"){ if(effIsAdmin()) renderVisitas(); renderAnuncios(); }
   if(t==="leads") renderLeads();
   if(t==="whatsapp") renderWhatsApp();
   if(t==="dashboard") renderDashboard();
@@ -4237,8 +4259,8 @@ async function renderUsers(){
     const assMap = {}; assRows.forEach(r=>{ assMap[r.cod]=r.nome; });
     wr.innerHTML="";
     if(!users.length){wr.innerHTML='<div class="empty"><div class="eicon">👥</div>Nenhum usuário aprovado.</div>';return;}
-    const rbg={equipe:"#D8EDE2",fornecedor:"#FDF0CC",cliente:"#EDE0F5"};
-    const rtx={equipe:"#2A4A3A",fornecedor:"#7A5C1A",cliente:"#5C3A6A"};
+    const rbg={equipe:"#D8EDE2",fornecedor:"#FDF0CC",cliente:"#EDE0F5",trafego:"#E3ECF7"};
+    const rtx={equipe:"#2A4A3A",fornecedor:"#7A5C1A",cliente:"#5C3A6A",trafego:"#1F3F6E"};
     users.forEach(u=>{
       const evN=(u.event_ids||[]).map(id=>{const ev=evts.find(e=>e.cod===id);return ev?ev.nome_evento||ev.cod:"";}).filter(Boolean).join(", ");
       const assNome = u.assessoria_cod ? (assMap[u.assessoria_cod]||u.assessoria_cod) : "";
@@ -5108,11 +5130,11 @@ function setVisAgrup(mode) {
 // ══════════════════════════════════════════
 // ANÚNCIOS META — custo por orçamento
 // O gasto mora na Meta (ads_insights, sincronizado por cron) e o funil mora
-// aqui. Este painel junta os dois: cada dispositivo é atribuído ao anúncio do
-// seu primeiro acesso no período (utm_content = ad.id, que a Meta preenche
-// dinamicamente no link), e os orçamentos/visitas daquele dispositivo contam
-// para esse anúncio. Primeiro acesso, não último: é o clique que trouxe a
-// pessoa que a mídia pagou.
+// aqui. A RPC relatorio_anuncios junta os dois no banco: cada dispositivo é
+// atribuído ao anúncio do seu primeiro acesso no período (utm_content = ad.id,
+// que a Meta preenche dinamicamente no link), e os orçamentos/visitas daquele
+// dispositivo contam para esse anúncio. Primeiro acesso, não último: é o
+// clique que trouxe a pessoa que a mídia pagou.
 let _adsDias = 90;
 
 function setAdsPeriodo(d){
@@ -5134,37 +5156,16 @@ async function renderAnuncios(){
   ["ads-c-gasto","ads-c-orc","ads-c-cpo"].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent="—";});
   const brl = v => "R$ " + Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
   try{
-    const since = new Date(); since.setDate(since.getDate()-_adsDias); since.setHours(0,0,0,0);
-    const sinceISO = since.toISOString();
-    const sinceDia = localDate(since);
-    const [ads, vis, orcs, vcs] = await Promise.all([
-      dbGetAll("ads_insights", "dia=gte."+sinceDia+"&select=dia,ad_id,ad_nome,campaign_nome,gasto,impressoes,cliques_link&order=dia.asc"),
-      // Só o que tem utm_content, em ordem cronológica: o primeiro registro de
-      // cada sessão é o "primeiro acesso" da atribuição.
-      dbGetAll("site_visits", "visited_at=gte."+sinceISO+"&utm_content=not.is.null&select=session_id,visited_at,utm_content&order=visited_at.asc"),
-      dbGet("orcamentos", "created_at=gte."+sinceISO+"&visitor_id=not.is.null&select=visitor_id&limit=5000"),
-      dbGet("visitas_comerciais", "created_at=gte."+sinceISO+"&status=neq.cancelada&visitor_id=not.is.null&select=visitor_id&limit=2000")
-    ]);
-
-    // Primeiro anúncio de cada dispositivo. utm_content numérico = ad.id da
-    // Meta; "link_in_bio" e afins são orgânicos e ficam de fora.
-    const primeiroAd = new Map();
-    vis.forEach(v=>{
-      if(!v.session_id || primeiroAd.has(v.session_id)) return;
-      if(/^\d+$/.test(String(v.utm_content||""))) primeiroAd.set(v.session_id, String(v.utm_content));
-    });
-
+    // Agregado no banco (relatorio_anuncios, security definer): quem chama não
+    // precisa ler orcamentos nem visitas_comerciais — é o que permite o papel
+    // 'trafego' ver isto sem enxergar nome, WhatsApp ou valor de cliente.
+    const rows = await sbFetch("rpc/relatorio_anuncios", {method:"POST", body:{p_dias:_adsDias}});
     const porAd = new Map();
-    const get = id => { let a=porAd.get(id); if(!a){a={ad_id:id,nome:"",campanha:"",gasto:0,impressoes:0,cliques:0,disp:0,orc:0,vis:0}; porAd.set(id,a);} return a; };
-    ads.forEach(r=>{
-      const a=get(String(r.ad_id));
-      a.gasto += Number(r.gasto)||0; a.impressoes += Number(r.impressoes)||0; a.cliques += Number(r.cliques_link)||0;
-      if(r.ad_nome) a.nome=r.ad_nome; if(r.campaign_nome) a.campanha=r.campaign_nome;
+    (rows||[]).forEach(r=>{
+      porAd.set(String(r.ad_id), {ad_id:String(r.ad_id), nome:r.ad_nome||"", campanha:r.campanha||"",
+        gasto:Number(r.gasto)||0, impressoes:Number(r.impressoes)||0, cliques:Number(r.cliques)||0,
+        disp:Number(r.disp)||0, orc:Number(r.orc)||0, vis:Number(r.vis)||0});
     });
-    primeiroAd.forEach(ad=>{ get(ad).disp++; });
-    orcs.forEach(o=>{ const ad=primeiroAd.get(o.visitor_id); if(ad) get(ad).orc++; });
-    vcs.forEach(v=>{ const ad=primeiroAd.get(v.visitor_id); if(ad) get(ad).vis++; });
-
     const linhas = [...porAd.values()].filter(a=>a.gasto>0||a.disp>0).sort((x,y)=>y.gasto-x.gasto);
     const totGasto = linhas.reduce((s,a)=>s+a.gasto,0);
     const totOrc   = linhas.reduce((s,a)=>s+a.orc,0);
