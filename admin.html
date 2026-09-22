@@ -105,7 +105,7 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.22f</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.22g</div>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -3336,6 +3336,16 @@ async function saveEvent(){
       toast(`⚠️ Data indisponível: conflito com "${ref}" (${dataRef}). Considere a montagem/desmontagem de 1 dia antes e depois.`);
       return;
     }
+    // Reserva do Airbnb nas mesmas datas: avisa e deixa decidir. Diferente do
+    // conflito acima, aqui nao bloqueia — pode ser que voce queira o evento e
+    // va cancelar a hospedagem.
+    const blocos = (await _bloqueiosAirbnb()).filter(b => b.data_ini <= d2 && b.data_fim >= d1);
+    if (blocos.length) {
+      const per = blocos.map(b => b.data_ini === b.data_fim
+        ? b.data_ini.split("-").reverse().join("/")
+        : b.data_ini.split("-").reverse().join("/") + " a " + b.data_fim.split("-").reverse().join("/")).join(", ");
+      if (!confirm("⚠️ O Airbnb tem reserva nessas datas (" + per + ").\n\nSalvar o evento assim mesmo? Você vai precisar resolver a hospedagem no anúncio.")) return;
+    }
   }
   const locSel=document.getElementById("mef-loc-sel").value;
   const location=locSel==="outro"?document.getElementById("mef-loc-txt").value:locSel;
@@ -4398,6 +4408,16 @@ function vcDesfechoBadge(d) {
   return `<div style="display:inline-block;font-size:10px;background:${o.bg};color:${o.fg};border-radius:4px;padding:1px 6px;margin-top:3px;font-weight:600;">${o.l}</div>`;
 }
 
+// Datas que o Airbnb reporta como reservadas. Sao so as reservas de verdade:
+// o airbnb-ical-import ja descarta os bloqueios que o anuncio gera por regra
+// (antecedencia minima, fim da janela de 9 meses) e os que ecoam a agenda.
+// Vazio em caso de falha: nunca esconder horario por erro de rede.
+async function _bloqueiosAirbnb() {
+  try { return await dbGet("bloqueios_airbnb", "select=data_ini,data_fim&order=data_ini.asc"); }
+  catch(e) { return []; }
+}
+const _dataNoAirbnb = (data, blocos) => (blocos||[]).some(b => data >= b.data_ini && data <= b.data_fim);
+
 async function _vcLoadAgendadas() {
   const el = document.getElementById("vc-ag-lista");
   el.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
@@ -4680,17 +4700,20 @@ function vcNovaManual() {
   // Carregar slots disponíveis
   (async()=>{
     const hoje = localDate();
-    const [slots, ag] = await Promise.all([
+    const [slots, ag, blocos] = await Promise.all([
       dbGet("slots_visita","data=gte."+hoje+"&order=data.asc,hora.asc&limit=200"),
-      dbGet("visitas_comerciais","status=neq.cancelada&select=slot_id")
+      dbGet("visitas_comerciais","status=neq.cancelada&select=slot_id"),
+      _bloqueiosAirbnb()
     ]);
     const bookedIds = new Set(ag.map(a=>a.slot_id));
     const livres = slots.filter(s=>!bookedIds.has(s.id));
     const sel = document.getElementById("vcm-slot");
     if(!sel) return;
     if(!livres.length){ sel.innerHTML='<option value="">Nenhum horário disponível</option>'; return; }
+    // Aqui o horario com reserva do Airbnb fica visivel, so marcado: some da
+    // tela do cliente, mas quem e' da casa pode decidir receber assim mesmo.
     sel.innerHTML = '<option value="">Selecione um horário</option>' +
-      livres.map(s=>`<option value="${s.id}" data-data="${s.data}" data-hora="${s.hora}">${new Date(s.data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"})} às ${s.hora.slice(0,5)}</option>`).join("");
+      livres.map(s=>`<option value="${s.id}" data-data="${s.data}" data-hora="${s.hora}">${_dataNoAirbnb(s.data, blocos) ? "⚠️ Airbnb · " : ""}${new Date(s.data+"T12:00:00").toLocaleDateString("pt-BR",{weekday:"short",day:"2-digit",month:"short"})} às ${s.hora.slice(0,5)}</option>`).join("");
   })();
 }
 
@@ -4749,14 +4772,18 @@ async function _orcLoadSlots() {
   _vcSelectedSlotId = null;
   try {
     const hoje = localDate();
-    const [slots, ag] = await Promise.all([
+    const [slots, ag, blocos] = await Promise.all([
       dbGet("slots_visita","data=gte."+hoje+"&order=data.asc,hora.asc&limit=200"),
-      dbGet("visitas_comerciais","status=neq.cancelada&select=slot_id")
+      dbGet("visitas_comerciais","status=neq.cancelada&select=slot_id"),
+      _bloqueiosAirbnb()
     ]);
     const bookedIds = new Set(ag.map(a=>a.slot_id));
-    // Agrupar datas com pelo menos 1 slot livre
+    // Agrupar datas com pelo menos 1 slot livre. Data com reserva do Airbnb nao
+    // e' oferecida: o anuncio vende uso exclusivo, com hospede na casa nao da
+    // para receber visita.
     const byDate = {};
-    slots.forEach(s=>{ if(!byDate[s.data]) byDate[s.data]=[]; byDate[s.data].push({...s,booked:bookedIds.has(s.id)}); });
+    slots.filter(s=>!_dataNoAirbnb(s.data, blocos))
+         .forEach(s=>{ if(!byDate[s.data]) byDate[s.data]=[]; byDate[s.data].push({...s,booked:bookedIds.has(s.id)}); });
     const datasLivres = Object.entries(byDate).filter(([,sls])=>sls.some(s=>!s.booked));
     const datasEl = document.getElementById("orc-slots-datas");
     if(!datasLivres.length) {

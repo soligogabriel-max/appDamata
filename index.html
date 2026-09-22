@@ -594,16 +594,23 @@ async function _vLoadSlots() {
   el.innerHTML = '<div style="font-size:13px;color:#aaa;">Carregando horários…</div>';
   try {
     const hoje = new Date().toISOString().slice(0, 10);
-    const [r1, r2] = await Promise.all([
+    const [r1, r2, r3] = await Promise.all([
       fetch(SB_URL+"/rest/v1/slots_visita?data=gte."+hoje+"&order=data.asc,hora.asc&limit=200",
         { headers:{ apikey:SB_KEY, Authorization:"Bearer "+SB_KEY } }),
       fetch(SB_URL+"/rest/v1/visitas_comerciais?status=neq.cancelada&select=slot_id",
-        { headers:{ apikey:SB_KEY, Authorization:"Bearer "+SB_KEY } })
+        { headers:{ apikey:SB_KEY, Authorization:"Bearer "+SB_KEY } }),
+      // Datas com reserva no Airbnb: o anúncio vende uso exclusivo, com hóspede
+      // na casa não dá para receber visita. Se esta chamada falhar, segue sem
+      // filtro — melhor oferecer demais do que sumir com a agenda por erro.
+      fetch(SB_URL+"/rest/v1/bloqueios_airbnb?select=data_ini,data_fim",
+        { headers:{ apikey:SB_KEY, Authorization:"Bearer "+SB_KEY } }).catch(()=>null)
     ]);
     const slots = await r1.json(), ag = await r2.json();
+    const blocos = r3 && r3.ok ? await r3.json().catch(()=>[]) : [];
+    const noAirbnb = d => (blocos||[]).some(b => d >= b.data_ini && d <= b.data_fim);
     const booked = new Set((ag||[]).map(a => a.slot_id));
     _vSlotsByDate = {};
-    (slots||[]).forEach(s => {
+    (slots||[]).filter(s => !noAirbnb(s.data)).forEach(s => {
       if (!_vSlotsByDate[s.data]) _vSlotsByDate[s.data] = [];
       _vSlotsByDate[s.data].push({ ...s, booked: booked.has(s.id) });
     });
