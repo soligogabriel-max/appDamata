@@ -91,7 +91,10 @@ function verOrcamento(id){
     <div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Itens orçados</div>
     ${itensTpl}
     <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;margin-top:4px;border-top:2px solid var(--br);"><span style="font-size:15px;font-weight:700;">Total</span><span style="font-size:20px;font-weight:700;color:var(--a);">${row.valor_total?fmt(row.valor_total):"—"}</span></div>
-    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+    <div style="margin-top:10px;">
+      <button onclick="exportarOrcamentoPDF(${id})" style="width:100%;padding:9px;border:1.5px solid var(--a);color:var(--a);background:#fff;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">📄 Exportar orçamento em PDF</button>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
       <button onclick="efetivarOrcamento(${id});closeOrcDet()" style="flex:1;padding:7px;border:1px solid var(--a);color:#fff;background:var(--a);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">📄 Efetivar</button>
       <button onclick="orcSetStatus(${id},'convertido');closeOrcDet()" style="flex:1;padding:7px;border:1px solid #27ae60;color:#27ae60;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;">✓ Convertido</button>
       <button onclick="orcSetStatus(${id},'expirado');closeOrcDet()" style="flex:1;padding:7px;border:1px solid #e74c3c;color:#e74c3c;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;">✕ Expirado</button>
@@ -377,15 +380,16 @@ function _orcRemoveFree(id){
 /* Linha de desconto do resumo e do PDF. Com o total ajustado na mão, o que o
    cliente vê é a diferença real até o subtotal — antes o PDF continuava
    imprimindo o desconto do pacote, que não fechava com o total impresso. */
-function _orcDiscLine(){
-  const sub=_orc._subtotal||0, tot=_orc.valor_total||0;
-  if(_orc._valorAjustado){
+function _orcDiscLine(o){
+  o=o||_orc;
+  const sub=o._subtotal||0, tot=o.valor_total||0;
+  if(o._valorAjustado){
     const d=sub-tot;
     if(Math.abs(d)<0.005) return null;
     return {label:d>0?"Desconto":"Acréscimo",valor:Math.abs(d),sinal:d>0?"−":"+",neg:d<0};
   }
-  if(!(_orc._discount>0)) return null;
-  return {label:"Desconto"+(_orc._discountPkg?" — "+_orc._discountPkg:""),valor:_orc._discount,sinal:"−",neg:false};
+  if(!(o._discount>0)) return null;
+  return {label:"Desconto"+(o._discountPkg?" — "+o._discountPkg:""),valor:o._discount,sinal:"−",neg:false};
 }
 
 let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_discountAuto:0,_discountPkgAuto:null,_discountManual:null,_saved:false,_activePkg:null,_activePkgs:[],_uSel:{},_priceOv:{},_freeItems:[],_freeSeq:0,_dbId:null,_stage:"lead"};
@@ -774,10 +778,7 @@ async function _orcLoadPacotes(){
       }
     }
     // Always reload inventario items for orçamento
-    const invOrc=await sbFetch("inventario?exibir_orcamento=eq.true&select=cod,descricao,imagem,descricao_orc&order=descricao.asc")||[];
-    _orc._invOrc=invOrc;
-    _orc._invByCod={};
-    invOrc.forEach(r=>{_orc._invByCod[r.cod]=r;});
+    await _orcFetchInv();
   }catch(e){
     body.innerHTML=`<div class="orc-card"><div style="text-align:center;padding:20px;color:var(--er)">Erro ao carregar pacotes.</div><div style="font-size:11px;color:var(--dl);padding:8px 16px;word-break:break-all;">${e.message||e}</div><div class="orc-nav"><button class="orc-btn-back" onclick="_orc.step=1;_orcStep()">← Voltar</button><button class="orc-btn-next" onclick="_orcLoadPacotes()">Tentar novamente</button></div></div>`;
     return;
@@ -1227,11 +1228,17 @@ async function _orcSalvar(){
   _orc.step=4; _orcStep();
 }
 
-function _orcAbrirPDF(){
+/* O PDF do orçamento tem uma fonte só: _orcPdfHTML. O wizard passa o próprio
+   _orc; a lista de orçamentos passa a linha do banco normalizada por
+   _orcPdfFromRow. Assim o que o admin exporta é byte a byte o que o cliente
+   salvou — antes só existia o caminho do wizard. */
+function _orcPdfHTML(o){
   const fmt=v=>"R$ "+v.toLocaleString("pt-BR",{minimumFractionDigits:2});
-  const nomes=[_orc.nome_noiva,_orc.nome_noivo].filter(Boolean).join(" e ")||_orc.nome_contratante;
-  const validade=new Date(); validade.setDate(validade.getDate()+7);
-  const sim=_orcCalcSimulacao(_orc.valor_total,_orc.data_evento);
+  const nomes=[o.nome_noiva,o.nome_noivo].filter(Boolean).join(" e ")||o.nome_contratante;
+  const _d=v=>new Date(v+"T12:00:00");
+  const emitido=o._emitido?_d(o._emitido):new Date();
+  const validade=o._validade?_d(o._validade):(()=>{const d=new Date();d.setDate(d.getDate()+7);return d;})();
+  const sim=_orcCalcSimulacao(o.valor_total,o.data_evento);
   const simPDF=sim?`
   <div style="margin-top:28px;border-top:2px solid #ddd;padding-top:18px;">
     <div style="font-size:15px;font-weight:700;color:#333;margin-bottom:14px;">Condições de Pagamento</div>
@@ -1250,13 +1257,13 @@ function _orcAbrirPDF(){
       <div style="font-size:11px;color:#2A6644;margin-top:4px;">${sim.discPct.toFixed(1)}% de desconto — economia de ${fmt(sim.desconto)}</div>
     </div>
   </div>`:'';
-  const itemRows=(_orc._selectedItems||[]).map(i=>{
+  const itemRows=(o._selectedItems||[]).map(i=>{
     const info=_orcItemInfo(i);
     const det=info?info.d:null;
     return `<tr><td><div style="font-weight:600">${_orcDesc(i)}${i.qty>1?' × '+i.qty:''}</div>${det?`<div style="font-size:11px;color:#777;margin-top:3px">${det}</div>`:''}</td><td style="text-align:right;vertical-align:top;white-space:nowrap;padding-left:16px">${fmt(i.subtotal)}</td></tr>`;
   }).join("");
-  const dl=_orcDiscLine();
-  const subtotalRow=dl?`<tr style="color:#888"><td>Subtotal</td><td style="text-align:right">${fmt(_orc._subtotal)}</td></tr>`:"";
+  const dl=_orcDiscLine(o);
+  const subtotalRow=dl?`<tr style="color:#888"><td>Subtotal</td><td style="text-align:right">${fmt(o._subtotal)}</td></tr>`:"";
   const discRow=dl?`<tr style="color:${dl.neg?'#a15c00':'#2a7a2a'};font-weight:600"><td>${dl.label}</td><td style="text-align:right">${dl.sinal} ${fmt(dl.valor)}</td></tr>`:"";
   const html=`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
 <title>Orçamento – Fazenda Damata</title>
@@ -1274,16 +1281,16 @@ function _orcAbrirPDF(){
   @media print{body{padding:20px}}
 </style></head><body>
 <h1>Orçamento – Fazenda Damata</h1>
-<div class="sub">Emitido em ${new Date().toLocaleDateString("pt-BR")} · Válido até ${validade.toLocaleDateString("pt-BR")}</div>
+<div class="sub">Emitido em ${emitido.toLocaleDateString("pt-BR")} · Válido até ${validade.toLocaleDateString("pt-BR")}</div>
 <div class="info">
-  <div><span>Contratante</span>${_orc.nome_contratante}</div>
-  <div><span>WhatsApp</span>${_orc.whatsapp}</div>
-  <div><span>Evento</span>${_orc.tipo_evento}</div>
-  <div><span>Data</span>${_orc.data_evento.split("-").reverse().join("/")}</div>
-  <div><span>Salão</span>${_orc.salao}</div>
-  <div><span>Convidados</span>${_orc.num_convidados}</div>
+  <div><span>Contratante</span>${o.nome_contratante}</div>
+  <div><span>WhatsApp</span>${o.whatsapp}</div>
+  <div><span>Evento</span>${o.tipo_evento}</div>
+  <div><span>Data</span>${o.data_evento.split("-").reverse().join("/")}</div>
+  <div><span>Salão</span>${o.salao}</div>
+  <div><span>Convidados</span>${o.num_convidados}</div>
   ${nomes?`<div><span>Nome(s)</span>${nomes}</div>`:''}
-  ${_orc.email?`<div><span>E-mail</span>${_orc.email}</div>`:''}
+  ${o.email?`<div><span>E-mail</span>${o.email}</div>`:''}
 </div>
 <table>
   <thead><tr><th>Item</th><th style="text-align:right">Valor</th></tr></thead>
@@ -1291,29 +1298,69 @@ function _orcAbrirPDF(){
     ${itemRows}
     ${subtotalRow}
     ${discRow}
-    <tr class="total-row"><td>Total</td><td style="text-align:right">${fmt(_orc.valor_total)}</td></tr>
+    <tr class="total-row"><td>Total</td><td style="text-align:right">${fmt(o.valor_total)}</td></tr>
   </tbody>
 </table>
 ${simPDF}
 <div class="footer">Fazenda Damata · fazendadamata.com · (19) 99678-4361<br>Este orçamento é válido por 7 dias a partir da data de emissão. Os valores poderão ser reajustados após o prazo.</div>
 <script>window.onload=function(){window.print();}<\/script>
 
-<!-- MODAL BIOMETRIA -->
-<div id="bio-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:center;justify-content:center;padding:20px">
-  <div id="bio-modal-inner" style="background:white;border-radius:20px;padding:32px 28px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25)">
-    <div style="font-size:44px;margin-bottom:12px">🔐</div>
-    <div style="font-weight:700;font-size:17px;color:#1e293b;margin-bottom:8px">Habilitar login com biometria?</div>
-    <div style="font-size:13px;color:#64748b;line-height:1.6;margin-bottom:24px">Na próxima visita, entre com sua digital ou Face ID — sem precisar digitar a senha.</div>
-    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-      <button onclick="hideBioModal()" style="background:white;border:1.5px solid #e2e8f0;color:#64748b;padding:10px 20px;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit">Agora não</button>
-      <button id="btn-bio-reg" onclick="registerBiometric()" style="background:#1e3a5f;color:white;border:none;padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Habilitar</button>
-    </div>
-  </div>
-</div>
 </body></html>`;
-  const w=window.open('','_blank','width=750,height=900');
+  return html;
+}
+
+function _orcPrintWindow(html,win){
+  const w=win||window.open('','_blank','width=750,height=900');
   if(!w){alert("Permita pop-ups para gerar o PDF.");return;}
   w.document.open();
   w.document.write(html);
   w.document.close();
+}
+function _orcAbrirPDF(){ _orcPrintWindow(_orcPdfHTML(_orc)); }
+
+// Inventário é a fonte das descrições e dos detalhes de cada item no PDF
+async function _orcFetchInv(){
+  const invOrc=await sbFetch("inventario?exibir_orcamento=eq.true&select=cod,descricao,imagem,descricao_orc&order=descricao.asc")||[];
+  _orc._invOrc=invOrc;
+  _orc._invByCod={};
+  invOrc.forEach(r=>{_orc._invByCod[r.cod]=r;});
+}
+async function _orcEnsureInv(){
+  if(_orc._invByCod&&Object.keys(_orc._invByCod).length) return;
+  await _orcFetchInv();
+}
+
+// Linha de `orcamentos` no formato que _orcPdfHTML espera. O desconto sai da
+// diferença entre a soma dos itens e o valor_total gravado — mesma regra da
+// página pública (edge function orcamento-publico).
+function _orcPdfFromRow(row){
+  const itens=(row.itens||[]).map(i=>({
+    cod_item:i.cod||null,descricao:i.descricao||"",
+    qty:i.qty||1,valor_unitario:i.valor_unitario||0,subtotal:Number(i.subtotal||0)
+  }));
+  const subtotal=itens.reduce((t,i)=>t+(i.subtotal||0),0);
+  const total=row.valor_total!=null?Number(row.valor_total):subtotal;
+  return {
+    nome_noiva:row.nome_noiva||"",nome_noivo:row.nome_noivo||"",
+    nome_contratante:row.nome_contratante||"",whatsapp:row.whatsapp||"",
+    email:row.email||"",tipo_evento:row.tipo_evento||"",
+    data_evento:row.data_evento||"",salao:row.salao||"",
+    num_convidados:row.num_convidados||"",
+    valor_total:total,_selectedItems:itens,_subtotal:subtotal,
+    _discount:Math.max(0,subtotal-total),_discountPkg:null,_valorAjustado:true,
+    _emitido:row.created_at?row.created_at.slice(0,10):null,
+    _validade:row.validade||null
+  };
+}
+
+// Exporta da lista o mesmo PDF que o cliente salva no fim do wizard
+async function exportarOrcamentoPDF(id){
+  const row=(_orcRowsCache||[]).find(r=>r.id===id);
+  if(!row){toast&&toast("Orçamento não encontrado.");return;}
+  // A janela tem que abrir no clique: depois do await o browser trata como popup
+  const w=window.open('','_blank','width=750,height=900');
+  if(!w){alert("Permita pop-ups para gerar o PDF.");return;}
+  w.document.write('<p style="font-family:Arial;color:#888;padding:40px">Gerando orçamento…</p>');
+  try{ await _orcEnsureInv(); }catch(e){ console.warn("[orcamento] inventário indisponível:",e); }
+  _orcPrintWindow(_orcPdfHTML(_orcPdfFromRow(row)),w);
 }
