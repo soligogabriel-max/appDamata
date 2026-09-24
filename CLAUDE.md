@@ -110,15 +110,22 @@ filtra `deleted_at` (código de evento apagado não volta a ser usado).
 
 ## Versão
 
-A cada commit funcional, atualizar `ll-version` no `admin.html`:
+A cada commit funcional, atualizar `LL_VERSION` no `<head>` do `admin.html`:
 
 ```html
-<div id="ll-version" ...>v2026.07.31i</div>
+<script>var LL_VERSION="v2026.09.24b";</script>
 ```
 
-Formato `v{ANO}.{MÊS}.{DIA}{letra}`. A versão também serve de cache-buster do
-iframe do gerador — o Pages manda `max-age=600` e sem isso o iframe fica até 10
-minutos servindo a versão anterior.
+Formato `v{ANO}.{MÊS}.{DIA}{letra}`. É a única fonte: o rótulo da tela
+(`#ll-version`), o iframe do gerador e as URLs de `admin.css`, `financeiro.js`,
+`orcamentos.js`, `crud.js` e `pedidos-vt.js` saem todos dela. **Sem a versão na
+URL dos módulos o deploy sai pela metade**: o Pages manda `max-age=600`, o
+navegador pega o `admin.html` novo com o `.js` velho em cache e a tela fica sem
+a mudança por até 10 minutos — já aconteceu, e parece "não subiu" quando subiu.
+
+Os módulos entram por um único `document.write` com as quatro tags
+concatenadas: `document.write` chamado em sequência não garante a ordem de
+inserção, e a ordem de execução deles importa.
 
 ## Como verificar
 
