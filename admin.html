@@ -32,7 +32,13 @@
 })();
 </script>
 <!-- End Meta Pixel -->
-<link rel="stylesheet" href="admin.css"/>
+<!-- Versão da build: rótulo na tela E cache-buster dos arquivos locais.
+     O Pages manda max-age=600 em tudo; sem a versão na URL o navegador pega o
+     admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
+     foi assim que o botão de exportar PDF não apareceu depois do deploy.
+     document.write mantém a ordem síncrona de carga que os módulos exigem. -->
+<script>var LL_VERSION="v2026.09.24b";</script>
+<script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
 
@@ -105,7 +111,8 @@
         </div>
       </div>
     </div>
-    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;">v2026.09.24a</div>
+    <div id="ll-version" style="color:rgba(255,255,255,.4);font-size:10px;letter-spacing:1px;"></div>
+    <script>document.getElementById("ll-version").textContent=LL_VERSION;</script>
   </div>
   <!-- Painel direito: login -->
   <div id="login-form-wrap">
@@ -1808,10 +1815,13 @@
 
 <div id="toast"></div>
 
-<script src="financeiro.js"></script>
-<script src="orcamentos.js"></script>
-<script src="crud.js"></script>
-<script src="pedidos-vt.js"></script>
+<script>
+// Uma escrita só: document.write chamado em sequência não garante a ordem de
+// inserção, e a ordem de execução destes módulos importa.
+document.write(["financeiro.js","orcamentos.js","crud.js","pedidos-vt.js"].map(function(f){
+  return '<scr'+'ipt src="'+f+'?v='+encodeURIComponent(LL_VERSION)+'"><\/scr'+'ipt>';
+}).join(""));
+</script>
 <script>
 // ══════════════════════════════════════════
 // Data local no formato YYYY-MM-DD (evita bug de UTC vs horário de Brasília)
