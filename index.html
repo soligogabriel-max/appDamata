@@ -381,6 +381,9 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
       <div style="font-size:52px;margin-bottom:14px;">🌿</div>
       <div style="font-size:18px;font-weight:800;color:#2E3C44;margin-bottom:10px;">Visita confirmada!</div>
       <div id="v-done-txt" style="font-size:14px;color:#6A7D75;line-height:1.6;"></div>
+      <!-- Só aparece quando o convite existe de verdade no Storage: link para
+           arquivo que ainda não subiu daria 404 na mão do cliente. -->
+      <a id="v-done-ics" href="#" download="visita-fazenda-damata.ics" style="display:none;margin-top:18px;padding:12px 22px;border-radius:10px;background:#fff;color:#2E3C44;border:1.5px solid #E8A52A;font-weight:700;font-size:14px;cursor:pointer;font-family:inherit;text-decoration:none;align-items:center;justify-content:center;gap:8px;">📅 Adicionar à minha agenda</a>
       <button onclick="fecharVisita()" style="margin-top:22px;padding:13px 30px;border-radius:10px;background:#E8A52A;color:#2E3C44;border:none;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit;">Fechar</button>
     </div>
   </div>
@@ -580,6 +583,8 @@ async function abrirVisita() {
   document.getElementById("v-form").style.display = "flex";
   document.getElementById("v-done").style.display = "none";
   _vSelSlotId = null;
+  const btnIcs = document.getElementById("v-done-ics");
+  if (btnIcs) btnIcs.style.display = "none";
   await _vLoadSlots();
 }
 
@@ -683,10 +688,17 @@ async function confirmarVisitaPublica() {
     // role. Mandar o evento pronto daqui dava 401 — a chave publishable não é
     // JWT, então a function não via role nenhuma e recusava.
     if (insertedId) {
+      // Não bloqueia a confirmação: a tela de sucesso aparece já, e o botão de
+      // adicionar à agenda surge depois, quando o convite estiver no ar.
       fetch(SB_URL+"/functions/v1/sync-google-calendar", {
         method: "POST",
         headers: { apikey:SB_KEY, Authorization:"Bearer "+SB_KEY, "Content-Type":"application/json" },
         body: JSON.stringify({ action:"upsert", visita_id: insertedId })
+      }).then(r => r.json()).then(resp => {
+        if (!resp || !resp.ics_url) return;
+        const b = document.getElementById("v-done-ics");
+        b.href = resp.ics_url;
+        b.style.display = "inline-flex";
       }).catch(()=>{});
     }
     // Notifica visitante e equipe via WhatsApp (fire-and-forget)

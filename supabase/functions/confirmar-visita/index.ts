@@ -37,6 +37,7 @@ h2{color:#1a2e1a;font-size:20px;margin-bottom:8px}
 .btn{display:block;width:100%;padding:14px;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;border:none;text-decoration:none;margin-bottom:12px}
 .btn-confirm{background:#16a34a;color:#fff}
 .btn-cancel{background:#fff;color:#dc2626;border:2px solid #fca5a5}
+.btn-ics{background:#fff;color:#2E3C44;border:2px solid #E8A52A}
 .msg{font-size:32px;margin-bottom:16px}
 .msg-title{color:#1a2e1a;font-size:22px;font-weight:700;margin-bottom:10px}
 .msg-text{color:#555;font-size:15px;line-height:1.6}
@@ -84,10 +85,20 @@ Deno.serve(async (req) => {
     if (v.status === "cancelada") {
       return page(`<div class="msg">😔</div><div class="msg-title">Visita cancelada</div><div class="msg-text">Esta visita já foi cancelada.<br><br>Para reagendar: <a class="link" href="https://fazendadamata.com/#visita">fazendadamata.com</a></div>`);
     }
+    // Convite para a agenda do cliente. Só oferece se o arquivo existe mesmo —
+    // visita antiga, de antes desta função, não tem convite gerado.
+    const icsUrl = `${SB_URL}/storage/v1/object/public/ical/visita-${id}.ics`;
+    let btnIcs = "";
+    try {
+      const head = await fetch(icsUrl, { method: "HEAD" });
+      if (head.ok) btnIcs = `<a class="btn btn-ics" href="${icsUrl}">📅 Adicionar à minha agenda</a>`;
+    } catch { /* sem convite, segue sem o botão */ }
+
     return page(`
       <h2>Sua visita está agendada</h2>
       <div class="info"><strong>${dataFmt}</strong><br>às <strong>${hora}</strong></div>
       <a class="btn btn-confirm" href="${confirmUrl}">✅ Confirmar presença</a>
+      ${btnIcs}
       <a class="btn btn-cancel" href="${cancelUrl}">❌ Cancelar visita</a>
     `);
   }

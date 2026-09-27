@@ -144,6 +144,95 @@ async function saveGcalId(id: string, gcalId: string | null) {
   });
 }
 
+// ── Convite do cliente ───────────────────────────────────────────────
+// Um .ics por visita, servido do bucket publico: o cliente toca o link no
+// celular e o proprio app de calendario abre — iPhone no Apple Calendar,
+// Android no Google. Nao exige e-mail nem login, que e' o ponto: o formulario
+// publico so pede nome e WhatsApp.
+const BUCKET_ICAL = "ical";
+const objetoVisita = (id: string) => `visita-${id}.ics`;
+
+// Horario em UTC em vez de TZID: dispensa carregar um VTIMEZONE no arquivo e
+// nao depende de o app do cliente conhecer America/Sao_Paulo. O Brasil nao tem
+// horario de verao desde 2019, entao -03:00 e' fixo.
+function utcCompacto(data: string, hora: string, somaMin = 0): string {
+  const [h, m] = hora.split(":").map(Number);
+  const d = new Date(Date.UTC(
+    +data.slice(0, 4), +data.slice(5, 7) - 1, +data.slice(8, 10),
+    h + 3, m + somaMin, 0,  // BRT -> UTC
+  ));
+  return d.toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
+}
+
+// RFC 5545: escapa \ ; , e quebra de linha no texto livre.
+const esc = (t: string) => String(t ?? "")
+  .replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+
+function icsDoCliente(visita: Visita, data: string, hora: string): string {
+  const agora = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
+  // SEQUENCE tem que crescer a cada versao para o app tratar como atualizacao
+  // e nao como evento novo. Segundos desde 2020 sobem sozinhos e cabem no int.
+  const seq = Math.floor(Date.now() / 1000) - 1577836800;
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Fazenda Damata//Visita//PT-BR",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:visita-${visita.id}@fazendadamata.com`,
+    `DTSTAMP:${agora}`,
+    `SEQUENCE:${seq}`,
+    `DTSTART:${utcCompacto(data, hora)}`,
+    `DTEND:${utcCompacto(data, hora, 30)}`,
+    "SUMMARY:Visita à Fazenda Damata",
+    `DESCRIPTION:${esc("Sua visita à Fazenda Damata está agendada. Qualquer dúvida, fale com a gente no WhatsApp: (19) 99783-0437")}`,
+    `LOCATION:${esc("Fazenda Damata, Mogi Mirim - SP")}`,
+    "STATUS:CONFIRMED",
+    "BEGIN:VALARM",
+    "TRIGGER:-P1D",
+    "ACTION:DISPLAY",
+    "DESCRIPTION:Visita à Fazenda Damata amanhã",
+    "END:VALARM",
+    "BEGIN:VALARM",
+    "TRIGGER:-PT2H",
+    "ACTION:DISPLAY",
+    "DESCRIPTION:Visita à Fazenda Damata em 2 horas",
+    "END:VALARM",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n") + "\r\n";
+}
+
+async function gravarIcsVisita(sbUrl: string, sbSvc: string, visita: Visita, data: string, hora: string) {
+  const corpo = icsDoCliente(visita, data, hora);
+  const res = await fetch(
+    `${sbUrl}/storage/v1/object/${BUCKET_ICAL}/${objetoVisita(visita.id)}`,
+    {
+      method: "POST",
+      headers: {
+        apikey: sbSvc,
+        Authorization: `Bearer ${sbSvc}`,
+        "Content-Type": "text/calendar",
+        "cache-control": "max-age=60",
+        "x-upsert": "true",
+      },
+      body: corpo,
+    },
+  );
+  if (res.ok) return { ok: true };
+  // Falha aqui nao pode ser silenciosa: foi assim que evento orfao no Google
+  // passou meses sem ninguem perceber.
+  return { ok: false, detalhe: `HTTP ${res.status} ${(await res.text().catch(() => "")).slice(0, 300)}` };
+}
+
+async function apagarIcsVisita(sbUrl: string, sbSvc: string, id: string) {
+  await fetch(`${sbUrl}/storage/v1/object/${BUCKET_ICAL}/${objetoVisita(id)}`, {
+    method: "DELETE",
+    headers: { apikey: sbSvc, Authorization: `Bearer ${sbSvc}` },
+  }).catch(() => {});
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "Método não permitido" }, 405);
@@ -250,7 +339,11 @@ Deno.serve(async (req) => {
       const detail = await delRes.text().catch(() => "");
       return json({ error: `Google recusou a exclusão (HTTP ${delRes.status}).`, detail }, 502);
     }
-    if (visita) await saveGcalId(visita.id, null);
+    if (visita) {
+      await saveGcalId(visita.id, null);
+      // Visita cancelada ou apagada: o convite do cliente sai do ar junto.
+      await apagarIcsVisita(SB_URL, SB_SVC, visita.id);
+    }
     return json({ ok: true, deleted: true });
   }
 
@@ -320,5 +413,17 @@ Deno.serve(async (req) => {
   // pelo navegador com a chave anon e falhava calado, deixando evento órfão.
   if (visita && calData.id !== visita.gcal_event_id) await saveGcalId(visita.id, calData.id);
 
-  return json({ ok: true, google_cal_id: calData.id });
+  // Convite do cliente, para o botao "Adicionar à minha agenda".
+  let ics_url: string | undefined;
+  let ics_erro: string | undefined;
+  if (visita?.slots_visita) {
+    const s = visita.slots_visita;
+    const r = await gravarIcsVisita(SB_URL, SB_SVC, visita, s.data, s.hora.slice(0, 5));
+    if (r.ok) ics_url = `${SB_URL}/storage/v1/object/public/${BUCKET_ICAL}/${objetoVisita(visita.id)}`;
+    else ics_erro = r.detalhe;
+  } else if (visita) {
+    ics_erro = "visita sem slot";
+  }
+
+  return json({ ok: true, google_cal_id: calData.id, ics_url, ics_erro });
 });
