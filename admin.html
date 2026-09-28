@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.09.27a";</script>
+<script>var LL_VERSION="v2026.09.28a";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -5235,6 +5235,8 @@ function setVisAgrup(mode) {
 // dispositivo contam para esse anúncio. Primeiro acesso, não último: é o
 // clique que trouxe a pessoa que a mídia pagou.
 let _adsDias = 90;
+let _adsCache = null;                            // linhas da RPC, para reordenar sem ir ao banco
+let _adsOrd = { col:"gasto", dir:"desc" };       // padrao: maior gasto primeiro, como era antes
 
 function setAdsPeriodo(d){
   _adsDias = d;
@@ -5253,7 +5255,6 @@ async function renderAnuncios(){
   if(!tabela) return;
   tabela.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   ["ads-c-gasto","ads-c-orc","ads-c-cpo"].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent="—";});
-  const brl = v => "R$ " + Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
   try{
     // Agregado no banco (relatorio_anuncios, security definer): quem chama não
     // precisa ler orcamentos nem visitas_comerciais — é o que permite o papel
@@ -5265,26 +5266,72 @@ async function renderAnuncios(){
         gasto:Number(r.gasto)||0, impressoes:Number(r.impressoes)||0, cliques:Number(r.cliques)||0,
         disp:Number(r.disp)||0, orc:Number(r.orc)||0, vis:Number(r.vis)||0});
     });
-    const linhas = [...porAd.values()].filter(a=>a.gasto>0||a.disp>0).sort((x,y)=>y.gasto-x.gasto);
-    const totGasto = linhas.reduce((s,a)=>s+a.gasto,0);
-    const totOrc   = linhas.reduce((s,a)=>s+a.orc,0);
-    const setTxt=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
-    setTxt("ads-c-gasto", brl(totGasto));
-    setTxt("ads-c-orc", String(totOrc));
-    setTxt("ads-c-cpo", totOrc ? brl(totGasto/totOrc) : "—");
+    _adsCache = [...porAd.values()].filter(a=>a.gasto>0||a.disp>0);
+    _adsDesenhaTabela();
+  }catch(e){
+    _adsCache = null;
+    tabela.innerHTML='<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar anúncios: '+e.message+'</div>';
+  }
+}
 
-    if(!linhas.length){
-      tabela.innerHTML='<div class="empty"><div class="eicon">📣</div>Nenhum gasto de anúncio no período. O sincronismo roda todo dia às 8h.</div>';
-      return;
-    }
-    const th = t=>`<th style="text-align:center;padding:6px 4px;border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;">${t}</th>`;
-    const td = (v,color)=>`<td style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--br);font-weight:600;font-size:12px;color:${color||"var(--dk)"};white-space:nowrap;">${v}</td>`;
-    const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-    tabela.innerHTML=`<table style="width:100%;border-collapse:collapse;">
-      <thead><tr style="background:var(--bg2);color:var(--dl);">
-        <th style="text-align:left;padding:6px 6px;border-bottom:1px solid var(--br);font-size:11px;">Anúncio</th>
-        ${th("Gasto")}${th("Cliques")}${th("No site")}${th("Orç.")}${th("R$/orç.")}${th("Visitas")}${th("CTR")}
-      </tr></thead>
+// Clicar no cabeçalho reordena o que já está em memória — sem nova chamada à
+// RPC, que agrega 90 dias de insights e não muda entre um clique e outro.
+function adsOrdenar(col){
+  const o = ADS_COLS.find(c=>c.k===col); if(!o) return;
+  // Mesma coluna inverte; coluna nova começa no sentido mais útil dela:
+  // decrescente para número (maior gasto primeiro), crescente para texto.
+  if(_adsOrd.col===col) _adsOrd.dir = _adsOrd.dir==="desc" ? "asc" : "desc";
+  else _adsOrd = { col, dir: o.txt ? "asc" : "desc" };
+  _adsDesenhaTabela();
+}
+
+// Colunas na ordem da tabela. `v` extrai o valor de ordenação: devolver null
+// manda a linha para o fim em qualquer sentido — anúncio sem orçamento não é
+// "o mais barato por orçamento", é imensurável.
+const ADS_COLS = [
+  { k:"nome",    rot:"Anúncio",  txt:true, v:a=>(a.nome||a.ad_id||"").toLowerCase() },
+  { k:"gasto",   rot:"Gasto",    v:a=>a.gasto },
+  { k:"cliques", rot:"Cliques",  v:a=>a.cliques },
+  { k:"disp",    rot:"No site",  v:a=>a.disp },
+  { k:"orc",     rot:"Orç.",     v:a=>a.orc },
+  { k:"cpo",     rot:"R$/orç.",  v:a=>a.orc ? a.gasto/a.orc : null },
+  { k:"vis",     rot:"Visitas",  v:a=>a.vis },
+  { k:"ctr",     rot:"CTR",      v:a=>a.impressoes ? 100*a.cliques/a.impressoes : null }
+];
+
+function _adsDesenhaTabela(){
+  const tabela = document.getElementById("ads-tabela");
+  if(!tabela || !_adsCache) return;
+  const brl = v => "R$ " + Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+
+  const totGasto = _adsCache.reduce((s,a)=>s+a.gasto,0);
+  const totOrc   = _adsCache.reduce((s,a)=>s+a.orc,0);
+  const setTxt=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  setTxt("ads-c-gasto", brl(totGasto));
+  setTxt("ads-c-orc", String(totOrc));
+  setTxt("ads-c-cpo", totOrc ? brl(totGasto/totOrc) : "—");
+
+  if(!_adsCache.length){
+    tabela.innerHTML='<div class="empty"><div class="eicon">📣</div>Nenhum gasto de anúncio no período. O sincronismo roda todo dia às 8h.</div>';
+    return;
+  }
+
+  const ord = ADS_COLS.find(c=>c.k===_adsOrd.col) || ADS_COLS[1];
+  const sinal = _adsOrd.dir==="asc" ? 1 : -1;
+  const linhas = [..._adsCache].sort((x,y)=>{
+    const a = ord.v(x), b = ord.v(y);
+    if(a===null || b===null) return a===b ? 0 : (a===null ? 1 : -1);   // vazio sempre por último
+    if(ord.txt) return sinal * String(a).localeCompare(String(b), "pt-BR");
+    return sinal * (a - b);
+  });
+
+  const seta = c => c.k===_adsOrd.col ? (_adsOrd.dir==="asc" ? " ▲" : " ▼") : "";
+  const cabec = c => `<th onclick="adsOrdenar('${c.k}')" title="Ordenar por ${c.rot}" style="text-align:${c.txt?"left":"center"};padding:6px ${c.txt?"6px":"4px"};border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;cursor:pointer;user-select:none;${c.k===_adsOrd.col?"color:var(--a);":""}">${c.rot}${seta(c)}</th>`;
+  const td = (v,color)=>`<td style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--br);font-weight:600;font-size:12px;color:${color||"var(--dk)"};white-space:nowrap;">${v}</td>`;
+  const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+  tabela.innerHTML=`<table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="background:var(--bg2);color:var(--dl);">${ADS_COLS.map(cabec).join("")}</tr></thead>
       <tbody>${linhas.map((a,i)=>{
         // Cliques cobrados sem nenhum dispositivo chegando: destino sem UTM, ou
         // campanha de mensagem (clique abre DM). Ou seja, gasto que não dá para medir.
@@ -5304,9 +5351,6 @@ async function renderAnuncios(){
           ${td(ctr.toFixed(1).replace(".",",")+"%")}
         </tr>`;}).join("")}</tbody>
     </table>`;
-  }catch(e){
-    tabela.innerHTML='<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar anúncios: '+e.message+'</div>';
-  }
 }
 
 // ══════════════════════════════════════════
