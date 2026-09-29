@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.09.28a";</script>
+<script>var LL_VERSION="v2026.09.29a";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -1009,7 +1009,7 @@
             </div>
           </div>
           <div id="ads-tabela" style="overflow-x:auto;"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
-          <div style="font-size:11px;color:var(--dl);margin-top:8px;line-height:1.5;">Gasto e cliques vêm da Meta, sincronizados todo dia às 8h. Orçamentos e visitas são atribuídos ao anúncio do <b>primeiro acesso</b> do dispositivo dentro do período, pelo <code>utm_content</code>. Anúncio com cliques e nenhum acesso no site está gastando sem deixar rastro — foi assim que metade da verba de jul/ago sumiu.</div>
+          <div style="font-size:11px;color:var(--dl);margin-top:8px;line-height:1.5;">Gasto e cliques vêm da Meta, sincronizados todo dia às 8h. Orçamentos e visitas são atribuídos ao anúncio do <b>primeiro acesso</b> do dispositivo dentro do período, pelo <code>utm_content</code>. Anúncio com cliques e nenhum acesso no site está gastando sem deixar rastro — foi assim que metade da verba de jul/ago sumiu. <b>WhatsApp</b> conta quem chegou por anúncio de clique-para-WhatsApp (pelo <code>referral</code> da Meta), invisível para o site.</div>
         </div>
       </div>
     </div>
@@ -3590,6 +3590,45 @@ function fecharHistoricoVisitante() {
   document.getElementById("m-hist-visitante").classList.remove("open");
 }
 
+// De onde veio esta pessoa. Duas fontes, e vence a mais antiga:
+//  - wppRef: primeira mensagem recebida com referral (anúncio clique-para-WhatsApp)
+//  - siteVisits: primeiro acesso com UTM; utm_content numérico é ad.id da Meta
+// Sem nenhuma das duas, sobra o referrer do primeiro acesso, ou "direto".
+function _origemVisitante(siteVisits, wppRef){
+  const v0 = (siteVisits||[]).find(v=>v.utm_source) || (siteVisits||[])[0] || null;
+  const tWpp  = wppRef && wppRef.referral ? new Date(wppRef.created_at).getTime() : Infinity;
+  const tSite = v0 ? new Date(v0.visited_at).getTime() : Infinity;
+  if (wppRef && wppRef.referral && tWpp <= tSite) {
+    const r = wppRef.referral;
+    return { canal:"whatsapp", adId: r.source_id ? String(r.source_id) : null, headline: r.headline||"", quando: wppRef.created_at,
+             texto: r.source_id ? "Anúncio, pelo WhatsApp" : "WhatsApp" };
+  }
+  if (!v0) return { canal:"nenhum", adId:null, quando:null, texto:"Sem rastro de origem" };
+  if (/^\d+$/.test(String(v0.utm_content||""))) {
+    return { canal:"site", adId:String(v0.utm_content), quando:v0.visited_at, texto:"Anúncio, pelo site" };
+  }
+  if (v0.utm_source) {
+    const partes = [v0.utm_source, v0.utm_medium].filter(Boolean).join(" / ");
+    return { canal:"site", adId:null, quando:v0.visited_at, texto: partes + (v0.utm_campaign ? " · " + v0.utm_campaign : "") };
+  }
+  let host = "";
+  try { host = v0.referrer ? new URL(v0.referrer).hostname.replace(/^www\./,"") : ""; } catch(_) { host = String(v0.referrer||"").slice(0,40); }
+  return { canal:"site", adId:null, quando:v0.visited_at, texto: host ? "Referência: " + host : "Acesso direto" };
+}
+function _origemHtml(origem, adInfo, fmtDt){
+  const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const badge = origem.adId
+    ? `<span style="background:#E3ECF7;color:#1F3F6E;font-size:10px;border-radius:4px;padding:2px 7px;font-weight:700;">📣 ${esc(origem.texto)}</span>`
+    : `<span style="font-size:13px;color:var(--dk);">${esc(origem.texto)}</span>`;
+  const ad = origem.adId
+    ? `<div style="font-size:12px;margin-top:6px;color:var(--dk);font-weight:600;">${esc(adInfo && adInfo.ad_nome ? adInfo.ad_nome : "anúncio " + origem.adId)}</div>` +
+      (adInfo && adInfo.campaign_nome ? `<div style="font-size:11px;color:var(--dl);">${esc(adInfo.campaign_nome)}</div>` : "") +
+      (origem.headline ? `<div style="font-size:11px;color:var(--dl);font-style:italic;">“${esc(origem.headline)}”</div>` : "")
+    : "";
+  const quando = origem.quando ? `<div style="font-size:11px;color:var(--dl);margin-top:4px;">${esc(fmtDt(origem.quando))}</div>` : "";
+  return `<div>${badge}${ad}${quando}</div>`;
+}
+
 async function abrirHistoricoVisitante(visitorId, nome, whatsapp) {
   const modal = document.getElementById("m-hist-visitante");
   const body  = document.getElementById("hist-body");
@@ -3608,7 +3647,7 @@ async function abrirHistoricoVisitante(visitorId, nome, whatsapp) {
 
     // Site visits — só se tiver visitor_id
     if (visitorId) {
-      promises.push(dbGet("site_visits", "session_id=eq."+visitorId+"&select=visited_at,device,referrer&order=visited_at.asc&limit=500"));
+      promises.push(dbGet("site_visits", "session_id=eq."+visitorId+"&select=visited_at,device,referrer,utm_source,utm_medium,utm_campaign,utm_content&order=visited_at.asc&limit=500"));
     } else {
       promises.push(Promise.resolve([]));
     }
@@ -3627,7 +3666,21 @@ async function abrirHistoricoVisitante(visitorId, nome, whatsapp) {
     const vcQ = vcFilters.length ? "or=("+vcFilters.join(",")+")" : null;
     promises.push(vcQ ? dbGet("visitas_comerciais", vcQ+"&select=id,created_at,status,obs,feedback,feedback_motivo,slot_id,slots_visita(data,hora)&order=created_at.desc&limit=50") : Promise.resolve([]));
 
-    const [siteVisits, orcamentos, vcVisitas] = await Promise.all(promises);
+    // Primeira mensagem recebida com referral de anúncio (clique-para-WhatsApp)
+    const digits = whatsapp ? _wppDigits(whatsapp) : "";
+    promises.push(digits
+      ? dbGet("wpp_mensagens", "direcao=eq.recebida&referral=not.is.null&telefone=like.*"+digits+"&select=created_at,referral&order=created_at.asc&limit=1")
+      : Promise.resolve([]));
+
+    const [siteVisits, orcamentos, vcVisitas, wppRefs] = await Promise.all(promises);
+
+    // ── Seção: Origem ──
+    const origem = _origemVisitante(siteVisits, wppRefs[0]||null);
+    let adInfo = null;
+    if (origem.adId) {
+      try { const r = await dbGet("ads_insights", "ad_id=eq."+origem.adId+"&select=ad_nome,campaign_nome&limit=1"); adInfo = r[0]||null; } catch(_){}
+    }
+    const origemHtml = _origemHtml(origem, adInfo, fmtDt);
 
     // ── Seção: Dados do visitante ──
     const wppLink = whatsapp
@@ -3698,6 +3751,11 @@ async function abrirHistoricoVisitante(visitorId, nome, whatsapp) {
         <div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;">Contato</div>
         <div style="font-size:14px;">WhatsApp: ${wppLink}</div>
         ${visitorId ? `<div style="font-size:11px;color:var(--dl);margin-top:4px;">ID rastreado: <code style="font-size:10px;">${visitorId.slice(0,8)}…</code></div>` : ''}
+      </div>
+      <hr style="border:none;border-top:1px solid var(--br);">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;">Origem</div>
+        ${origemHtml}
       </div>
       <hr style="border:none;border-top:1px solid var(--br);">
       <div>
@@ -5264,9 +5322,9 @@ async function renderAnuncios(){
     (rows||[]).forEach(r=>{
       porAd.set(String(r.ad_id), {ad_id:String(r.ad_id), nome:r.ad_nome||"", campanha:r.campanha||"",
         gasto:Number(r.gasto)||0, impressoes:Number(r.impressoes)||0, cliques:Number(r.cliques)||0,
-        disp:Number(r.disp)||0, orc:Number(r.orc)||0, vis:Number(r.vis)||0});
+        disp:Number(r.disp)||0, orc:Number(r.orc)||0, vis:Number(r.vis)||0, wpp:Number(r.wpp)||0});
     });
-    _adsCache = [...porAd.values()].filter(a=>a.gasto>0||a.disp>0);
+    _adsCache = [...porAd.values()].filter(a=>a.gasto>0||a.disp>0||a.wpp>0);
     _adsDesenhaTabela();
   }catch(e){
     _adsCache = null;
@@ -5296,6 +5354,7 @@ const ADS_COLS = [
   { k:"orc",     rot:"Orç.",     v:a=>a.orc },
   { k:"cpo",     rot:"R$/orç.",  v:a=>a.orc ? a.gasto/a.orc : null },
   { k:"vis",     rot:"Visitas",  v:a=>a.vis },
+  { k:"wpp",     rot:"WhatsApp", v:a=>a.wpp },
   { k:"ctr",     rot:"CTR",      v:a=>a.impressoes ? 100*a.cliques/a.impressoes : null }
 ];
 
@@ -5348,6 +5407,7 @@ function _adsDesenhaTabela(){
           ${td(a.orc||"—", a.orc?"#2E7D52":"var(--dl)")}
           ${td(a.orc?brl(a.gasto/a.orc):"—", a.orc?"var(--dk)":"var(--dl)")}
           ${td(a.vis||"—", a.vis?"#1565C0":"var(--dl)")}
+          ${td(a.wpp||"—", a.wpp?"#2E7D52":"var(--dl)")}
           ${td(ctr.toFixed(1).replace(".",",")+"%")}
         </tr>`;}).join("")}</tbody>
     </table>`;

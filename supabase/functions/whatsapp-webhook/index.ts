@@ -1,6 +1,7 @@
 // Edge Function: whatsapp-webhook
 // Recebe mensagens do WhatsApp via Meta Cloud API
-// Salva todas mensagens em wpp_mensagens e envia resposta automática de atendimento
+// Salva todas mensagens em wpp_mensagens (com o referral de anúncio, quando vem)
+// e envia resposta automática de atendimento
 
 const VERIFY_TOKEN = Deno.env.get("META_VERIFY_TOKEN") ?? "";
 const SB_URL       = Deno.env.get("SUPABASE_URL") ?? "";
@@ -29,15 +30,24 @@ const sbH = {
   Prefer: "return=minimal",
 };
 
+// referral: quando a conversa nasce de um anúncio de clique-para-WhatsApp, a
+// Meta manda {source_type:"ad", source_id:<ad.id>, ctwa_clid, headline, ...}
+// na primeira mensagem. Guardado inteiro: é o único elo entre o lead que chega
+// pelo WhatsApp e o anúncio que o trouxe.
 async function salvarMensagem(
   telefone: string, mensagem: string,
   direcao: "recebida" | "enviada",
-  nome?: string, wamid?: string, tipo?: string
+  nome?: string, wamid?: string, tipo?: string,
+  referral?: unknown
 ) {
   await fetch(`${SB_URL}/rest/v1/wpp_mensagens`, {
     method: "POST",
     headers: sbH,
-    body: JSON.stringify({ telefone, mensagem, direcao, nome: nome || null, wamid: wamid || null, tipo: tipo || "text" }),
+    body: JSON.stringify({
+      telefone, mensagem, direcao,
+      nome: nome || null, wamid: wamid || null, tipo: tipo || "text",
+      referral: referral && typeof referral === "object" ? referral : null,
+    }),
   }).catch(() => {});
 }
 
@@ -89,7 +99,7 @@ Deno.serve(async (req) => {
       const texto = msg.type === "text"
         ? (msg.text?.body ?? "")
         : `[${msg.type}]`;
-      await salvarMensagem(from, texto, "recebida", nome, msg.id);
+      await salvarMensagem(from, texto, "recebida", nome, msg.id, msg.type, msg.referral);
 
       // Envia resposta automática e salva no histórico
       const wamid = await enviarResposta(from);
