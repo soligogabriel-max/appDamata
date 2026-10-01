@@ -931,6 +931,26 @@
           <div class="sec-t">🧪 Landing de Teste (por partes)</div>
           <p style="color:var(--dl);font-size:13px;margin-bottom:16px">Landing acessível somente por link direto, dividida em N seções. Configure o número de partes e atribua cada PDF/vídeo a uma parte.</p>
 
+          <!-- Hero -->
+          <div style="background:var(--bg);border:1px solid var(--br);border-radius:14px;padding:20px 22px;margin-bottom:16px">
+            <div style="font-size:12px;font-weight:700;color:var(--dl);margin-bottom:12px;letter-spacing:.03em">Imagem Hero (topo da página)</div>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <label style="padding:9px 18px;background:var(--a);color:#fff;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">
+                  <input type="file" id="lt-hero-input" accept="image/*" style="display:none" onchange="ltHeroUpload()">
+                  Upload foto
+                </label>
+                <button onclick="ltHeroSalvar()" style="padding:9px 18px;background:var(--bg);border:1.5px solid var(--br);border-radius:8px;font-size:13px;font-weight:700;color:var(--t);cursor:pointer">Salvar</button>
+                <span id="lt-hero-status" style="font-size:13px;color:var(--dl)"></span>
+              </div>
+              <div id="lt-hero-preview" style="display:none;width:100%;max-height:180px;border-radius:8px;overflow:hidden">
+                <img id="lt-hero-preview-img" src="" alt="" style="width:100%;height:180px;object-fit:cover;display:block">
+              </div>
+              <input id="lt-hero-url" type="text" placeholder="URL da foto (preenchido ao fazer upload)" style="width:100%;padding:8px 12px;border:1.5px solid var(--br);border-radius:8px;font-size:13px;color:var(--t);background:var(--bg)">
+              <textarea id="lt-hero-texto" rows="2" placeholder="Texto exibido sobre a foto (opcional)…" style="width:100%;padding:8px 12px;border:1.5px solid var(--br);border-radius:8px;font-size:13px;color:var(--t);background:var(--bg);resize:vertical;font-family:inherit"></textarea>
+            </div>
+          </div>
+
           <div style="background:var(--bg);border:1px solid var(--br);border-radius:14px;padding:20px 22px;margin-bottom:16px">
             <div style="font-size:12px;font-weight:700;color:var(--dl);margin-bottom:8px;letter-spacing:.03em">Número de partes</div>
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -5919,12 +5939,59 @@ let _ltNumPartes = 3;
 let _ltSlug = "";
 let _ltCarrosseis = {};
 
+async function ltHeroUpload() {
+  const input = document.getElementById("lt-hero-input");
+  const st = document.getElementById("lt-hero-status");
+  if (!input.files.length) return;
+  const file = input.files[0];
+  st.textContent = "Enviando…";
+  try {
+    const token = _authToken;
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("folder", "hero");
+    const res = await fetch(SB_URL + "/functions/v1/upload-landing-pdf", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + token },
+      body: fd
+    });
+    const data = await res.json();
+    if (!res.ok || !data.url) throw new Error(data.error || "Erro no upload");
+    document.getElementById("lt-hero-url").value = data.url;
+    document.getElementById("lt-hero-preview-img").src = data.url;
+    document.getElementById("lt-hero-preview").style.display = "block";
+    st.textContent = "✓ Upload concluído";
+  } catch(e) {
+    st.textContent = "Erro: " + e.message;
+  }
+}
+
+async function ltHeroSalvar() {
+  const st = document.getElementById("lt-hero-status");
+  const foto = document.getElementById("lt-hero-url").value.trim();
+  const texto = document.getElementById("lt-hero-texto").value.trim();
+  st.textContent = "Salvando…";
+  try {
+    const valor = { foto, texto };
+    const ex = await sbFetch("app_config?chave=eq.landing_teste_hero&select=chave");
+    if (ex && ex.length) {
+      await sbFetch("app_config?chave=eq.landing_teste_hero", { method: "PATCH", body: { valor } });
+    } else {
+      await sbFetch("app_config", { method: "POST", body: { chave: "landing_teste_hero", valor } });
+    }
+    st.textContent = "✓ Salvo";
+  } catch(e) {
+    st.textContent = "Erro: " + e.message;
+  }
+}
+
 async function renderLandingTeste() {
   try {
-    const [cfgRes, pdfsRes, videosRes] = await Promise.all([
+    const [cfgRes, pdfsRes, videosRes, heroRes] = await Promise.all([
       sbFetch("app_config?chave=in.(landing_teste_slug,landing_teste_num_partes,landing_teste_partes_config)&select=chave,valor"),
       sbFetch("app_config?chave=eq.landing_pdfs&select=valor"),
-      sbFetch("app_config?chave=eq.videos_landing&select=valor")
+      sbFetch("app_config?chave=eq.videos_landing&select=valor"),
+      sbFetch("app_config?chave=eq.landing_teste_hero&select=valor")
     ]);
     const cfg = {};
     (cfgRes || []).forEach(r => { cfg[r.chave] = r.valor; });
@@ -5939,6 +6006,15 @@ async function renderLandingTeste() {
     const pdfs   = Array.isArray(pdfsRes?.[0]?.valor)   ? pdfsRes[0].valor   : [];
     const videos = Array.isArray(videosRes?.[0]?.valor) ? videosRes[0].valor : [];
     ltRenderLista(pdfs, videos);
+    // Hero
+    const hero = heroRes?.[0]?.valor || {};
+    if (hero.foto) {
+      document.getElementById("lt-hero-url").value = hero.foto;
+      const prev = document.getElementById("lt-hero-preview");
+      document.getElementById("lt-hero-preview-img").src = hero.foto;
+      prev.style.display = "block";
+    }
+    if (hero.texto) document.getElementById("lt-hero-texto").value = hero.texto;
   } catch(e) {
     console.error("renderLandingTeste:", e);
   }
