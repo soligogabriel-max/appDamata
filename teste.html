@@ -12,7 +12,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&display=swap" rel="stylesheet">
   <title>Fazenda Damata — Apresentação</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;}
@@ -67,9 +67,21 @@
     .ll-vid-thumb:hover .yt-play svg{transform:scale(1.1);}
 
     #footer{
-      width:100%;background:#1A252D;padding:44px 24px 36px;
-      display:flex;flex-direction:column;align-items:center;gap:14px;
+      width:100%;background:#1A252D;
+      padding:44px 24px 36px;
+      display:flex;flex-direction:column;align-items:center;gap:22px;
     }
+    #footer-links{
+      display:flex;align-items:center;justify-content:center;gap:32px;
+    }
+    .ft-link{
+      display:flex;flex-direction:column;align-items:center;gap:7px;
+      text-decoration:none;color:rgba(255,255,255,.55);
+      font-size:11px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;
+      transition:color .18s;
+    }
+    .ft-link:hover{color:#E8A52A;}
+    .ft-link svg{width:28px;height:28px;fill:currentColor;}
     #footer-copy{font-size:10px;color:rgba(255,255,255,.2);letter-spacing:1px;}
     #footer-test-badge{font-size:10px;color:rgba(255,255,255,.15);letter-spacing:.5px;}
 
@@ -95,13 +107,15 @@
       position:relative;z-index:1;
       padding:40px 24px;max-width:820px;width:100%;
       text-align:center;
-      font-family:'DM Serif Display',serif;
-      font-size:clamp(26px,5vw,52px);
+      font-family:'Cormorant Garamond',serif;
+      font-size:clamp(30px,6vw,64px);
       font-weight:400;
+      font-style:italic;
       color:#fff;
-      text-shadow:0 2px 16px rgba(0,0,0,.4);
-      line-height:1.25;
+      text-shadow:0 2px 20px rgba(0,0,0,.45);
+      line-height:1.2;
       white-space:pre-wrap;
+      letter-spacing:.01em;
     }
   </style>
 </head>
@@ -110,6 +124,35 @@
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K88C6CQC"
 height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 <!-- End Google Tag Manager (noscript) -->
+
+<!-- Rastreamento UTM + sessão -->
+<script>
+  (function(){
+    try {
+      var sid = localStorage.getItem('dmv_sid');
+      if(!sid){ sid = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g,function(c){return(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16)}); localStorage.setItem('dmv_sid',sid); }
+      var ref = document.referrer || '';
+      var dev = /Mobi|Android/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+      var p = new URLSearchParams(location.search);
+      var utms = {};
+      ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(function(k){
+        var v = p.get(k);
+        if(v) utms[k] = v;
+      });
+      if(Object.keys(utms).length){
+        localStorage.setItem('dmv_utms', JSON.stringify(utms));
+      } else {
+        try{ utms = JSON.parse(localStorage.getItem('dmv_utms')||'{}'); }catch(e2){}
+      }
+      fetch('https://wwnndsprpofmgbklqdgg.supabase.co/rest/v1/site_visits',{
+        method:'POST',
+        headers:{'apikey':'sb_publishable__RQxBa8P-lryd0LtWgTJPw_-aSWERWK','Content-Type':'application/json','Prefer':'return=minimal'},
+        body:JSON.stringify(Object.assign({session_id:sid,referrer:ref,device:dev,page:'landing_teste'},utms))
+      });
+    } catch(e){}
+  })();
+</script>
+<!-- End rastreamento -->
 
 <div id="sticky-top">
   <div id="header">
@@ -135,6 +178,20 @@ height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 </div>
 
 <footer id="footer">
+  <div id="footer-links">
+    <a class="ft-link" href="https://instagram.com/damatafazenda" target="_blank" rel="noopener" aria-label="Instagram">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+      Instagram
+    </a>
+    <a class="ft-link" href="https://maps.app.goo.gl/B2KEUapfKFutrrKKA" target="_blank" rel="noopener" aria-label="Como chegar">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 0C7.802 0 4 3.403 4 7.602 4 11.8 7.469 16.812 12 24c4.531-7.188 8-12.2 8-16.398C20 3.403 16.199 0 12 0zm0 11a3 3 0 110-6 3 3 0 010 6z"/></svg>
+      Como chegar
+    </a>
+    <a class="ft-link" href="/admin.html#login" aria-label="Portal">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M18 8h-1V6A5 5 0 007 6v2H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V10a2 2 0 00-2-2zm-6 9a2 2 0 110-4 2 2 0 010 4zm3.1-9H8.9V6a3.1 3.1 0 016.2 0v2z"/></svg>
+      Portal
+    </a>
+  </div>
   <div id="footer-copy">FAZENDA DAMATA · Mogi Mirim · SP</div>
   <div id="footer-test-badge">Página de apresentação — não indexada</div>
 </footer>
