@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.09.29b";</script>
+<script>var LL_VERSION="v2026.10.02a";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -945,22 +945,22 @@
           <div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:14px 16px;text-align:center;">
             <div style="font-size:26px;font-weight:700;color:var(--a);" id="vis-total-mes">—</div>
             <div style="font-size:11px;color:var(--dl);margin-top:3px;font-weight:600;">Visitas este mês</div>
-            <div style="font-size:10px;color:var(--dl);margin-top:3px;" id="vis-total-mes-ant">—</div>
+            <div style="font-size:10px;color:var(--dl);margin-top:3px;line-height:1.45;" id="vis-total-mes-ant">—</div>
           </div>
           <div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:14px 16px;text-align:center;">
             <div style="font-size:26px;font-weight:700;color:var(--a);" id="vis-uniq-mes">—</div>
             <div style="font-size:11px;color:var(--dl);margin-top:3px;font-weight:600;">Únicos este mês</div>
-            <div style="font-size:10px;color:var(--dl);margin-top:3px;" id="vis-uniq-mes-ant">—</div>
+            <div style="font-size:10px;color:var(--dl);margin-top:3px;line-height:1.45;" id="vis-uniq-mes-ant">—</div>
           </div>
           <div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:14px 16px;text-align:center;">
             <div style="font-size:26px;font-weight:700;color:var(--a);" id="vis-orc-mes">—</div>
             <div style="font-size:11px;color:var(--dl);margin-top:3px;font-weight:600;">Orçamentos este mês</div>
-            <div style="font-size:10px;color:var(--dl);margin-top:3px;" id="vis-orc-mes-ant">—</div>
+            <div style="font-size:10px;color:var(--dl);margin-top:3px;line-height:1.45;" id="vis-orc-mes-ant">—</div>
           </div>
           <div style="flex:1;min-width:140px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:14px 16px;text-align:center;">
             <div style="font-size:26px;font-weight:700;color:var(--a);" id="vis-vc-mes">—</div>
             <div style="font-size:11px;color:var(--dl);margin-top:3px;font-weight:600;">Visitas marcadas este mês</div>
-            <div style="font-size:10px;color:var(--dl);margin-top:3px;" id="vis-vc-mes-ant">—</div>
+            <div style="font-size:10px;color:var(--dl);margin-top:3px;line-height:1.45;" id="vis-vc-mes-ant">—</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
@@ -5738,6 +5738,33 @@ function exportarLeadsCSV() {
   setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
 }
 
+// Linha de histórico dos cards: os três meses anteriores, do mais recente para
+// o mais antigo ("set 6.081 · ago 5.869 · jul 1.771"). Mês sem dado nenhum
+// entra com zero, para não dar a impressão de que faltou mês na sequência.
+function _visHistoricoCards(resumo, mesAtual) {
+  const campos = [["vis-total-mes-ant","visitas"],["vis-uniq-mes-ant","unicos"],
+                  ["vis-orc-mes-ant","orcamentos"],["vis-vc-mes-ant","marcadas"]];
+  if(!Array.isArray(resumo)) {   // RPC indisponível: não inventa número
+    campos.forEach(([id])=>{ const el=document.getElementById(id); if(el) el.textContent="—"; });
+    return;
+  }
+  const porMes = {};
+  resumo.forEach(r=>{ porMes[r.mes] = r; });
+
+  // Os três meses imediatamente anteriores ao atual, calculados e não lidos da
+  // resposta: assim um mês sem nenhuma visita ainda aparece, como zero.
+  const meses = [];
+  const d = new Date(mesAtual+"-01T12:00:00");
+  for(let i=0;i<3;i++){ d.setMonth(d.getMonth()-1); meses.push(localDate(d).slice(0,7)); }
+
+  const rotulo = m => new Date(m+"-01T12:00:00")
+    .toLocaleDateString("pt-BR",{month:"short"}).replace(".","").toLowerCase();
+  campos.forEach(([id,campo])=>{
+    const el = document.getElementById(id); if(!el) return;
+    el.textContent = meses.map(m=>rotulo(m)+" "+Number(porMes[m]?.[campo]||0).toLocaleString("pt-BR")).join(" · ");
+  });
+}
+
 async function renderVisitas() {
   const tabela = document.getElementById("vis-tabela");
   tabela.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
@@ -5747,45 +5774,34 @@ async function renderVisitas() {
     const isMes = _visAgrup === "mes";
     const hoje = localDate();
     const mesAtual = hoje.slice(0,7);
-    // mês passado: primeiro dia do mês anterior
-    const prevMonthDate = new Date(hoje+"T12:00:00"); prevMonthDate.setDate(1); prevMonthDate.setMonth(prevMonthDate.getMonth()-1);
-    const mesPrev = localDate(prevMonthDate).slice(0,7);
-    // since: para a tabela; cardSince: inclui mês passado para os cards
-    const cardSince = new Date(prevMonthDate); cardSince.setHours(0,0,0,0);
-    const tableSince = new Date(); tableSince.setDate(tableSince.getDate() - (isMes ? 365 : 30)); tableSince.setHours(0,0,0,0);
-    const since = tableSince < cardSince ? tableSince : cardSince; // o mais antigo entre os dois
-    const [rows, orcRows, vcRows] = await Promise.all([
+    const since = new Date(); since.setDate(since.getDate() - (isMes ? 365 : 30)); since.setHours(0,0,0,0);
+    const [rows, orcRows, vcRows, resumo] = await Promise.all([
       dbGetAll("site_visits", "visited_at=gte."+since.toISOString()+"&select=visited_at,session_id,referrer,device,utm_source&order=visited_at.desc"),
       dbGet("orcamentos", "created_at=gte."+since.toISOString()+"&select=id,created_at,visitor_id,whatsapp&limit=5000"),
-      dbGet("visitas_comerciais", "status=neq.cancelada&select=created_at&limit=2000")
+      dbGet("visitas_comerciais", "status=neq.cancelada&select=created_at&limit=2000"),
+      // Histórico dos cards agregado no banco: um mês passa de 6 mil visitas, e
+      // trazer três meses de linhas cruas só para somar quatro números seriam
+      // ~18 mil registros por abertura da aba. Falhar aqui não derruba a tela.
+      sbFetch("rpc/resumo_mensal_site", {method:"POST", body:{p_meses:4}}).catch(()=>null)
     ]);
 
-    // ── Cards: este mês vs mês passado ──
-    let totalMes=0, uniqMes=new Set(), totalMesAnt=0, uniqMesAnt=new Set();
+    // ── Cards: este mês, com os três meses anteriores embaixo ──
+    let totalMes=0; const uniqMes=new Set();
     rows.forEach(r=>{
-      const m=utcToLocalDate(r.visited_at).slice(0,7);
-      if(m===mesAtual){totalMes++;uniqMes.add(r.session_id);}
-      else if(m===mesPrev){totalMesAnt++;uniqMesAnt.add(r.session_id);}
+      if(utcToLocalDate(r.visited_at).slice(0,7)===mesAtual){ totalMes++; uniqMes.add(r.session_id); }
     });
-    const orcMes=new Set(), orcMesAnt=new Set();
+    const orcMes=new Set();
     orcRows.forEach((r,i)=>{
-      const m=utcToLocalDate(r.created_at).slice(0,7);
-      if(m===mesAtual) orcMes.add(orcPessoaKey(r,i));
-      else if(m===mesPrev) orcMesAnt.add(orcPessoaKey(r,i));
+      if(utcToLocalDate(r.created_at).slice(0,7)===mesAtual) orcMes.add(orcPessoaKey(r,i));
     });
-    let vcMes=0, vcMesAnt=0;
-    vcRows.forEach(r=>{
-      const m=utcToLocalDate(r.created_at).slice(0,7);
-      if(m===mesAtual) vcMes++; else if(m===mesPrev) vcMesAnt++;
-    });
+    let vcMes=0;
+    vcRows.forEach(r=>{ if(utcToLocalDate(r.created_at).slice(0,7)===mesAtual) vcMes++; });
+
     document.getElementById("vis-total-mes").textContent = totalMes;
-    document.getElementById("vis-total-mes-ant").textContent = "mês passado: "+totalMesAnt;
     document.getElementById("vis-uniq-mes").textContent = uniqMes.size;
-    document.getElementById("vis-uniq-mes-ant").textContent = "mês passado: "+uniqMesAnt.size;
     document.getElementById("vis-orc-mes").textContent = orcMes.size;
-    document.getElementById("vis-orc-mes-ant").textContent = "mês passado: "+orcMesAnt.size;
     document.getElementById("vis-vc-mes").textContent = vcMes;
-    document.getElementById("vis-vc-mes-ant").textContent = "mês passado: "+vcMesAnt;
+    _visHistoricoCards(resumo, mesAtual);
 
     const th = t=>`<th style="text-align:center;padding:6px 4px;border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;">${t}</th>`;
     const td = (v,color)=>`<td style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--br);font-weight:600;font-size:12px;color:${color||"var(--dk)"};">${v}</td>`;
