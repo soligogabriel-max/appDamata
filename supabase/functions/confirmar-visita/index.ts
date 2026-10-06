@@ -18,6 +18,12 @@ async function makeToken(id: string): Promise<string> {
     .replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 function page(body: string) {
   return new Response(`<!DOCTYPE html>
 <html lang="pt-BR">
@@ -53,7 +59,10 @@ a.link{color:#4a7c59;text-decoration:none;font-weight:600}
 <div class="brand">FAZENDA DAMATA</div>
 ${body}
 </div></body></html>`, {
-    headers: { "Content-Type": "text/html; charset=utf-8" }
+    // Quem busca este HTML e' o visita.html, de outra origem
+    // (fazendadamata.com): sem liberar CORS o navegador bloqueia o fetch e o
+    // cliente ve "Nao foi possivel abrir sua visita".
+    headers: { "Content-Type": "text/html; charset=utf-8", ...CORS }
   });
 }
 
@@ -67,13 +76,6 @@ const svc = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type":
 // Os botões apontam para cá, e não para a função, senão o primeiro clique
 // jogaria o cliente de volta na tela de código.
 const PUBLIC_PAGE = "https://fazendadamata.com/visita.html";
-
-// Só para o endpoint ?acao=link, que o admin chama de outra origem.
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 function getJwtRole(authHeader: string): string | null {
   const t = authHeader.replace(/^Bearer\s+/i, "").trim();
