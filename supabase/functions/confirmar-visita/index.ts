@@ -38,6 +38,10 @@ h2{color:#1a2e1a;font-size:20px;margin-bottom:8px}
 .btn-confirm{background:#16a34a;color:#fff}
 .btn-cancel{background:#fff;color:#dc2626;border:2px solid #fca5a5}
 .btn-ics{background:#fff;color:#2E3C44;border:2px solid #E8A52A}
+.btn-remarcar{background:#fff;color:#4a7c59;border:2px solid #9fc3ab}
+.slot{display:block;width:100%;padding:12px;margin-bottom:8px;border-radius:12px;border:1.5px solid #dbe5dd;background:#fff;color:#1a2e1a;font-size:15px;font-weight:600;text-decoration:none;text-align:center}
+.slot small{display:block;font-weight:400;color:#6b7d70;font-size:12px;margin-top:2px}
+.slots{max-height:46vh;overflow-y:auto;margin-bottom:14px;text-align:left}
 .msg{font-size:32px;margin-bottom:16px}
 .msg-title{color:#1a2e1a;font-size:22px;font-weight:700;margin-bottom:10px}
 .msg-text{color:#555;font-size:15px;line-height:1.6}
@@ -51,6 +55,27 @@ ${body}
 </div></body></html>`, {
     headers: { "Content-Type": "text/html; charset=utf-8" }
   });
+}
+
+const svc = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
+
+const hojeLocal = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);  // BRT = UTC-3
+const agoraLocal = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 16).replace("T", " ");
+const fmtDia = (d: string) =>
+  new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
+
+// Horários ainda livres, do mais próximo para o mais distante. Exclui o atual
+// do próprio cliente: remarcar para o mesmo horário não é remarcar.
+async function slotsLivres(slotAtual: string | null) {
+  const [rs, rv] = await Promise.all([
+    fetch(`${SB_URL}/rest/v1/slots_visita?data=gte.${hojeLocal()}&select=id,data,hora&order=data.asc,hora.asc&limit=200`, { headers: svc }),
+    fetch(`${SB_URL}/rest/v1/visitas_comerciais?status=neq.cancelada&select=slot_id`, { headers: svc }),
+  ]);
+  const slots = rs.ok ? await rs.json().catch(() => []) : [];
+  const ocup  = new Set(((rv.ok ? await rv.json().catch(() => []) : []) as { slot_id: string }[]).map((x) => x.slot_id));
+  const agora = agoraLocal();
+  return (slots as { id: string; data: string; hora: string }[])
+    .filter((s) => s.id !== slotAtual && !ocup.has(s.id) && `${s.data} ${s.hora.slice(0, 5)}` > agora);
 }
 
 Deno.serve(async (req) => {
@@ -79,6 +104,7 @@ Deno.serve(async (req) => {
   const base = url.origin + url.pathname;
   const confirmUrl = `${base}?id=${id}&acao=confirmar&token=${token}`;
   const cancelUrl  = `${base}?id=${id}&acao=cancelar&token=${token}`;
+  const remarcarUrl = `${base}?id=${id}&acao=remarcar&token=${token}`;
 
   // Página principal — mostrar opções
   if (!acao) {
@@ -98,6 +124,7 @@ Deno.serve(async (req) => {
       <h2>Sua visita está agendada</h2>
       <div class="info"><strong>${dataFmt}</strong><br>às <strong>${hora}</strong></div>
       <a class="btn btn-confirm" href="${confirmUrl}">✅ Confirmar presença</a>
+      <a class="btn btn-remarcar" href="${remarcarUrl}">🔄 Remarcar para outro horário</a>
       ${btnIcs}
       <a class="btn btn-cancel" href="${cancelUrl}">❌ Cancelar visita</a>
     `);
@@ -129,6 +156,78 @@ Deno.serve(async (req) => {
       }
     }
     return page(`<div class="msg">😔</div><div class="msg-title">Visita cancelada</div><div class="msg-text">Sua visita de <strong>${dataFmt} às ${hora}</strong> foi cancelada.<br><br>Quando quiser reagendar:<br><a class="link" href="https://fazendadamata.com/#visita">fazendadamata.com</a></div>`);
+  }
+
+  // ── Remarcar ───────────────────────────────────────────────────────
+  // Sem prazo mínimo de propósito: o lembrete com este link só sai às 9h da
+  // véspera, então qualquer corte de 24h deixaria o botão inútil na prática.
+  // Vale até a hora da visita; depois disso não há o que remarcar.
+  if (acao === "remarcar") {
+    const base2 = `${base}?id=${id}&token=${token}`;
+    if (v.status === "cancelada") {
+      return page(`<div class="msg">😔</div><div class="msg-title">Visita cancelada</div><div class="msg-text">Esta visita já foi cancelada.<br><br>Para marcar outra: <a class="link" href="https://fazendadamata.com/#visita">fazendadamata.com</a></div>`);
+    }
+    if (slot && `${slot.data} ${String(slot.hora).slice(0, 5)}` <= agoraLocal()) {
+      return page(`<div class="msg">⏰</div><div class="msg-title">Horário já passou</div><div class="msg-text">Esta visita era <strong>${dataFmt} às ${hora}</strong>.<br><br>Para marcar outra: <a class="link" href="https://fazendadamata.com/#visita">fazendadamata.com</a><br>ou chame no WhatsApp: (19) 99783-0437</div>`);
+    }
+
+    const escolhido = url.searchParams.get("slot") ?? "";
+    const livres = await slotsLivres(v.slot_id ?? null);
+
+    // Sem escolha ainda: mostra a lista.
+    if (!escolhido) {
+      if (!livres.length) {
+        return page(`<div class="msg">😕</div><div class="msg-title">Sem outros horários</div><div class="msg-text">No momento não há outro horário livre.<br><br>Chame a gente no WhatsApp que a gente dá um jeito:<br><a class="link" href="https://wa.me/5519997830437">(19) 99783-0437</a></div>`);
+      }
+      return page(`
+        <h2>Escolha o novo horário</h2>
+        <div class="info">Hoje sua visita é<br><strong>${dataFmt}</strong> às <strong>${hora}</strong></div>
+        <div class="slots">${livres.map((s) =>
+          `<a class="slot" href="${base2}&acao=remarcar&slot=${s.id}">${fmtDia(s.data)}<small>às ${String(s.hora).slice(0, 5)}</small></a>`).join("")}</div>
+        <a class="btn btn-cancel" href="${base2}">Voltar</a>
+      `);
+    }
+
+    // Escolheu: o horário pode ter sido tomado entre carregar a lista e clicar.
+    const novo = livres.find((s) => s.id === escolhido);
+    if (!novo) {
+      return page(`<div class="msg">😕</div><div class="msg-title">Horário indisponível</div><div class="msg-text">Alguém marcou esse horário antes. Escolha outro:<br><br><a class="btn btn-remarcar" href="${base2}&acao=remarcar">🔄 Ver horários</a></div>`);
+    }
+
+    const upd = await fetch(`${SB_URL}/rest/v1/visitas_comerciais?id=eq.${id}`, {
+      method: "PATCH",
+      headers: { ...svc, Prefer: "return=minimal" },
+      body: JSON.stringify({ slot_id: novo.id }),
+    });
+    if (!upd.ok) {
+      return page(`<div class="msg">⚠️</div><div class="msg-title">Não consegui remarcar</div><div class="msg-text">Tente de novo em instantes ou chame no WhatsApp:<br><a class="link" href="https://wa.me/5519997830437">(19) 99783-0437</a></div>`);
+    }
+
+    // Move o evento na agenda da equipe e reescreve o convite do cliente. A
+    // function lê a visita do banco, então já pega o horário novo; o convite
+    // mantém o mesmo identificador e o celular dele trata como atualização.
+    try {
+      await fetch(`${SB_URL}/functions/v1/sync-google-calendar`, {
+        method: "POST", headers: svc,
+        body: JSON.stringify({ action: "upsert", visita_id: id }),
+      });
+    } catch (e) {
+      console.error("remarcar: falha ao mover evento no Google Calendar", id, e);
+    }
+
+    const icsUrl2 = `${SB_URL}/storage/v1/object/public/ical/visita-${id}.ics`;
+    let btnIcs2 = "";
+    try {
+      const head = await fetch(icsUrl2, { method: "HEAD" });
+      if (head.ok) btnIcs2 = `<a class="btn btn-ics" href="${icsUrl2}">📅 Atualizar na minha agenda</a>`;
+    } catch { /* segue sem o botão */ }
+
+    return page(`
+      <div class="msg">🔄</div>
+      <div class="msg-title">Visita remarcada!</div>
+      <div class="msg-text">Seu novo horário é<br><strong>${fmtDia(novo.data)} às ${String(novo.hora).slice(0, 5)}</strong>.<br><br>Aguardamos você! 🌿</div>
+      ${btnIcs2}
+    `);
   }
 
   return page(`<div class="msg">❌</div><div class="msg-title">Ação inválida</div>`);
