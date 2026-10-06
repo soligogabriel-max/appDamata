@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.02a";</script>
+<script>var LL_VERSION="v2026.10.06a";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -5467,7 +5467,7 @@ function _leadScore(l) {
   const pV = Math.min(1, (l.valorMax || 0) / LEADS_REF.valor);
   const pR = l.diasUlt == null ? 0 : Math.max(0, 1 - l.diasUlt / LEADS_REF.recencia);
   const engajamento = 40*pA + 40*pO + 20*pV;
-  return Math.min(100, Math.round(engajamento * (0.35 + 0.65*pR)) + (l.temVisita ? 10 : 0));
+  return Math.min(100, Math.round(engajamento * (0.35 + 0.65*pR)) + (l.temVisita ? 20 : 0));
 }
 
 // Só os dígitos nacionais, para casar o mesmo número escrito de jeitos
@@ -5632,6 +5632,8 @@ function _leadsPintar() {
                 valor:l=>l.valorMax, recente:l=>(l.diasUlt==null?9e9:-l.diasUlt),
                 nome:l=>(l.nome||"~").toLowerCase() }[_leadsSort] || (l=>l.score);
   linhas.sort((a,b) => {
+    // leads com visita marcada sempre acima dos sem visita
+    if (a.temVisita !== b.temVisita) return a.temVisita ? -1 : 1;
     const va = key(a), vb = key(b);
     const cmp = typeof va === "string" ? va.localeCompare(vb) : va - vb;
     return _leadsDesc ? -cmp : cmp;
