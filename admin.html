@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.06c";</script>
+<script>var LL_VERSION="v2026.10.06d";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -4586,6 +4586,7 @@ function _vcRenderAgendadas() {
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${statusLabel[v.status]||v.status}${v.feedback?` <span style="font-size:10px;background:${v.feedback==='interesse'?'#d1fae5':'#fee2e2'};color:${v.feedback==='interesse'?'#065f46':'#991b1b'};border-radius:4px;padding:1px 5px;margin-left:4px;">${v.feedback==='interesse'?'✅ Interesse':'❌ Sem interesse'}</span>`:''}${v.feedback==='sem_interesse'&&v.feedback_motivo?`<div style="font-size:10px;color:var(--dl);margin-top:2px;">${v.feedback_motivo}</div>`:''}${vcDesfechoBadge(v.desfecho)}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">
           <div style="display:flex;align-items:center;gap:6px;">
+          ${v.status === "agendada" ? `<button onclick="vcCopiarLink('${v.id}',this)" title="Copiar o link do cliente (confirmar, remarcar ou cancelar)" style="padding:4px 7px;background:none;border:1px solid var(--br);border-radius:6px;cursor:pointer;font-size:12px;color:var(--dk);line-height:1;white-space:nowrap;">🔗 Link</button>` : ''}
           <button onclick="vcAbrirEdicao('${v.id}')" title="Editar visita" style="padding:4px 10px;background:none;border:1px solid var(--br);border-radius:6px;cursor:pointer;font-size:12px;color:var(--a);line-height:1;white-space:nowrap;">✏️ Editar</button>
           ${!v.gcal_event_id ? `<button onclick="vcSyncGCal('${v.id}',this)" title="Sincronizar com Google Calendar" style="padding:4px 7px;background:none;border:1px solid #b0c4de;border-radius:6px;cursor:pointer;font-size:12px;color:#1e3a5f;line-height:1;white-space:nowrap;">📅 Sync</button>` : ''}
           <button onclick="vcDeletarVisita('${v.id}','${v.gcal_event_id||''}')" title="Excluir visita" style="padding:4px 7px;background:none;border:1px solid #fca5a5;border-radius:6px;cursor:pointer;font-size:13px;color:#dc2626;line-height:1;">🗑️</button>
@@ -4779,6 +4780,37 @@ async function vcDeletarVisita(id, gcalId) {
     _vcLoadAgendadas();
     toast("✅ Visita excluída.");
   } catch(e) { toast("Erro ao excluir: "+e.message); }
+}
+
+// O link do cliente e' assinado, entao o navegador nao consegue montar: quem
+// devolve e' a propria confirmar-visita, que guarda o segredo. Util quando o
+// cliente pede para remarcar antes da vespera, que e' quando o lembrete
+// automatico com esse link ainda nao saiu.
+async function vcCopiarLink(vcId, btn) {
+  const txtOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = "⏳";
+  try {
+    const res = await fetch(SB_URL + "/functions/v1/confirmar-visita?acao=link&id=" + encodeURIComponent(vcId), {
+      headers: { "apikey": SB_KEY, "Authorization": "Bearer " + _authToken }
+    });
+    const r = await res.json().catch(() => ({}));
+    if (!res.ok || !r.url) throw new Error(r.error || ("HTTP " + res.status));
+    let copiou = false;
+    try { await navigator.clipboard.writeText(r.url); copiou = true; } catch(e) { /* ver abaixo */ }
+    if (copiou) {
+      btn.textContent = "✅ Copiado";
+      toast("🔗 Link copiado — e' so colar no WhatsApp do cliente.");
+      setTimeout(()=>{ btn.textContent = txtOriginal; btn.disabled = false; }, 2000);
+    } else {
+      // Sem permissao de area de transferencia (acontece em alguns navegadores
+      // de celular): mostra o link para copiar na mao, em vez de falhar calado.
+      prompt("Copie o link do cliente:", r.url);
+      btn.textContent = txtOriginal; btn.disabled = false;
+    }
+  } catch(e) {
+    toast("⚠️ Não consegui gerar o link: " + e.message, 4000);
+    btn.textContent = txtOriginal; btn.disabled = false;
+  }
 }
 
 // Remove o evento do Google. Levanta erro se falhar — antes a resposta era

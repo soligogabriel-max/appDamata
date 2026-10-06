@@ -59,6 +59,22 @@ ${body}
 
 const svc = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
 
+// Só para o endpoint ?acao=link, que o admin chama de outra origem.
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+function getJwtRole(authHeader: string): string | null {
+  const t = authHeader.replace(/^Bearer\s+/i, "").trim();
+  if (!t) return null;
+  try {
+    const p = JSON.parse(atob(t.split(".")[1]));
+    return p?.app_metadata?.role || p?.user_metadata?.role || null;
+  } catch { return null; }
+}
+
 const hojeLocal = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);  // BRT = UTC-3
 const agoraLocal = () => new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 16).replace("T", " ");
 const fmtDia = (d: string) =>
@@ -83,6 +99,27 @@ Deno.serve(async (req) => {
   const id    = url.searchParams.get("id") ?? "";
   const acao  = url.searchParams.get("acao") ?? "";
   const token = url.searchParams.get("token") ?? "";
+
+  // ── Link assinado para a equipe mandar ao cliente ──────────────────
+  // O lembrete automático com o link só sai às 9h da véspera. Quem pede para
+  // remarcar antes disso não tem link nenhum, e a equipe não consegue montar
+  // um: ele é assinado. Aqui a própria função devolve o link pronto, só para
+  // admin/equipe logados — sem isso seria um gerador aberto de tokens.
+  if (acao === "link") {
+    if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+    const papel = getJwtRole(req.headers.get("Authorization") || "");
+    if (!["admin", "equipe"].includes(papel ?? "")) {
+      return new Response(JSON.stringify({ error: "Não autorizado." }),
+        { status: 401, headers: { ...CORS, "Content-Type": "application/json" } });
+    }
+    if (!id) {
+      return new Response(JSON.stringify({ error: "id obrigatório." }),
+        { status: 400, headers: { ...CORS, "Content-Type": "application/json" } });
+    }
+    const assinado = `${url.origin}${url.pathname}?id=${id}&token=${await makeToken(id)}`;
+    return new Response(JSON.stringify({ ok: true, url: assinado }),
+      { headers: { ...CORS, "Content-Type": "application/json" } });
+  }
 
   if (!id || !token) return page(`<div class="msg">❌</div><div class="msg-title">Link inválido</div><div class="msg-text">Este link é inválido ou expirou.</div>`);
 
