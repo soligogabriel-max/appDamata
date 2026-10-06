@@ -59,6 +59,12 @@ ${body}
 
 const svc = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
 
+// Endereço público desta função. NÃO dá para derivar do request: o gateway
+// entrega aqui o caminho já sem /functions/v1 e com esquema http, então
+// url.origin + url.pathname montava "http://projeto.supabase.co/confirmar-visita",
+// que responde 404. Era o que quebrava os botões da página.
+const PUBLIC_URL = `${SB_URL.replace(/\/+$/, "")}/functions/v1/confirmar-visita`;
+
 // Só para o endpoint ?acao=link, que o admin chama de outra origem.
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -116,7 +122,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "id obrigatório." }),
         { status: 400, headers: { ...CORS, "Content-Type": "application/json" } });
     }
-    const assinado = `${url.origin}${url.pathname}?id=${id}&token=${await makeToken(id)}`;
+    const assinado = `${PUBLIC_URL}?id=${id}&token=${await makeToken(id)}`;
     return new Response(JSON.stringify({ ok: true, url: assinado }),
       { headers: { ...CORS, "Content-Type": "application/json" } });
   }
@@ -138,7 +144,7 @@ Deno.serve(async (req) => {
   const slot = v.slots_visita;
   const dataFmt = slot ? new Date(slot.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" }) : "";
   const hora = slot?.hora?.slice(0, 5) ?? "";
-  const base = url.origin + url.pathname;
+  const base = PUBLIC_URL;
   const confirmUrl = `${base}?id=${id}&acao=confirmar&token=${token}`;
   const cancelUrl  = `${base}?id=${id}&acao=cancelar&token=${token}`;
   const remarcarUrl = `${base}?id=${id}&acao=remarcar&token=${token}`;
