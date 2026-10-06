@@ -59,11 +59,14 @@ ${body}
 
 const svc = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json" };
 
-// Endereço público desta função. NÃO dá para derivar do request: o gateway
-// entrega aqui o caminho já sem /functions/v1 e com esquema http, então
-// url.origin + url.pathname montava "http://projeto.supabase.co/confirmar-visita",
-// que responde 404. Era o que quebrava os botões da página.
-const PUBLIC_URL = `${SB_URL.replace(/\/+$/, "")}/functions/v1/confirmar-visita`;
+// Onde o cliente abre isto: uma página estática no domínio da Damata, que
+// busca este HTML e renderiza. A função não pode entregar a página direto — o
+// gateway degrada o que sai de functions/v1 e o cliente vê código-fonte. Mesma
+// solução do orçamento (ver orcamento.html / visita.html).
+//
+// Os botões apontam para cá, e não para a função, senão o primeiro clique
+// jogaria o cliente de volta na tela de código.
+const PUBLIC_PAGE = "https://fazendadamata.com/visita.html";
 
 // Só para o endpoint ?acao=link, que o admin chama de outra origem.
 const CORS = {
@@ -122,9 +125,15 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "id obrigatório." }),
         { status: 400, headers: { ...CORS, "Content-Type": "application/json" } });
     }
-    const assinado = `${PUBLIC_URL}?id=${id}&token=${await makeToken(id)}`;
+    const assinado = `${PUBLIC_PAGE}?id=${id}&token=${await makeToken(id)}`;
     return new Response(JSON.stringify({ ok: true, url: assinado }),
       { headers: { ...CORS, "Content-Type": "application/json" } });
+  }
+
+  if (!url.searchParams.has("raw")) {
+    const destino = new URL(PUBLIC_PAGE);
+    url.searchParams.forEach((v, k) => destino.searchParams.set(k, v));
+    return new Response(null, { status: 302, headers: { Location: destino.toString() } });
   }
 
   if (!id || !token) return page(`<div class="msg">❌</div><div class="msg-title">Link inválido</div><div class="msg-text">Este link é inválido ou expirou.</div>`);
@@ -144,7 +153,7 @@ Deno.serve(async (req) => {
   const slot = v.slots_visita;
   const dataFmt = slot ? new Date(slot.data + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" }) : "";
   const hora = slot?.hora?.slice(0, 5) ?? "";
-  const base = PUBLIC_URL;
+  const base = PUBLIC_PAGE;
   const confirmUrl = `${base}?id=${id}&acao=confirmar&token=${token}`;
   const cancelUrl  = `${base}?id=${id}&acao=cancelar&token=${token}`;
   const remarcarUrl = `${base}?id=${id}&acao=remarcar&token=${token}`;

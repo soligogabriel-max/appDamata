@@ -11,7 +11,9 @@ const WPP_TOKEN = Deno.env.get("META_WPP_TOKEN")!;
 const PHONE_ID  = Deno.env.get("META_WPP_PHONE_ID")!;
 const SECRET    = Deno.env.get("LEMBRETE_SECRET") ?? "damata2026";
 const TEMPLATE  = "lembrete_visita_damata";
-const FUNC_URL  = `${Deno.env.get("SUPABASE_URL")?.replace("supabase.co","supabase.co/functions/v1") ?? ""}/confirmar-visita`;
+// Página no domínio da Damata, não a function: o gateway do Supabase degrada o
+// que sai de functions/v1 e o cliente via código-fonte em vez da página.
+const FUNC_URL  = "https://fazendadamata.com/visita.html";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",

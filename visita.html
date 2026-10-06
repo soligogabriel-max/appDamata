@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Sua visita — Fazenda Damata</title>
+<!--
+  Página da visita do cliente — o link que vai por WhatsApp.
+
+  A Edge Function confirmar-visita monta a página inteira, mas não pode
+  entregá-la: o gateway do Supabase degrada o que sai de
+  *.supabase.co/functions/v1/ (proteção anti-phishing do domínio
+  compartilhado), e o cliente via código-fonte em vez da página. Mesmo
+  problema que tirou o orçamento de lá — ver orcamento.html.
+
+  Aqui buscamos o HTML da função e renderizamos no domínio da Damata. O
+  parâmetro raw=1 avisa a função que quem está chamando é esta página, para
+  ela devolver o HTML em vez de redirecionar para cá (link antigo, apontando
+  direto para a função, cairia em laço sem isso).
+
+  Os botões vêm da função já apontando para esta página, então confirmar,
+  remarcar e cancelar continuam dentro do fazendadamata.com.
+-->
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,'Segoe UI',Arial,sans-serif;background:#f0f4f0;min-height:100vh;
+     display:flex;align-items:center;justify-content:center;padding:20px;color:#222}
+.card{background:#fff;border-radius:20px;padding:36px 28px;max-width:420px;width:100%;
+      text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.10)}
+.brand{color:#4a7c59;font-size:13px;font-weight:700;letter-spacing:.8px;margin-bottom:20px}
+h1{color:#1a2e1a;font-size:20px;margin-bottom:10px;font-weight:700}
+p{color:#666;font-size:14px;line-height:1.6}
+.spin{width:32px;height:32px;margin:0 auto 18px;border:3px solid #dbe5dd;border-top-color:#4a7c59;
+      border-radius:50%;animation:g .8s linear infinite}
+@keyframes g{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="card" id="cx">
+  <div class="brand">FAZENDA DAMATA</div>
+  <div class="spin"></div>
+  <p>Carregando sua visita…</p>
+</div>
+
+<script>
+var FN = "https://wwnndsprpofmgbklqdgg.supabase.co/functions/v1/confirmar-visita";
+
+function aviso(titulo, texto){
+  document.getElementById("cx").innerHTML =
+    '<div class="brand">FAZENDA DAMATA</div><h1></h1><p></p>';
+  document.querySelector("#cx h1").textContent = titulo;
+  document.querySelector("#cx p").textContent  = texto;
+}
+
+(async function(){
+  var q = new URLSearchParams(location.search);
+  if(!q.get("id") || !q.get("token")){
+    aviso("Link inválido","Confira o link que você recebeu ou peça um novo à nossa equipe.");
+    return;
+  }
+  q.set("raw","1");
+  try{
+    var r = await fetch(FN + "?" + q.toString());
+    var html = await r.text();
+    if(!html || html.indexOf("<") === -1) throw new Error("resposta vazia");
+    document.open(); document.write(html); document.close();
+  }catch(err){
+    aviso("Não foi possível abrir sua visita",
+          "Tente novamente em instantes. Se persistir, chame a gente no WhatsApp: (19) 99783-0437.");
+    console.error("[visita]", err);
+  }
+})();
+</script>
+</body>
+</html>
