@@ -386,6 +386,14 @@ async function _vtFichaDados(vt) {
 // os dois mostram exatamente a mesma coisa. Estilo vai junto, escopado em
 // .vt-ficha, para funcionar dentro do admin e na janela de impressão sem depender
 // do admin.css.
+// "Outro" vira o complemento digitado; sem complemento, mostra "Outro" mesmo.
+function _vtLocalTexto(vt) {
+  const l = vt.local_cerimonia;
+  if(!l) return "—";
+  if(l==="Outro") return vt.local_cerimonia_outro || "Outro";
+  return l;
+}
+
 function _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap) {
   const rows = linhas.length ? linhas.map(ln=>{
     const nome = fornMap[ln.fornecedor_cod] || ln.nome_fornecedor || ln.fornecedor_cod || "—";
@@ -418,6 +426,8 @@ function _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap) {
       <div class="c"><span class="c-l">Evento</span><span class="c-v">${_esc(nomeEv||"—")}</span></div>
       <div class="c"><span class="c-l">Data do evento</span><span class="c-v">${dataEv?fmtDate(dataEv):"—"}</span></div>
       <div class="c"><span class="c-l">Data da visita</span><span class="c-v">${quando}</span></div>
+      <div class="c"><span class="c-l">Convidados</span><span class="c-v">${vt.num_convidados ?? "—"}</span></div>
+      <div class="c"><span class="c-l">Local da cerimônia</span><span class="c-v">${_esc(_vtLocalTexto(vt))}</span></div>
     </div>
     <table>
       <thead><tr><th style="width:22%">Tipo</th><th style="width:28%">Fornecedor</th><th>Observações</th></tr></thead>
@@ -620,6 +630,14 @@ async function _vtConfirmNovoForn(btn) {
   finally { btn.disabled=false; btn.textContent="✔ Confirmar"; }
 }
 
+// "Outro" sozinho não diz nada na ficha do fornecedor, então pede o complemento.
+function _vtLocalChange() {
+  const wrap = document.getElementById("vtm-local-outro-wrap");
+  const ehOutro = document.getElementById("vtm-local").value === "Outro";
+  wrap.style.display = ehOutro ? "" : "none";
+  if(!ehOutro) document.getElementById("vtm-local-outro").value = "";
+}
+
 async function openVTModal(vt) {
   try {
     _vtId = vt ? vt.id : null;
@@ -627,6 +645,10 @@ async function openVTModal(vt) {
     document.getElementById("vtm-data").value = vt?.data_vt||"";
     // hora vem do Postgres como "14:30:00"; o input type=time só aceita HH:MM
     document.getElementById("vtm-hora").value = (vt?.hora||"").slice(0,5);
+    document.getElementById("vtm-convidados").value = (vt?.num_convidados ?? "");
+    document.getElementById("vtm-local").value = vt?.local_cerimonia||"";
+    document.getElementById("vtm-local-outro").value = vt?.local_cerimonia_outro||"";
+    _vtLocalChange();
     document.getElementById("vtm-linhas").innerHTML="";
     const sel = document.getElementById("vtm-evento");
     sel.innerHTML='<option value="">— Selecione o evento —</option>';
@@ -669,12 +691,19 @@ async function saveVT() {
     const cod_evento = document.getElementById("vtm-evento").value;
     const data_vt = document.getElementById("vtm-data").value||null;
     const hora = document.getElementById("vtm-hora").value||null;
+    // campo vazio tem de gravar null, não 0 nem NaN — a coluna é integer
+    const convRaw = document.getElementById("vtm-convidados").value.trim();
+    const num_convidados = convRaw==="" ? null : (Number.isFinite(+convRaw) ? Math.trunc(+convRaw) : null);
+    const local_cerimonia = document.getElementById("vtm-local").value||null;
+    const local_cerimonia_outro = local_cerimonia==="Outro"
+      ? (document.getElementById("vtm-local-outro").value.trim()||null) : null;
     if(!cod_evento){ toast("Selecione um evento."); return; }
+    const campos = {cod_evento,data_vt,hora,num_convidados,local_cerimonia,local_cerimonia_outro};
     let vtId = _vtId;
     if(vtId) {
-      await dbUpdate("visitas_tecnicas","id=eq."+vtId,{cod_evento,data_vt,hora});
+      await dbUpdate("visitas_tecnicas","id=eq."+vtId,campos);
     } else {
-      const res = await sbFetch("visitas_tecnicas",{method:"POST",body:{cod_evento,data_vt,hora},prefer:"return=representation"});
+      const res = await sbFetch("visitas_tecnicas",{method:"POST",body:campos,prefer:"return=representation"});
       vtId = Array.isArray(res)?res[0]?.id:res?.id;
     }
     // Separa linhas existentes (com id) das novas (sem id)
