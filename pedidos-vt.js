@@ -422,6 +422,14 @@ function _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap, spaces) {
       <td style="text-align:center"><b>${tot}</b></td></tr>`;
   }).join("");
   const mobObs = (vt.mob_obs||"").trim();
+  // Hospedagens: só as que aparecem em algum lado entram na ficha — listar as
+  // 11 com tudo vazio só gastaria papel na visita.
+  const hospAdd = _vtParseSpaces(vt.hosp_add);
+  const hospLinhas = _VT_HOSP.filter(([k])=>sp[k]||hospAdd[k]);
+  const hospRows = hospLinhas.length ? hospLinhas.map(([k,rot])=>
+    `<tr><td>${rot}</td><td style="text-align:center">${sp[k]?"✓":"—"}</td>
+      <td style="text-align:center">${hospAdd[k]?"✓":"—"}</td></tr>`).join("")
+    : `<tr><td colspan="3" style="text-align:center;color:#9ca3af;padding:14px;">Nenhuma hospedagem no contrato nem adicional.</td></tr>`;
   const rows = linhas.length ? linhas.map(ln=>{
     const nome = fornMap[ln.fornecedor_cod] || ln.nome_fornecedor || ln.fornecedor_cod || "—";
     // espaço para anotar à mão quando não há observação registrada
@@ -460,7 +468,7 @@ function _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap, spaces) {
       <div class="c"><span class="c-l">Convidados</span><span class="c-v">${vt.num_convidados ?? "—"}</span></div>
       <div class="c"><span class="c-l">Local da cerimônia</span><span class="c-v">${_esc(_vtLocalTexto(vt))}</span></div>
     </div>
-    <div class="sec">Mobiliário</div>
+    <div class="sec">Mobiliário e serviços</div>
     <table class="mob">
       <thead><tr><th style="width:40%">Item</th><th style="width:20%;text-align:center">No contrato</th><th style="width:20%;text-align:center">Adicional</th><th style="width:20%;text-align:center">Total</th></tr></thead>
       <tbody>${mobRows}</tbody>
@@ -468,6 +476,11 @@ function _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap, spaces) {
     <div class="mob-obs"><span class="c-l">Onde será usado</span>
       <div class="obs">${mobObs?_esc(mobObs).replace(/\n/g,"<br>"):'<span class="vazio">&nbsp;</span>'}</div>
     </div>
+    <div class="sec">Hospedagem</div>
+    <table class="mob">
+      <thead><tr><th style="width:56%">Hospedagem</th><th style="width:22%;text-align:center">No contrato</th><th style="width:22%;text-align:center">Adicional</th></tr></thead>
+      <tbody>${hospRows}</tbody>
+    </table>
     <div class="sec">Fornecedores</div>
     <table>
       <thead><tr><th style="width:22%">Tipo</th><th style="width:28%">Fornecedor</th><th>Observações</th></tr></thead>
@@ -681,8 +694,22 @@ const _VT_MOB = [
   {k:"ban",   sp:"ban",   rot:"Bancos de madeira"},
   // fuBal é booleano no contrato (tem balcão hexagonal ou não), não quantidade
   {k:"bal",   sp:"fuBal", rot:"Balcão do bar", bool:true},
+  // staff e horas extras: mesmas chaves que o quadro do evento usa. A maioria
+  // das agendas nem traz a chave — ausente conta como 0, que é o que significa.
+  {k:"staff", sp:"staff", rot:"Staff (diárias)"},
+  {k:"horas", sp:"horas", rot:"Horas extras recepção"},
 ];
 let _vtSpacesPorEvento = {};
+
+// Hospedagens: mesmas chaves e rótulos do AD_ESPACOS do admin (a lista que o
+// cliente lê no termo de aditivo). Coluna "No contrato" é só espelho do
+// spaces_json; a VT guarda apenas o que ela acrescenta.
+const _VT_HOSP = [
+  ["acLoft","Loft Flamboyant"], ["acCasa","Casa Flamboyant"], ["acSuiteAss","Suíte Assessoria"],
+  ["acSf1","Suíte Flamboyant 1"], ["acSf2","Suíte Flamboyant 2"], ["acSf3","Suíte Flamboyant 3"],
+  ["acSf4","Suíte Flamboyant 4"], ["acSf5","Suíte Flamboyant 5"],
+  ["acSb1","Suíte Bromélias 1"], ["acSb2","Suíte Bromélias 2"], ["acSb3","Suíte Bromélias 3"],
+];
 
 // spaces_json é text com JSON dentro (não jsonb), então pode vir malformado.
 function _vtParseSpaces(raw) {
@@ -731,6 +758,18 @@ function _vtMobTotal() {
 function _vtEventoChange() {
   _vtLoadFornec();
   _vtMobRefresh();
+  _vtHospRefresh();
+}
+
+// Marca a coluna "No contrato" das hospedagens a partir do evento selecionado.
+// A coluna "Adicional" é do usuário e não é tocada aqui.
+function _vtHospRefresh() {
+  const cod = document.getElementById("vtm-evento").value;
+  const sp = _vtMobContrato(cod);
+  _VT_HOSP.forEach(([k])=>{
+    const el = document.getElementById("vth-"+k+"-ctr");
+    if(el) el.checked = !!(cod && sp[k]);
+  });
 }
 
 // "Outro" sozinho não diz nada na ficha do fornecedor, então pede o complemento.
@@ -756,6 +795,12 @@ async function openVTModal(vt) {
       document.getElementById("vtm-mob-"+it.k+"-add").value = (vt?.["mob_"+it.k+"_add"] ?? "");
     });
     document.getElementById("vtm-mob-obs").value = vt?.mob_obs||"";
+    // hosp_add é jsonb: pode vir objeto do PostgREST ou texto, conforme o driver
+    const hospAdd = _vtParseSpaces(vt?.hosp_add);
+    _VT_HOSP.forEach(([k])=>{
+      const el = document.getElementById("vth-"+k+"-add");
+      if(el) el.checked = !!hospAdd[k];
+    });
     document.getElementById("vtm-linhas").innerHTML="";
     const sel = document.getElementById("vtm-evento");
     sel.innerHTML='<option value="">— Selecione o evento —</option>';
@@ -782,6 +827,7 @@ async function openVTModal(vt) {
     _vtSpacesPorEvento = {};
     evts.forEach(e=>{ _vtSpacesPorEvento[e.cod] = e.spaces_json; });
     _vtMobRefresh();
+    _vtHospRefresh();
     try {
       _vtFornecList = await dbGet("fornecedores","select=codigo,nome,tipo_servico&order=nome.asc&limit=500");
     } catch(fe){ _vtFornecList=[]; }
@@ -818,6 +864,14 @@ async function saveVT() {
         : (Number.isFinite(+raw) ? Math.max(0, Math.trunc(+raw)) : null);
     });
     campos.mob_obs = document.getElementById("vtm-mob-obs").value.trim()||null;
+    // só as marcadas entram, no formato do spaces_json. Nenhuma marcada grava
+    // null em vez de {} — "nada acrescentado" e não "objeto vazio por engano".
+    const hosp = {};
+    _VT_HOSP.forEach(([k])=>{
+      const el = document.getElementById("vth-"+k+"-add");
+      if(el && el.checked) hosp[k] = true;
+    });
+    campos.hosp_add = Object.keys(hosp).length ? hosp : null;
     let vtId = _vtId;
     if(vtId) {
       await dbUpdate("visitas_tecnicas","id=eq."+vtId,campos);
