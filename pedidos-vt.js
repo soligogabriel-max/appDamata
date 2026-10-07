@@ -379,7 +379,13 @@ async function _vtFichaDados(vt) {
     const fs = await dbGet("fornecedores","select=codigo,nome&limit=500");
     fs.forEach(f=>{ fornMap[f.codigo]=f.nome; });
   } catch(fe){ fornMap = {}; }
-  return {linhas, fornMap};
+  // contrato do evento, para a tabela de mobiliário da ficha
+  let spaces = null;
+  try {
+    const ev = await dbGet("agenda","select=cod,spaces_json&cod=eq."+encodeURIComponent(vt.cod_evento||"")+"&limit=1");
+    spaces = ev[0]?.spaces_json ?? null;
+  } catch(se){ spaces = null; }
+  return {linhas, fornMap, spaces};
 }
 
 // Corpo do relatório, usado tanto na visualização em tela quanto na impressão —
@@ -394,7 +400,28 @@ function _vtLocalTexto(vt) {
   return l;
 }
 
-function _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap) {
+function _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap, spaces) {
+  // Mobiliário: contrato (ao vivo do spaces_json) + adicional combinado na VT.
+  const sp = _vtParseSpaces(spaces);
+  const mobRows = _VT_MOB.map(it=>{
+    const add = vt["mob_"+it.k+"_add"];
+    const temAdd = add !== null && add !== undefined && add !== "";
+    const a = temAdd ? Number(add) : 0;
+    let ctr, tot;
+    if(it.bool) {
+      const base = sp[it.sp] ? 1 : 0;
+      ctr = base ? "Sim" : "Não";
+      tot = (base+a) ? ("Sim"+(a?" +"+a:"")) : "Não";
+    } else {
+      const base = Number(sp[it.sp])||0;
+      ctr = String(base);
+      tot = String(base+a);
+    }
+    return `<tr><td>${it.rot}</td><td style="text-align:center">${ctr}</td>
+      <td style="text-align:center">${temAdd?a:"—"}</td>
+      <td style="text-align:center"><b>${tot}</b></td></tr>`;
+  }).join("");
+  const mobObs = (vt.mob_obs||"").trim();
   const rows = linhas.length ? linhas.map(ln=>{
     const nome = fornMap[ln.fornecedor_cod] || ln.nome_fornecedor || ln.fornecedor_cod || "—";
     // espaço para anotar à mão quando não há observação registrada
@@ -418,6 +445,10 @@ function _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap) {
     .vt-ficha .obs{white-space:pre-wrap;}
     .vt-ficha .vazio{display:block;min-height:34px;}
     .vt-ficha .footer{margin-top:16px;font-size:10px;color:#9ca3af;text-align:right;}
+    .vt-ficha .sec{font-size:12px;font-weight:800;color:#2E3C44;margin:16px 0 6px;letter-spacing:.3px;}
+    .vt-ficha table.mob{margin-bottom:10px;}
+    .vt-ficha .mob-obs{padding:10px 12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;}
+    .vt-ficha .mob-obs .obs{margin-top:4px;}
   </style>
   <div class="vt-ficha">
     <h1>Visita Técnica</h1>
@@ -429,6 +460,15 @@ function _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap) {
       <div class="c"><span class="c-l">Convidados</span><span class="c-v">${vt.num_convidados ?? "—"}</span></div>
       <div class="c"><span class="c-l">Local da cerimônia</span><span class="c-v">${_esc(_vtLocalTexto(vt))}</span></div>
     </div>
+    <div class="sec">Mobiliário</div>
+    <table class="mob">
+      <thead><tr><th style="width:40%">Item</th><th style="width:20%;text-align:center">No contrato</th><th style="width:20%;text-align:center">Adicional</th><th style="width:20%;text-align:center">Total</th></tr></thead>
+      <tbody>${mobRows}</tbody>
+    </table>
+    <div class="mob-obs"><span class="c-l">Onde será usado</span>
+      <div class="obs">${mobObs?_esc(mobObs).replace(/\n/g,"<br>"):'<span class="vazio">&nbsp;</span>'}</div>
+    </div>
+    <div class="sec">Fornecedores</div>
     <table>
       <thead><tr><th style="width:22%">Tipo</th><th style="width:28%">Fornecedor</th><th>Observações</th></tr></thead>
       <tbody>${rows}</tbody>
@@ -443,8 +483,8 @@ async function _vtVerRelatorio(vt, nomeEv, dataEv) {
   corpo.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
   document.getElementById("m-vt-rel").classList.add("open");
   try {
-    const {linhas, fornMap} = await _vtFichaDados(vt);
-    corpo.innerHTML = _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap);
+    const {linhas, fornMap, spaces} = await _vtFichaDados(vt);
+    corpo.innerHTML = _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap, spaces);
     // o botão de imprimir do modal reaproveita a mesma VT que está na tela
     _vtRelAtual = {vt, nomeEv, dataEv};
   } catch(e){ corpo.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro: '+_esc(e.message)+'</div>'; }
@@ -459,7 +499,7 @@ function _vtRelImprimir() {
 // Ficha da VT para levar impressa à visita ou mandar para os fornecedores.
 async function _vtPrint(vt, nomeEv, dataEv) {
   try {
-    const {linhas, fornMap} = await _vtFichaDados(vt);
+    const {linhas, fornMap, spaces} = await _vtFichaDados(vt);
     const w = window.open("","_blank","width=900,height=700");
     if(!w){ toast("Libere os pop-ups para imprimir a ficha."); return; }
     w.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
@@ -469,7 +509,7 @@ async function _vtPrint(vt, nomeEv, dataEv) {
     body{padding:24px 32px;}
     @media print{body{padding:0;}@page{margin:16mm 12mm;size:A4;}}
   </style></head><body>
-  ${_vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap)}
+  ${_vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap, spaces)}
   <script>window.onload=()=>window.print();<\/script>
   </body></html>`);
     w.document.close();
@@ -630,6 +670,69 @@ async function _vtConfirmNovoForn(btn) {
   finally { btn.disabled=false; btn.textContent="✔ Confirmar"; }
 }
 
+// ── Mobiliário ────────────────────────────────────────────────────────────
+// As quantidades do contrato vivem em agenda.spaces_json (que os aditivos já
+// somam) e são lidas ao vivo, nunca copiadas para a VT: copiar criaria uma
+// segunda verdade que envelhece sem avisar quando sai um aditivo.
+// Itens: chave no spaces_json → sufixo dos ids no modal.
+const _VT_MOB = [
+  {k:"mesas", sp:"mesas", rot:"Mesas de madeira"},
+  {k:"cad",   sp:"cad",   rot:"Cadeiras Tiffany"},
+  {k:"ban",   sp:"ban",   rot:"Bancos de madeira"},
+  // fuBal é booleano no contrato (tem balcão hexagonal ou não), não quantidade
+  {k:"bal",   sp:"fuBal", rot:"Balcão do bar", bool:true},
+];
+let _vtSpacesPorEvento = {};
+
+// spaces_json é text com JSON dentro (não jsonb), então pode vir malformado.
+function _vtParseSpaces(raw) {
+  if(!raw) return {};
+  if(typeof raw === "object") return raw;
+  try { return JSON.parse(raw)||{}; } catch(e){ return {}; }
+}
+
+function _vtMobContrato(cod) {
+  return _vtParseSpaces(_vtSpacesPorEvento[cod]);
+}
+
+// Preenche a coluna "No contrato" a partir do evento selecionado e recalcula
+// os totais. Chamada ao abrir e a cada troca de evento.
+function _vtMobRefresh() {
+  const cod = document.getElementById("vtm-evento").value;
+  const sp = _vtMobContrato(cod);
+  _VT_MOB.forEach(it=>{
+    const el = document.getElementById("vtm-mob-"+it.k+"-ctr");
+    if(!el) return;
+    if(!cod) { el.textContent = "—"; return; }
+    el.textContent = it.bool ? (sp[it.sp] ? "Sim" : "Não") : String(Number(sp[it.sp])||0);
+  });
+  _vtMobTotal();
+}
+
+function _vtMobTotal() {
+  const cod = document.getElementById("vtm-evento").value;
+  const sp = _vtMobContrato(cod);
+  _VT_MOB.forEach(it=>{
+    const tot = document.getElementById("vtm-mob-"+it.k+"-tot");
+    const add = document.getElementById("vtm-mob-"+it.k+"-add");
+    if(!tot||!add) return;
+    const a = Math.max(0, Math.trunc(Number(add.value)||0));
+    if(it.bool) {
+      // balcão: contrato é sim/não, então o total é "Sim" + os extras
+      const base = sp[it.sp] ? 1 : 0;
+      tot.textContent = cod ? (base+a ? "Sim"+(a?" +"+a:"") : "Não") : "—";
+    } else {
+      tot.textContent = cod ? String((Number(sp[it.sp])||0) + a) : "—";
+    }
+  });
+}
+
+// onchange do select de evento: fornecedores e mobiliário dependem do evento.
+function _vtEventoChange() {
+  _vtLoadFornec();
+  _vtMobRefresh();
+}
+
 // "Outro" sozinho não diz nada na ficha do fornecedor, então pede o complemento.
 function _vtLocalChange() {
   const wrap = document.getElementById("vtm-local-outro-wrap");
@@ -649,13 +752,17 @@ async function openVTModal(vt) {
     document.getElementById("vtm-local").value = vt?.local_cerimonia||"";
     document.getElementById("vtm-local-outro").value = vt?.local_cerimonia_outro||"";
     _vtLocalChange();
+    _VT_MOB.forEach(it=>{
+      document.getElementById("vtm-mob-"+it.k+"-add").value = (vt?.["mob_"+it.k+"_add"] ?? "");
+    });
+    document.getElementById("vtm-mob-obs").value = vt?.mob_obs||"";
     document.getElementById("vtm-linhas").innerHTML="";
     const sel = document.getElementById("vtm-evento");
     sel.innerHTML='<option value="">— Selecione o evento —</option>';
     // Abre o modal imediatamente, carrega dados em seguida
     document.getElementById("m-vt").classList.add("open");
     const hojeVT = new Date().toISOString().slice(0,10);
-    const evts = await dbGet("agenda","select=cod,nome_evento&data_evento=gte."+hojeVT+"&order=data_evento.asc&limit=500");
+    const evts = await dbGet("agenda","select=cod,nome_evento,spaces_json&data_evento=gte."+hojeVT+"&order=data_evento.asc&limit=500");
     // O filtro acima traz só eventos futuros. Numa VT de evento já realizado — a aba
     // "Passados" lista justamente essas — o evento salvo não vinha na lista, o select
     // ficava em "" e saveVT abortava em "Selecione um evento": não dava para editar
@@ -663,7 +770,7 @@ async function openVTModal(vt) {
     if(vt?.cod_evento && !evts.some(e=>e.cod===vt.cod_evento)) {
       let ant = null;
       try {
-        const r = await dbGet("agenda","select=cod,nome_evento&cod=eq."+encodeURIComponent(vt.cod_evento)+"&limit=1");
+        const r = await dbGet("agenda","select=cod,nome_evento,spaces_json&cod=eq."+encodeURIComponent(vt.cod_evento)+"&limit=1");
         ant = r[0]||null;
       } catch(ee){ ant = null; }
       // Evento apagado (dbGet filtra deleted_at) cai no fallback: mantém o vínculo
@@ -671,6 +778,10 @@ async function openVTModal(vt) {
       evts.unshift(ant || {cod:vt.cod_evento, nome_evento:vt.cod_evento});
     }
     evts.forEach(e=>{ const o=document.createElement("option"); o.value=e.cod; o.textContent=(e.nome_evento||e.cod); if(vt&&e.cod===vt.cod_evento)o.selected=true; sel.appendChild(o); });
+    // contrato de cada evento, para a coluna "No contrato" do mobiliário
+    _vtSpacesPorEvento = {};
+    evts.forEach(e=>{ _vtSpacesPorEvento[e.cod] = e.spaces_json; });
+    _vtMobRefresh();
     try {
       _vtFornecList = await dbGet("fornecedores","select=codigo,nome,tipo_servico&order=nome.asc&limit=500");
     } catch(fe){ _vtFornecList=[]; }
@@ -699,6 +810,14 @@ async function saveVT() {
       ? (document.getElementById("vtm-local-outro").value.trim()||null) : null;
     if(!cod_evento){ toast("Selecione um evento."); return; }
     const campos = {cod_evento,data_vt,hora,num_convidados,local_cerimonia,local_cerimonia_outro};
+    // adicionais de mobiliário: vazio grava null, nunca 0, para distinguir
+    // "não combinamos nada" de "combinamos zero a mais"
+    _VT_MOB.forEach(it=>{
+      const raw = document.getElementById("vtm-mob-"+it.k+"-add").value.trim();
+      campos["mob_"+it.k+"_add"] = raw==="" ? null
+        : (Number.isFinite(+raw) ? Math.max(0, Math.trunc(+raw)) : null);
+    });
+    campos.mob_obs = document.getElementById("vtm-mob-obs").value.trim()||null;
     let vtId = _vtId;
     if(vtId) {
       await dbUpdate("visitas_tecnicas","id=eq."+vtId,campos);

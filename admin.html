@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.07a";</script>
+<script>var LL_VERSION="v2026.10.07b";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -1472,7 +1472,7 @@
   <div class="mbox" style="max-width:720px;">
     <div class="mtitle" id="vt-modal-title">Visita Técnica</div>
     <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px;margin-bottom:12px;">
-      <div><label class="lbl">Evento</label><select class="inp" id="vtm-evento" style="margin-bottom:0;" onchange="_vtLoadFornec()"></select></div>
+      <div><label class="lbl">Evento</label><select class="inp" id="vtm-evento" style="margin-bottom:0;" onchange="_vtEventoChange()"></select></div>
       <div><label class="lbl">Data da VT</label><input class="inp" id="vtm-data" type="date" style="margin-bottom:0;"/></div>
       <div><label class="lbl">Hora</label><input class="inp" id="vtm-hora" type="time" style="margin-bottom:0;"/></div>
     </div>
@@ -1486,6 +1486,47 @@
         <option value="Outro">Outro</option>
       </select></div>
       <div id="vtm-local-outro-wrap" style="display:none;"><label class="lbl">Qual?</label><input class="inp" id="vtm-local-outro" type="text" maxlength="120" placeholder="Especifique o local" style="margin-bottom:0;"/></div>
+    </div>
+    <div style="font-weight:700;font-size:13px;color:var(--dk);margin-bottom:8px;">Mobiliário</div>
+    <div style="border:1px solid var(--br);border-radius:10px;padding:10px;margin-bottom:12px;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--dl);">
+          <th style="text-align:left;padding:4px 6px;">Item</th>
+          <th style="text-align:center;padding:4px 6px;width:22%;">No contrato</th>
+          <th style="text-align:center;padding:4px 6px;width:26%;">Adicional</th>
+          <th style="text-align:center;padding:4px 6px;width:18%;">Total</th>
+        </tr></thead>
+        <tbody>
+        <tr>
+          <td style="padding:4px 6px;">Mesas de madeira</td>
+          <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-mesas-ctr" style="font-weight:700;">—</span></td>
+          <td style="padding:4px 6px;"><input class="inp" id="vtm-mob-mesas-add" type="number" min="0" step="1" placeholder="0" style="margin-bottom:0;text-align:center;" oninput="_vtMobTotal()"/></td>
+          <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-mesas-tot" style="font-weight:700;color:var(--a);">—</span></td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;">Cadeiras Tiffany</td>
+          <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-cad-ctr" style="font-weight:700;">—</span></td>
+          <td style="padding:4px 6px;"><input class="inp" id="vtm-mob-cad-add" type="number" min="0" step="1" placeholder="0" style="margin-bottom:0;text-align:center;" oninput="_vtMobTotal()"/></td>
+          <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-cad-tot" style="font-weight:700;color:var(--a);">—</span></td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;">Bancos de madeira</td>
+          <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-ban-ctr" style="font-weight:700;">—</span></td>
+          <td style="padding:4px 6px;"><input class="inp" id="vtm-mob-ban-add" type="number" min="0" step="1" placeholder="0" style="margin-bottom:0;text-align:center;" oninput="_vtMobTotal()"/></td>
+          <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-ban-tot" style="font-weight:700;color:var(--a);">—</span></td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;">Balcão do bar</td>
+          <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-bal-ctr" style="font-weight:700;">—</span></td>
+          <td style="padding:4px 6px;"><input class="inp" id="vtm-mob-bal-add" type="number" min="0" step="1" placeholder="0" style="margin-bottom:0;text-align:center;" oninput="_vtMobTotal()"/></td>
+          <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-bal-tot" style="font-weight:700;color:var(--a);">—</span></td>
+        </tr>
+        </tbody>
+      </table>
+      <div style="margin-top:8px;">
+        <label class="lbl">Onde o mobiliário será usado</label>
+        <textarea class="inp" id="vtm-mob-obs" rows="3" maxlength="2000" style="margin-bottom:0;resize:vertical;" placeholder="Ex.: 60 cadeiras na cerimônia no gramado, resto no salão. Bancos só no deck."></textarea>
+      </div>
     </div>
     <div style="font-weight:700;font-size:13px;color:var(--dk);margin-bottom:8px;">Fornecedores presentes</div>
     <div id="vtm-linhas" style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px;"></div>
