@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.06d";</script>
+<script>var LL_VERSION="v2026.10.07a";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -1475,6 +1475,17 @@
       <div><label class="lbl">Evento</label><select class="inp" id="vtm-evento" style="margin-bottom:0;" onchange="_vtLoadFornec()"></select></div>
       <div><label class="lbl">Data da VT</label><input class="inp" id="vtm-data" type="date" style="margin-bottom:0;"/></div>
       <div><label class="lbl">Hora</label><input class="inp" id="vtm-hora" type="time" style="margin-bottom:0;"/></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div><label class="lbl">Nº de convidados</label><input class="inp" id="vtm-convidados" type="number" min="0" step="1" placeholder="Ex.: 100" style="margin-bottom:0;"/></div>
+      <div><label class="lbl">Local da cerimônia</label><select class="inp" id="vtm-local" style="margin-bottom:0;" onchange="_vtLocalChange()">
+        <option value="">— Selecione —</option>
+        <option value="Coberto">Coberto</option>
+        <option value="Gramado">Gramado</option>
+        <option value="Capela">Capela</option>
+        <option value="Outro">Outro</option>
+      </select></div>
+      <div id="vtm-local-outro-wrap" style="display:none;"><label class="lbl">Qual?</label><input class="inp" id="vtm-local-outro" type="text" maxlength="120" placeholder="Especifique o local" style="margin-bottom:0;"/></div>
     </div>
     <div style="font-weight:700;font-size:13px;color:var(--dk);margin-bottom:8px;">Fornecedores presentes</div>
     <div id="vtm-linhas" style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px;"></div>
