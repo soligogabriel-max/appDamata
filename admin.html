@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.07b";</script>
+<script>var LL_VERSION="v2026.10.07c";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -1487,7 +1487,7 @@
       </select></div>
       <div id="vtm-local-outro-wrap" style="display:none;"><label class="lbl">Qual?</label><input class="inp" id="vtm-local-outro" type="text" maxlength="120" placeholder="Especifique o local" style="margin-bottom:0;"/></div>
     </div>
-    <div style="font-weight:700;font-size:13px;color:var(--dk);margin-bottom:8px;">Mobiliário</div>
+    <div style="font-weight:700;font-size:13px;color:var(--dk);margin-bottom:8px;">Mobiliário e serviços</div>
     <div style="border:1px solid var(--br);border-radius:10px;padding:10px;margin-bottom:12px;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead><tr style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--dl);">
@@ -1520,6 +1520,18 @@
           <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-bal-ctr" style="font-weight:700;">—</span></td>
           <td style="padding:4px 6px;"><input class="inp" id="vtm-mob-bal-add" type="number" min="0" step="1" placeholder="0" style="margin-bottom:0;text-align:center;" oninput="_vtMobTotal()"/></td>
           <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-bal-tot" style="font-weight:700;color:var(--a);">—</span></td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;">Staff (diárias)</td>
+          <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-staff-ctr" style="font-weight:700;">—</span></td>
+          <td style="padding:4px 6px;"><input class="inp" id="vtm-mob-staff-add" type="number" min="0" step="1" placeholder="0" style="margin-bottom:0;text-align:center;" oninput="_vtMobTotal()"/></td>
+          <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-staff-tot" style="font-weight:700;color:var(--a);">—</span></td>
+        </tr>
+        <tr>
+          <td style="padding:4px 6px;">Horas extras recepção</td>
+          <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-horas-ctr" style="font-weight:700;">—</span></td>
+          <td style="padding:4px 6px;"><input class="inp" id="vtm-mob-horas-add" type="number" min="0" step="1" placeholder="0" style="margin-bottom:0;text-align:center;" oninput="_vtMobTotal()"/></td>
+          <td style="padding:4px 6px;text-align:center;"><span id="vtm-mob-horas-tot" style="font-weight:700;color:var(--a);">—</span></td>
         </tr>
         </tbody>
       </table>

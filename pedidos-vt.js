@@ -460,7 +460,7 @@ function _vtFichaHTML(vt, nomeEv, dataEv, linhas, fornMap, spaces) {
       <div class="c"><span class="c-l">Convidados</span><span class="c-v">${vt.num_convidados ?? "—"}</span></div>
       <div class="c"><span class="c-l">Local da cerimônia</span><span class="c-v">${_esc(_vtLocalTexto(vt))}</span></div>
     </div>
-    <div class="sec">Mobiliário</div>
+    <div class="sec">Mobiliário e serviços</div>
     <table class="mob">
       <thead><tr><th style="width:40%">Item</th><th style="width:20%;text-align:center">No contrato</th><th style="width:20%;text-align:center">Adicional</th><th style="width:20%;text-align:center">Total</th></tr></thead>
       <tbody>${mobRows}</tbody>
@@ -681,6 +681,10 @@ const _VT_MOB = [
   {k:"ban",   sp:"ban",   rot:"Bancos de madeira"},
   // fuBal é booleano no contrato (tem balcão hexagonal ou não), não quantidade
   {k:"bal",   sp:"fuBal", rot:"Balcão do bar", bool:true},
+  // staff e horas extras: mesmas chaves que o quadro do evento usa. A maioria
+  // das agendas nem traz a chave — ausente conta como 0, que é o que significa.
+  {k:"staff", sp:"staff", rot:"Staff (diárias)"},
+  {k:"horas", sp:"horas", rot:"Horas extras recepção"},
 ];
 let _vtSpacesPorEvento = {};
 
