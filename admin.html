@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.17j";</script>
+<script>var LL_VERSION="v2026.10.17k";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -5697,9 +5697,73 @@ async function renderFunil(){
       Cada etapa conta quem entrou nela no período, pela data de criação.
       Descarte = fechou outro espaço, sem interesse ou não responde.
       Contrato fechado = evento criado na agenda, não o desfecho marcado na visita.</div>`;
+    _funilFechados();
   }catch(e){
     box.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar o funil: '+e.message+'</div>';
   }
+}
+
+/* Detalhe dos contratos fechados: quanto tempo cada um levou e de onde veio.
+   Carregado depois do funil para a tela nao esperar as duas consultas. */
+const FUNIL_ORIGEM = {
+  "anúncio":                     { cor:"#1565C0", bg:"#E3F0FF" },
+  "site, sem anúncio":           { cor:"#2A6644", bg:"#E6F6EC" },
+  "orçamento feito pela equipe": { cor:"#92400E", bg:"#FEF3C7" },
+  "fora do site":                { cor:"#6B7280", bg:"#F1F2F4" }
+};
+
+async function _funilFechados(){
+  const box = document.getElementById("funil-box");
+  if(!box) return;
+  let linhas;
+  try { linhas = await sbFetch("rpc/funil_fechados", {method:"POST", body:{p_dias:_funilDias}}); }
+  catch(e){ return; }                       // sem detalhe o funil continua de pe
+  if(!Array.isArray(linhas) || !linhas.length) return;
+
+  const comDias = linhas.filter(l => l.dias_ate_fechar != null).map(l => l.dias_ate_fechar).sort((a,b)=>a-b);
+  const mediana = comDias.length
+    ? (comDias.length % 2 ? comDias[(comDias.length-1)/2]
+                          : Math.round((comDias[comDias.length/2 - 1] + comDias[comDias.length/2]) / 2))
+    : null;
+
+  const esc = x => String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  const sel = (linhas.map(l=>`
+    <tr>
+      <td style="padding:6px 6px;border-bottom:1px solid var(--br);font-size:12px;">
+        <div style="font-weight:600;color:var(--dk);">${esc(l.nome_evento)}</div>
+        <div style="font-size:10px;color:var(--dl);">${new Date(l.fechado_em+"T12:00:00").toLocaleDateString("pt-BR")}</div>
+      </td>
+      <td style="padding:6px;border-bottom:1px solid var(--br);text-align:center;font-size:12px;font-weight:600;white-space:nowrap;">
+        ${l.dias_ate_fechar == null ? '<span style="color:var(--dl);">—</span>'
+          : l.dias_ate_fechar === 0 ? "no mesmo dia" : l.dias_ate_fechar + (l.dias_ate_fechar===1?" dia":" dias")}
+      </td>
+      <td style="padding:6px;border-bottom:1px solid var(--br);font-size:11px;">
+        ${(()=>{ const c = FUNIL_ORIGEM[l.origem] || FUNIL_ORIGEM["fora do site"];
+          return `<span style="background:${c.bg};color:${c.cor};border-radius:4px;padding:2px 6px;font-weight:600;white-space:nowrap;">${esc(l.origem)}</span>`
+               + (l.ad_nome ? `<div style="color:var(--dl);margin-top:2px;">${esc(l.ad_nome)}</div>` : ""); })()}
+      </td>
+    </tr>`).join(""));
+
+  box.insertAdjacentHTML("beforeend", `
+    <div style="margin-top:26px;border-top:1px solid var(--br);padding-top:16px;">
+      <div style="font-size:13px;font-weight:700;color:var(--dk);margin-bottom:2px;">Contratos fechados no período</div>
+      <div style="font-size:11px;color:var(--dl);margin-bottom:12px;">
+        ${mediana == null ? "Nenhum com orçamento de origem para medir o tempo."
+          : "Mediana de <b>" + (mediana === 0 ? "fechamento no mesmo dia" : mediana + (mediana===1?" dia":" dias")) + "</b> entre o orçamento e o contrato."}
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:var(--bg2);color:var(--dl);">
+          <th style="text-align:left;padding:6px;font-size:11px;">Evento</th>
+          <th style="text-align:center;padding:6px;font-size:11px;white-space:nowrap;">Até fechar</th>
+          <th style="text-align:left;padding:6px;font-size:11px;">Origem</th>
+        </tr></thead>
+        <tbody>${sel}</tbody>
+      </table>
+      <div style="font-size:11px;color:var(--dl);margin-top:10px;line-height:1.6;">
+        "Orçamento feito pela equipe" = simulação montada num aparelho da casa, não pelo cliente no site —
+        por isso não tem anúncio de origem. "Fora do site" = evento criado direto na agenda, sem orçamento.
+      </div>
+    </div>`);
 }
 
 // dispositivo contam para esse anúncio. Primeiro acesso, não último: é o
