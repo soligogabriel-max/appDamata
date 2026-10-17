@@ -307,8 +307,14 @@ window.addEventListener("message",function(e){
   }
 });
 
+// Orçamento que originou este contrato. Viaja até o evento na agenda para o
+// funil saber quais negócios fechados vieram do site. Null = veio por fora
+// (indicação, telefone), e isso também é informação.
+var _orcOrigemId = null;
+
 // Pré-preenche a partir de um orçamento efetivado
 function prefillFromOrcamento(o){
+  _orcOrigemId = o && o.id != null ? o.id : null;
   if(o.tipo_evento==="Casamento"){
     if(g("o-noiva")) g("o-noiva").value=o.nome_noiva||"";
     if(g("o-noivo")) g("o-noivo").value=o.nome_noivo||"";
@@ -652,6 +658,7 @@ function salvarNoSistema(){
     itens:itens,
     gcEvt:_gcEvt,
     gcUserId:_gcUser?_gcUser.id:null,
+    orcId:_orcOrigemId,
     acLoft:g("o-loft").checked,acCasa:g("o-casa").checked,
     acSf1:g("o-sf1").checked,acSf2:g("o-sf2").checked,acSf3:g("o-sf3").checked,
     acSf4:g("o-sf4").checked,acSf5:g("o-sf5").checked,
@@ -690,6 +697,7 @@ async function gerarLinkContrato(){
     itens:preset.itens,
     gcEvt:_gcEvt,
     gcUserId:_gcUser?_gcUser.id:null,
+    orcId:_orcOrigemId,
     contrato_gerado:true,
     spTumb:preset.spTumb,spPeroba:preset.spPeroba,spBrom:preset.spBrom,dayQty:preset.dayQty,
     acLoft:preset.acLoft,acCasa:preset.acCasa,acSuiteAss:preset.acSuiteAss,

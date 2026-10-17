@@ -19,7 +19,7 @@ create or replace function public.funil_vendas(p_dias int default 90)
 returns table(
   acessos bigint, orcamentos bigint, visitas_marcadas bigint,
   visitas_realizadas bigint, em_jogo bigint, fechou_contrato bigint,
-  contrato_assinado bigint
+  contrato_assinado bigint, fechou_do_site bigint
 )
 language plpgsql stable security definer set search_path = public as $$
 declare ini timestamptz;
@@ -65,7 +65,11 @@ begin
       where a.deleted_at is null and a.created_at >= ini),
     (select count(*) from agenda a
       where a.deleted_at is null and a.created_at >= ini
-        and a.assinatura_status = 'assinado');
+        and a.assinatura_status = 'assinado'),
+    -- Quantos desses vieram de um orçamento do site: agenda.orc_id, gravado no
+    -- "Efetivar orçamento". Nulo = entrou por indicação ou telefone.
+    (select count(*) from agenda a
+      where a.deleted_at is null and a.created_at >= ini and a.orc_id is not null);
 end $$;
 
 -- security definer: contar orçamento não exige poder ler nome, WhatsApp e

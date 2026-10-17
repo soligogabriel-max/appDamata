@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.17i";</script>
+<script>var LL_VERSION="v2026.10.17j";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -5692,7 +5692,7 @@ async function renderFunil(){
         </div>`;
       ant = v;
       return linha;
-    }).join("") + (Number(f.fechou_contrato) ? `<div style="font-size:11px;color:var(--dl);margin:-6px 0 14px;padding-left:2px;">dos quais <b style="color:#2a6644;">${n(f.contrato_assinado)}</b> já com contrato assinado</div>` : "") + `<div style="font-size:11px;color:var(--dl);border-top:1px solid var(--br);padding-top:10px;margin-top:4px;line-height:1.6;">
+    }).join("") + (Number(f.fechou_contrato) ? `<div style="font-size:11px;color:var(--dl);margin:-6px 0 14px;padding-left:2px;">dos quais <b style="color:#2a6644;">${n(f.fechou_do_site)}</b> vieram de orçamento do site e <b style="color:#2a6644;">${n(f.contrato_assinado)}</b> já estão com contrato assinado</div>` : "") + `<div style="font-size:11px;color:var(--dl);border-top:1px solid var(--br);padding-top:10px;margin-top:4px;line-height:1.6;">
       A barra mostra a conversão em relação à etapa anterior — proporcional ao topo, tudo depois dos acessos viraria um risco.
       Cada etapa conta quem entrou nela no período, pela data de criação.
       Descarte = fechou outro espaço, sem interesse ou não responde.
@@ -6951,6 +6951,7 @@ async function salvarContrato(preset) {
         tipo_evento: preset.tipoEvento||"Casamento",
         obs: preset.obs||null,
         payments_json: paymentsJson, spaces_json: spacesJson,
+        ...(preset.orcId != null ? { orc_id: preset.orcId } : {}),
       }, prefer:"return=minimal"});
       isEdit = true;
     } else if(preset.code) {
@@ -6967,6 +6968,9 @@ async function salvarContrato(preset) {
         valor_locacao: preset.total ? parseFloat(preset.total) : null,
         obs: preset.obs||null,
         payments_json: paymentsJson, spaces_json: spacesJson,
+        // Origem do negócio: vem do "Efetivar orçamento". Null quando o evento
+        // nasce direto no gerador (indicação, telefone) — e isso é informação.
+        orc_id: preset.orcId != null ? preset.orcId : null,
       };
       if(agExist.length && !agExist[0].deleted_at) {
         // Colisão: código já pertence a evento ativo — pede o próximo ao banco
