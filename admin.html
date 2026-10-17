@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.17k";</script>
+<script>var LL_VERSION="v2026.10.17l";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -5725,6 +5725,14 @@ async function _funilFechados(){
     ? (comDias.length % 2 ? comDias[(comDias.length-1)/2]
                           : Math.round((comDias[comDias.length/2 - 1] + comDias[comDias.length/2]) / 2))
     : null;
+  // Media e mediana juntas de proposito: com poucos contratos um unico caso
+  // longo puxa a media (0,0,0,26 da' media 6,5 e mediana 0). Ver as duas evita
+  // ler como "demora uma semana" o que na verdade e' "fecha na hora, menos um".
+  const media = comDias.length
+    ? Math.round(10 * comDias.reduce((a,b)=>a+b,0) / comDias.length) / 10
+    : null;
+  const dstr = v => v === 0 ? "no mesmo dia"
+    : String(v).replace(".", ",") + (v === 1 ? " dia" : " dias");
 
   const esc = x => String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
   const sel = (linhas.map(l=>`
@@ -5749,7 +5757,8 @@ async function _funilFechados(){
       <div style="font-size:13px;font-weight:700;color:var(--dk);margin-bottom:2px;">Contratos fechados no período</div>
       <div style="font-size:11px;color:var(--dl);margin-bottom:12px;">
         ${mediana == null ? "Nenhum com orçamento de origem para medir o tempo."
-          : "Mediana de <b>" + (mediana === 0 ? "fechamento no mesmo dia" : mediana + (mediana===1?" dia":" dias")) + "</b> entre o orçamento e o contrato."}
+          : `Entre o orçamento e o contrato: prazo médio de <b>${dstr(media)}</b> · mediana <b>${dstr(mediana)}</b>`
+            + ` <span style="opacity:.8">(${comDias.length} ${comDias.length===1?"contrato":"contratos"} com origem, de ${dstr(comDias[0])} a ${dstr(comDias[comDias.length-1])})</span>`}
       </div>
       <table style="width:100%;border-collapse:collapse;">
         <thead><tr style="background:var(--bg2);color:var(--dl);">
