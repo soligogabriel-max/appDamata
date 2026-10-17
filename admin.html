@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.17c";</script>
+<script>var LL_VERSION="v2026.10.17d";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -4645,6 +4645,22 @@ async function _vcLinkCliente(vcId) {
   return r.url;
 }
 
+// Confirmacao registrada pela equipe. Na pratica a maioria dos clientes
+// responde por texto no WhatsApp em vez de tocar no link, e essa resposta
+// precisa caber na tela igual a do link.
+async function vcMarcarConfirmada(vcId, confirmou) {
+  try {
+    await sbFetch("visitas_comerciais?id=eq." + vcId, {
+      method: "PATCH",
+      body: { confirmada_em: confirmou ? new Date().toISOString() : null },
+      prefer: "return=minimal"
+    });
+    document.getElementById("m-vc-confirmar")?.classList.remove("open");
+    toast(confirmou ? "✅ Presença confirmada." : "↩️ Confirmação desfeita.");
+    _vcLoadAgendadas();
+  } catch(e) { toast("Erro: " + e.message, 4000); }
+}
+
 // Cobranca de confirmacao, no mesmo molde do follow-up pos-visita: mensagem
 // pronta e editavel, enviada pelo SEU WhatsApp, com o link do cliente dentro.
 async function vcAbrirConfirmacao(vcId, nome, whatsapp, quando) {
@@ -4675,6 +4691,9 @@ async function vcAbrirConfirmacao(vcId, nome, whatsapp, quando) {
         <a id="vcc-wpp" href="#" target="_blank" style="flex:1;padding:12px;background:#25d366;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px;text-decoration:none;text-align:center;">📲 Enviar no WhatsApp</a>
         <button onclick="document.getElementById('m-vc-confirmar').classList.remove('open')" style="padding:12px 18px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;">Agora não</button>
       </div>
+      <!-- Para quando o cliente ja respondeu por texto: marca sem precisar
+           abrir o Editar. -->
+      <button id="vcc-ja" style="width:100%;margin-top:10px;padding:11px;background:none;border:1px dashed var(--br);border-radius:8px;cursor:pointer;font-size:13px;color:var(--dk);font-family:inherit;">✅ Ele já confirmou — marcar aqui</button>
     </div>`;
     document.body.appendChild(m);
   }
@@ -4693,6 +4712,7 @@ async function vcAbrirConfirmacao(vcId, nome, whatsapp, quando) {
     else { navigator.clipboard?.writeText(txt); toast("📋 Mensagem copiada!"); }
     document.getElementById("m-vc-confirmar").classList.remove("open");
   };
+  document.getElementById("vcc-ja").onclick = () => vcMarcarConfirmada(vcId, true);
   m.classList.add("open");
 }
 
@@ -4862,6 +4882,7 @@ async function vcAbrirEdicao(vcId) {
       <input type="hidden" id="vce-gcal"  value="${v.gcal_event_id || ''}">
       <input type="hidden" id="vce-slot0" value="${v.slot_id || ''}">
       <input type="hidden" id="vce-desf0" value="${v.desfecho || ''}">
+      <input type="hidden" id="vce-conf0" value="${v.confirmada_em ? 'sim' : ''}">
       <input type="hidden" id="vce-nome0" value="${_vcAttr(v.nome)}">
       <input type="hidden" id="vce-wpp0"  value="${_vcAttr(v.whatsapp)}">
       <label class="lbl">Cliente</label>
@@ -4877,6 +4898,11 @@ async function vcAbrirEdicao(vcId) {
       <select id="vce-desfecho" class="inp">
         <option value="">— sem resposta ainda —</option>
         ${VC_DESFECHOS.map(o => `<option value="${o.v}"${o.v === v.desfecho ? ' selected' : ''}>${o.l}</option>`).join("")}
+      </select>
+      <label class="lbl">Confirmação de presença</label>
+      <select id="vce-conf" class="inp">
+        <option value=""${v.confirmada_em ? '' : ' selected'}>— sem resposta —</option>
+        <option value="sim"${v.confirmada_em ? ' selected' : ''}>✅ Confirmou presença</option>
       </select>
       <label class="lbl">Status</label>
       <select id="vce-status" class="inp">
@@ -4916,6 +4942,11 @@ async function vcSalvarEdicao() {
     if (slotId) patch.slot_id = slotId;
     // Mudou de horario: a confirmacao era do horario antigo e nao vale mais.
     if (slotId && slotId !== slot0) { patch.confirmada_em = null; patch.lembrete_em = null; }
+    // Depois da regra acima de proposito: se voce marcou na tela, a sua
+    // escolha vence o zeramento automatico da remarcacao.
+    const conf  = document.getElementById("vce-conf")?.value || "";
+    const conf0 = document.getElementById("vce-conf0")?.value || "";
+    if (conf !== conf0) patch.confirmada_em = conf ? new Date().toISOString() : null;
     if (desfecho !== desfecho0) patch.desfecho_em = desfecho ? new Date().toISOString() : null;
     if (["visitado_alta","visitado_baixa"].includes(status) && !VC_DESFECHOS_FINAIS.includes(desfecho)) {
       const d7 = new Date(); d7.setDate(d7.getDate() + 7);
