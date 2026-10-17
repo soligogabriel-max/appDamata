@@ -796,7 +796,7 @@ async function _orcLoadPacotes(){
      1. salões, na ordem combinada (Tumbérgia, Bromélias)
      2. Peroba Rosa
      3. hospedagem (casa e suítes), em ordem alfabética
-     4. o resto, na ordem de cadastro
+     4. o resto, também em ordem alfabética
 
    Os três primeiros vão por código e não por nome: código é chave e não muda
    quando alguém corrige a descrição. Hospedagem vai por nome porque assim
@@ -811,13 +811,13 @@ function _orcOrdenaItens(items){
     if (fix >= 0) return 0;
     return _orcEhHospedagem(desc(u)) ? 1 : 2;
   };
-  // sort estável (ES2019): empate no bloco 2 preserva a ordem de cadastro
+  // numeric: "Suíte 10" depois da 9, não depois da 1.
+  const alfa = (a, b) => desc(a).localeCompare(desc(b), "pt-BR", { numeric: true, sensitivity: "base" });
   return items.slice().sort((a, b) => {
     const ba = bloco(a), bb = bloco(b);
     if (ba !== bb) return ba - bb;
-    if (ba === 0) return ORC_ORDEM_FIXA.indexOf(a.cod) - ORC_ORDEM_FIXA.indexOf(b.cod);
-    if (ba === 1) return desc(a).localeCompare(desc(b), "pt-BR", { numeric: true, sensitivity: "base" });
-    return 0;
+    // Bloco 1 é o único com ordem combinada; os outros dois vão por nome.
+    return ba === 0 ? ORC_ORDEM_FIXA.indexOf(a.cod) - ORC_ORDEM_FIXA.indexOf(b.cod) : alfa(a, b);
   });
 }
 
