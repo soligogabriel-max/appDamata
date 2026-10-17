@@ -267,7 +267,9 @@ Deno.serve(async (req) => {
       // Zera a confirmação junto: ela era do horário antigo. Deixar marcado
       // faria a equipe contar com uma presença que o cliente nunca confirmou
       // para a data nova.
-      body: JSON.stringify({ slot_id: novo.id, confirmada_em: null }),
+      // Zera confirmação e lembrete: os dois eram do horário antigo. Um novo
+      // lembrete sai na véspera da data nova.
+      body: JSON.stringify({ slot_id: novo.id, confirmada_em: null, lembrete_em: null }),
     });
     if (!upd.ok) {
       return page(`<div class="msg">⚠️</div><div class="msg-title">Não consegui remarcar</div><div class="msg-text">Tente de novo em instantes ou chame no WhatsApp:<br><a class="link" href="https://wa.me/5519997830437">(19) 99783-0437</a></div>`);

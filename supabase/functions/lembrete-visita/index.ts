@@ -97,6 +97,14 @@ Deno.serve(async (req) => {
 
       const r = await sendTemplate(phone, nome, dataFmt, hora, link);
       if (r.messages) {
+        // Marca que o cliente recebeu o link. A aba Agendadas usa isto para só
+        // cobrar confirmação de quem foi perguntado.
+        await fetch(`${SB_URL}/rest/v1/visitas_comerciais?id=eq.${v.id}`, {
+          method: "PATCH",
+          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+          body: JSON.stringify({ lembrete_em: new Date().toISOString() }),
+        }).catch((e) => console.error("lembrete: falha ao marcar envio", v.id, e));
+
         // Salva mensagem enviada no histórico
         await fetch(`${SB_URL}/rest/v1/wpp_mensagens`, {
           method: "POST",
