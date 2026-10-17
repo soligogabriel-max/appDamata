@@ -186,6 +186,19 @@ Deno.serve(async (req) => {
 
   // Confirmar
   if (acao === "confirmar") {
+    if (v.status === "cancelada") {
+      return page(`<div class="msg">😔</div><div class="msg-title">Visita cancelada</div><div class="msg-text">Esta visita foi cancelada, então não há o que confirmar.<br><br>Para marcar outra: <a class="link" href="https://fazendadamata.com/#visita">fazendadamata.com</a></div>`);
+    }
+    // Registra de verdade. Antes isto só devolvia a página de agradecimento, e
+    // a equipe não tinha como saber quem tinha confirmado. Clicar de novo não
+    // reescreve a data: vale a primeira confirmação.
+    if (!v.confirmada_em) {
+      await fetch(`${SB_URL}/rest/v1/visitas_comerciais?id=eq.${id}`, {
+        method: "PATCH",
+        headers: { ...svc, Prefer: "return=minimal" },
+        body: JSON.stringify({ confirmada_em: new Date().toISOString() }),
+      }).catch((e) => console.error("confirmar: falha ao gravar", id, e));
+    }
     return page(`<div class="msg">✅</div><div class="msg-title">Presença confirmada!</div><div class="msg-text">Sua visita está confirmada para<br><strong>${dataFmt} às ${hora}</strong>.<br><br>Aguardamos você! 🌿</div>`);
   }
 
@@ -251,7 +264,10 @@ Deno.serve(async (req) => {
     const upd = await fetch(`${SB_URL}/rest/v1/visitas_comerciais?id=eq.${id}`, {
       method: "PATCH",
       headers: { ...svc, Prefer: "return=minimal" },
-      body: JSON.stringify({ slot_id: novo.id }),
+      // Zera a confirmação junto: ela era do horário antigo. Deixar marcado
+      // faria a equipe contar com uma presença que o cliente nunca confirmou
+      // para a data nova.
+      body: JSON.stringify({ slot_id: novo.id, confirmada_em: null }),
     });
     if (!upd.ok) {
       return page(`<div class="msg">⚠️</div><div class="msg-title">Não consegui remarcar</div><div class="msg-text">Tente de novo em instantes ou chame no WhatsApp:<br><a class="link" href="https://wa.me/5519997830437">(19) 99783-0437</a></div>`);

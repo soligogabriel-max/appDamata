@@ -4618,6 +4618,20 @@ const VC_DESFECHOS = [
 // mandando follow-up. "Decidindo" e "nao responde" continuam no fluxo.
 const VC_DESFECHOS_FINAIS = ["fechou_contrato", "fechou_outro"];
 
+// Se o cliente confirmou presenca pelo link do lembrete. So faz sentido em
+// visita ainda agendada: confirmada e' o estado de antes da visita acontecer.
+// "Sem resposta" aparece apenas depois que o lembrete saiu (9h da vespera) —
+// antes disso o cliente nem recebeu o link, e cobrar resposta dele seria
+// ruido na tela.
+function vcConfirmacaoBadge(v) {
+  if (v.status !== "agendada") return "";
+  if (v.confirmada_em) {
+    const d = new Date(v.confirmada_em).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+    return `<div style="display:inline-block;font-size:10px;background:#d1fae5;color:#065f46;border-radius:4px;padding:1px 6px;margin-top:3px;font-weight:600;" title="Cliente confirmou presença em ${d}">✅ Confirmou · ${d}</div>`;
+  }
+  return `<div style="display:inline-block;font-size:10px;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 6px;margin-top:3px;font-weight:600;" title="O cliente recebeu o lembrete e ainda não confirmou">⏳ Sem confirmação</div>`;
+}
+
 function vcDesfechoBadge(d) {
   const o = VC_DESFECHOS.find(x => x.v === d);
   if (!o) return "";
@@ -4714,7 +4728,7 @@ function _vcRenderAgendadas() {
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);font-weight:600;">${fmtSlot(v.slot_id)}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.nome ? `<button onclick='abrirHistoricoVisitante(${JSON.stringify(v.visitor_id||null)},${JSON.stringify(v.nome||"")},${JSON.stringify(v.whatsapp||null)})' style='background:none;border:none;cursor:pointer;color:var(--a);font-weight:600;font-size:13px;text-decoration:underline;text-underline-offset:2px;padding:0;'>${v.nome}</button>` : "—"}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.whatsapp?`<a href="https://wa.me/55${v.whatsapp.replace(/\D/g,'')}" target="_blank" style="color:var(--a);">${v.whatsapp}</a>`:"—"}</td>
-        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${statusLabel[v.status]||v.status}${v.feedback?` <span style="font-size:10px;background:${v.feedback==='interesse'?'#d1fae5':'#fee2e2'};color:${v.feedback==='interesse'?'#065f46':'#991b1b'};border-radius:4px;padding:1px 5px;margin-left:4px;">${v.feedback==='interesse'?'✅ Interesse':'❌ Sem interesse'}</span>`:''}${v.feedback==='sem_interesse'&&v.feedback_motivo?`<div style="font-size:10px;color:var(--dl);margin-top:2px;">${v.feedback_motivo}</div>`:''}${vcDesfechoBadge(v.desfecho)}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${statusLabel[v.status]||v.status}${v.feedback?` <span style="font-size:10px;background:${v.feedback==='interesse'?'#d1fae5':'#fee2e2'};color:${v.feedback==='interesse'?'#065f46':'#991b1b'};border-radius:4px;padding:1px 5px;margin-left:4px;">${v.feedback==='interesse'?'✅ Interesse':'❌ Sem interesse'}</span>`:''}${v.feedback==='sem_interesse'&&v.feedback_motivo?`<div style="font-size:10px;color:var(--dl);margin-top:2px;">${v.feedback_motivo}</div>`:''}${vcDesfechoBadge(v.desfecho)}${vcConfirmacaoBadge(v)}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">
           <div style="display:flex;align-items:center;gap:6px;">
           ${v.status === "agendada" ? `<button onclick="vcCopiarLink('${v.id}',this)" title="Copiar o link do cliente (confirmar, remarcar ou cancelar)" style="padding:4px 7px;background:none;border:1px solid var(--br);border-radius:6px;cursor:pointer;font-size:12px;color:var(--dk);line-height:1;white-space:nowrap;">🔗 Link</button>` : ''}
@@ -4819,8 +4833,11 @@ async function vcSalvarEdicao() {
   try {
     const desfecho  = document.getElementById("vce-desfecho").value || null;
     const desfecho0 = document.getElementById("vce-desf0").value || null;
+    const slot0 = document.getElementById("vce-slot0")?.value || "";
     const patch = { status, obs: obs || null, desfecho, nome, whatsapp: wpp || null };
     if (slotId) patch.slot_id = slotId;
+    // Mudou de horario: a confirmacao era do horario antigo e nao vale mais.
+    if (slotId && slotId !== slot0) patch.confirmada_em = null;
     if (desfecho !== desfecho0) patch.desfecho_em = desfecho ? new Date().toISOString() : null;
     if (["visitado_alta","visitado_baixa"].includes(status) && !VC_DESFECHOS_FINAIS.includes(desfecho)) {
       const d7 = new Date(); d7.setDate(d7.getDate() + 7);
@@ -4837,7 +4854,6 @@ async function vcSalvarEdicao() {
     await sbFetch("visitas_comerciais?id=eq." + vcId, { method:"PATCH", body:patch, prefer:"return=minimal" });
     // Remarcou: o evento tem que andar junto. Roda depois do PATCH porque a
     // function le a data nova direto do banco.
-    const slot0 = document.getElementById("vce-slot0")?.value || "";
     const nome0 = document.getElementById("vce-nome0")?.value || "";
     const wpp0  = document.getElementById("vce-wpp0")?.value  || "";
     const mudouEvento = (slotId && slotId !== slot0) || nome !== nome0 || wpp !== wpp0;
