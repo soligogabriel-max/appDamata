@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.17g";</script>
+<script>var LL_VERSION="v2026.10.17h";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -324,6 +324,7 @@
     <div class="tgrp" id="grp-relatorios">
       <button class="tgrp-btn" onclick="toggleGrp('grp-relatorios')">📊 Relatórios</button>
       <div class="tgrp-drop">
+        <button class="tab" onclick="setTab('funil');closeGrps()" id="t-funil">🔻 Funil de Vendas</button>
         <button class="tab" onclick="setTab('leads');closeGrps()" id="t-leads">🔥 Leads Quentes</button>
         <button class="tab" onclick="setTab('relatorio');closeGrps()" id="t-relatorio">📋 Faturamento</button>
         <button class="tab" onclick="setTab('relorc');closeGrps()" id="t-relorc">💬 Orçamentos</button>
@@ -881,6 +882,14 @@
         </div>
       </div>
     </div>
+    <div id="p-funil" class="panel">
+      <div class="uwrap" style="max-width:760px">
+        <div class="sec-t">🔻 Funil de Vendas</div>
+        <div id="funil-per" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;"></div>
+        <div id="funil-box"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
+      </div>
+    </div>
+
     <div id="p-leads" class="panel">
       <div class="uwrap" style="max-width:1040px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
@@ -2089,7 +2098,7 @@ function _applyNavForRole(role){
     allSubTabs.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     document.getElementById("t-pedidos-eq").style.display="none";
     // desfaz o que a simulação de "trafego" esconde
-    ["t-leads","t-relatorio","t-relorc","t-whatsapp","t-visitas","t-agenda"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
+    ["t-leads","t-relatorio","t-relorc","t-whatsapp","t-visitas","t-agenda","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     var wrapA=document.querySelector("#p-visitas .uwrap");
     if(wrapA) Array.from(wrapA.children).forEach(c=>{ c.style.display=""; c.style.borderTop=""; c.style.marginTop=""; });
   } else if(role==="trafego"){
@@ -2097,7 +2106,7 @@ function _applyNavForRole(role){
     // de anúncios — que é alimentado por RPC agregada, sem dado de cliente.
     allGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     var gr=document.getElementById("grp-relatorios"); if(gr) gr.style.display="";
-    ["t-dashboard","t-relatorio","t-relorc","t-whatsapp"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    ["t-dashboard","t-relatorio","t-relorc","t-whatsapp","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     var tv=document.getElementById("t-visitas"); if(tv) tv.style.display="";
     var ta=document.getElementById("t-agenda"); if(ta) ta.style.display="none";
     document.getElementById("t-pedidos-eq").style.display="none";
@@ -2536,7 +2545,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",conciliacao:"p-conciliacao",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",vc:"p-vc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas",whatsapp:"p-whatsapp",leads:"p-leads"};
+  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",conciliacao:"p-conciliacao",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",vc:"p-vc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas",whatsapp:"p-whatsapp",leads:"p-leads",funil:"p-funil"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(cfilter);
   if(t==="receber") renderReceber();
@@ -2562,6 +2571,7 @@ function setTab(t) {
   if(t==="socios") renderContaSocios();
   if(t==="visitas"){ if(effIsAdmin()) renderVisitas(); renderAnuncios(); }
   if(t==="leads") renderLeads();
+  if(t==="funil") renderFunil();
   if(t==="whatsapp") renderWhatsApp();
   if(t==="dashboard") renderDashboard();
   if(t==="vc") renderVC();
@@ -5615,6 +5625,82 @@ function setVisAgrup(mode) {
 // aqui. A RPC relatorio_anuncios junta os dois no banco: cada dispositivo é
 // atribuído ao anúncio do seu primeiro acesso no período (utm_content = ad.id,
 // que a Meta preenche dinamicamente no link), e os orçamentos/visitas daquele
+/* ── Funil de vendas ──────────────────────────────────────────────────
+   Do acesso ao site ao contrato fechado. A RPC funil_vendas agrega no banco:
+   a primeira etapa sozinha passa de 11 mil sessões em 90 dias.
+
+   Cada etapa conta quem chegou nela no período, e não quem veio da etapa
+   anterior: 496 dos 498 orçamentos trazem o identificador do navegador, mas
+   só 18 das 25 visitas — o resto foi marcado pela equipe no WhatsApp. Num
+   funil estrito essas visitas sumiriam, e visita marcada por telefone é
+   resultado real.
+
+   A barra mede a conversão em relação à etapa ANTERIOR, não ao topo: com
+   266 orçamentos para 11.716 acessos, barra proporcional ao topo seria um
+   risco de 2px em todas as etapas seguintes, e o gráfico não diria nada. */
+const FUNIL_ETAPAS = [
+  { k:"acessos",            rot:"Acessos únicos",     sub:"visitantes diferentes no site",     cor:"#8aa6c1" },
+  { k:"orcamentos",         rot:"Orçamentos",         sub:"pessoas, não simulações",            cor:"#6f9bbf" },
+  { k:"visitas_marcadas",   rot:"Visitas marcadas",   sub:"inclui as que depois cancelaram",    cor:"#E8A52A" },
+  { k:"visitas_realizadas", rot:"Visitas realizadas", sub:"o cliente veio",                     cor:"#d08a1e" },
+  { k:"em_jogo",            rot:"Ainda em jogo",      sub:"visitou e não foi descartado",       cor:"#4a7c59" },
+  { k:"fechou_contrato",    rot:"Fechou contrato",    sub:"desfecho marcado na visita",         cor:"#2a6644" }
+];
+let _funilDias = 90;
+
+function setFunilPeriodo(d){ _funilDias = d; renderFunil(); }
+
+async function renderFunil(){
+  const box = document.getElementById("funil-box");
+  const per = document.getElementById("funil-per");
+  if(!box) return;
+  if(per) per.innerHTML = [7,14,21,28,60,90].map(n=>{
+    const on = n===_funilDias;
+    return `<button onclick="setFunilPeriodo(${n})" style="padding:5px 12px;border:1px solid ${on?"var(--a)":"var(--br)"};background:${on?"var(--a)":"transparent"};color:${on?"#fff":"var(--dl)"};border-radius:999px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">${n} dias</button>`;
+  }).join("");
+  box.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  try{
+    const rows = await sbFetch("rpc/funil_vendas", {method:"POST", body:{p_dias:_funilDias}});
+    const f = Array.isArray(rows) ? rows[0] : rows;
+    if(!f){ box.innerHTML = '<div class="empty"><div class="eicon">📭</div>Sem dados no período.</div>'; return; }
+    const topo = Number(f.acessos) || 0;
+    const n = v => Number(v||0).toLocaleString("pt-BR");
+    const pct = (a,b) => b ? (100*a/b) : 0;
+    const fmtPct = v => (v>=10 ? v.toFixed(0) : v.toFixed(v>=1?1:2)).replace(".",",") + "%";
+
+    let ant = null;
+    box.innerHTML = FUNIL_ETAPAS.map(e=>{
+      const v = Number(f[e.k]) || 0;
+      const daAnterior = ant===null ? 100 : pct(v, ant);
+      const doTopo = pct(v, topo);
+      // minimo de 6% para a barra nao sumir quando a conversao e' baixa —
+      // mas zero desenha nada, senao parece que a etapa teve alguma coisa
+      const larg = v === 0 ? 0 : Math.max(6, Math.min(100, daAnterior));
+      const linha = `
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:4px;">
+            <div style="font-size:13px;font-weight:700;color:var(--dk);">${e.rot}</div>
+            <div style="font-size:18px;font-weight:800;color:${e.cor};white-space:nowrap;">${n(v)}</div>
+          </div>
+          <div style="background:var(--bg2);border-radius:6px;overflow:hidden;height:22px;">
+            <div style="width:${larg}%;height:100%;background:${e.cor};border-radius:6px;transition:width .3s;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;gap:10px;margin-top:3px;font-size:10px;color:var(--dl);">
+            <span>${e.sub}</span>
+            <span style="white-space:nowrap;">${ant===null ? "ponto de partida" : fmtPct(daAnterior)+" da etapa anterior · "+fmtPct(doTopo)+" dos acessos"}</span>
+          </div>
+        </div>`;
+      ant = v;
+      return linha;
+    }).join("") + `<div style="font-size:11px;color:var(--dl);border-top:1px solid var(--br);padding-top:10px;margin-top:4px;line-height:1.6;">
+      A barra mostra a conversão em relação à etapa anterior — proporcional ao topo, tudo depois dos acessos viraria um risco.
+      Cada etapa conta quem entrou nela no período, pela data de criação.
+      Descarte = fechou outro espaço, sem interesse ou não responde.</div>`;
+  }catch(e){
+    box.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar o funil: '+e.message+'</div>';
+  }
+}
+
 // dispositivo contam para esse anúncio. Primeiro acesso, não último: é o
 // clique que trouxe a pessoa que a mídia pagou.
 let _adsDias = 90;
