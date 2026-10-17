@@ -1,5 +1,10 @@
 -- Funil de vendas: do acesso ao site até o contrato fechado.
 --
+-- A última etapa conta EVENTO CRIADO NA AGENDA, não o campo desfecho da
+-- visita: desfecho depende de marcação manual e vive vazio. Não há vínculo
+-- entre agenda e orçamento/visita no banco, o que reforça o funil por
+-- contagem de etapa em vez de subconjunto estrito.
+--
 -- Agregado no banco porque a primeira etapa sozinha passa de 11 mil sessões em
 -- 90 dias — trazer linha crua para somar seis números não se paga.
 --
@@ -13,7 +18,8 @@
 create or replace function public.funil_vendas(p_dias int default 90)
 returns table(
   acessos bigint, orcamentos bigint, visitas_marcadas bigint,
-  visitas_realizadas bigint, em_jogo bigint, fechou_contrato bigint
+  visitas_realizadas bigint, em_jogo bigint, fechou_contrato bigint,
+  contrato_assinado bigint
 )
 language plpgsql stable security definer set search_path = public as $$
 declare ini timestamptz;
@@ -50,7 +56,16 @@ begin
       where status in ('visitado_alta','visitado_baixa','realizada')
         and coalesce(desfecho, '') not in ('fechou_outro', 'nao_responde')
         and coalesce(feedback, '') <> 'sem_interesse'),
-    (select count(*) from vis where desfecho = 'fechou_contrato');
+    -- Fechou contrato = evento novo na agenda. A primeira versão lia o campo
+    -- desfecho da visita e dava sempre zero: ele depende de alguém marcar à
+    -- mão e está preenchido em 3 de 25 visitas (todas como "fechou outro").
+    -- Evento na agenda não depende de ninguém lembrar — a data só é bloqueada
+    -- quando o negócio foi ganho.
+    (select count(*) from agenda a
+      where a.deleted_at is null and a.created_at >= ini),
+    (select count(*) from agenda a
+      where a.deleted_at is null and a.created_at >= ini
+        and a.assinatura_status = 'assinado');
 end $$;
 
 -- security definer: contar orçamento não exige poder ler nome, WhatsApp e

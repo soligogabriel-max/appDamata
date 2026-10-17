@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.17h";</script>
+<script>var LL_VERSION="v2026.10.17i";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -5644,7 +5644,7 @@ const FUNIL_ETAPAS = [
   { k:"visitas_marcadas",   rot:"Visitas marcadas",   sub:"inclui as que depois cancelaram",    cor:"#E8A52A" },
   { k:"visitas_realizadas", rot:"Visitas realizadas", sub:"o cliente veio",                     cor:"#d08a1e" },
   { k:"em_jogo",            rot:"Ainda em jogo",      sub:"visitou e não foi descartado",       cor:"#4a7c59" },
-  { k:"fechou_contrato",    rot:"Fechou contrato",    sub:"desfecho marcado na visita",         cor:"#2a6644" }
+  { k:"fechou_contrato",    rot:"Fechou contrato",    sub:"evento novo na agenda",              cor:"#2a6644" }
 ];
 let _funilDias = 90;
 
@@ -5692,10 +5692,11 @@ async function renderFunil(){
         </div>`;
       ant = v;
       return linha;
-    }).join("") + `<div style="font-size:11px;color:var(--dl);border-top:1px solid var(--br);padding-top:10px;margin-top:4px;line-height:1.6;">
+    }).join("") + (Number(f.fechou_contrato) ? `<div style="font-size:11px;color:var(--dl);margin:-6px 0 14px;padding-left:2px;">dos quais <b style="color:#2a6644;">${n(f.contrato_assinado)}</b> já com contrato assinado</div>` : "") + `<div style="font-size:11px;color:var(--dl);border-top:1px solid var(--br);padding-top:10px;margin-top:4px;line-height:1.6;">
       A barra mostra a conversão em relação à etapa anterior — proporcional ao topo, tudo depois dos acessos viraria um risco.
       Cada etapa conta quem entrou nela no período, pela data de criação.
-      Descarte = fechou outro espaço, sem interesse ou não responde.</div>`;
+      Descarte = fechou outro espaço, sem interesse ou não responde.
+      Contrato fechado = evento criado na agenda, não o desfecho marcado na visita.</div>`;
   }catch(e){
     box.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar o funil: '+e.message+'</div>';
   }
