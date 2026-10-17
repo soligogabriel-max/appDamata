@@ -786,6 +786,41 @@ async function _orcLoadPacotes(){
   body.innerHTML=_orcHTML2();
 }
 
+/* Ordem em que os itens aparecem no orçamento — tela, resumo e PDF saem todos
+   daqui, porque o PDF só percorre a seleção na ordem da tela.
+
+   Antes era a ordem de cadastro na tabela de preços (o id), que não diz nada
+   para quem lê o orçamento: a Suíte 7 vinha antes dos salões.
+
+   Quatro blocos:
+     1. salões, na ordem combinada (Tumbérgia, Bromélias)
+     2. Peroba Rosa
+     3. hospedagem (casa e suítes), em ordem alfabética
+     4. o resto, na ordem de cadastro
+
+   Os três primeiros vão por código e não por nome: código é chave e não muda
+   quando alguém corrige a descrição. Hospedagem vai por nome porque assim
+   suíte nova entra sozinha no lugar certo, sem mexer em código nenhum. */
+const ORC_ORDEM_FIXA = ["000004", "000005", "000007"];  // Espaço Tumbérgia, Espaço Bromélias, Peroba Rosa
+const _orcEhHospedagem = d => /^\s*(su[ií]te|casa)\b/i.test(d || "");
+
+function _orcOrdenaItens(items){
+  const desc = u => { const inv = _orc._invByCod[u.cod]; return (inv && inv.descricao) || u.cod || ""; };
+  const bloco = u => {
+    const fix = ORC_ORDEM_FIXA.indexOf(u.cod);
+    if (fix >= 0) return 0;
+    return _orcEhHospedagem(desc(u)) ? 1 : 2;
+  };
+  // sort estável (ES2019): empate no bloco 2 preserva a ordem de cadastro
+  return items.slice().sort((a, b) => {
+    const ba = bloco(a), bb = bloco(b);
+    if (ba !== bb) return ba - bb;
+    if (ba === 0) return ORC_ORDEM_FIXA.indexOf(a.cod) - ORC_ORDEM_FIXA.indexOf(b.cod);
+    if (ba === 1) return desc(a).localeCompare(desc(b), "pt-BR", { numeric: true, sensitivity: "base" });
+    return 0;
+  });
+}
+
 // Build unified item list (dedup by cod_item) + packages with their cod members
 function _orcBuildUnified(){
   const seen=new Set();
@@ -809,7 +844,7 @@ function _orcBuildUnified(){
   });
   _orc._uPkgs=pkgs;
   _orc._uByCod=byCod;
-  _orc._uItems=order.map(c=>byCod[c]);
+  _orc._uItems=_orcOrdenaItens(order.map(c=>byCod[c]));
   if(!_orc._uSel) _orc._uSel={};
 }
 
