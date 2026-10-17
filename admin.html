@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.17b";</script>
+<script>var LL_VERSION="v2026.10.17c";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -3831,7 +3831,7 @@ async function abrirHistoricoVisitante(visitorId, nome, whatsapp) {
 
     // ── Seção: Dados do visitante ──
     const wppLink = whatsapp
-      ? `<a href="https://wa.me/55${whatsapp.replace(/\D/g,'')}" target="_blank" style="color:var(--a);font-weight:600;">${whatsapp}</a>`
+      ? `<a href="https://wa.me/${_vcWaNumero(whatsapp)}" target="_blank" style="color:var(--a);font-weight:600;">${whatsapp}</a>`
       : '<span style="color:var(--dl);">Não informado</span>';
 
     // ── Seção: Visitas ao site ──
@@ -4623,7 +4623,80 @@ const VC_DESFECHOS_FINAIS = ["fechou_contrato", "fechou_outro"];
 // "Sem resposta" aparece apenas depois que o lembrete saiu (9h da vespera) —
 // antes disso o cliente nem recebeu o link, e cobrar resposta dele seria
 // ruido na tela.
-function vcConfirmacaoBadge(v) {
+// Os numeros sao gravados em formatos variados, e a maioria ja vem com o 55
+// ("+55 19 98955-6917"). O codigo antigo prefixava 55 sempre, gerando
+// wa.me/5555... — link quebrado para quase todo mundo.
+function _vcWaNumero(wpp) {
+  const d = String(wpp || "").replace(/\D/g, "");
+  if (!d) return "";
+  if (d.length >= 12 && d.startsWith("55")) return d;   // ja internacional
+  if (d.length >= 10) return "55" + d;                  // DDD + numero
+  return "";                                            // curto demais, nao arrisca
+}
+
+// Link assinado do cliente. Quem assina e' a confirmar-visita; o navegador nao
+// tem o segredo.
+async function _vcLinkCliente(vcId) {
+  const res = await fetch(SB_URL + "/functions/v1/confirmar-visita?acao=link&id=" + encodeURIComponent(vcId), {
+    headers: { "apikey": SB_KEY, "Authorization": "Bearer " + _authToken }
+  });
+  const r = await res.json().catch(() => ({}));
+  if (!res.ok || !r.url) throw new Error(r.error || ("HTTP " + res.status));
+  return r.url;
+}
+
+// Cobranca de confirmacao, no mesmo molde do follow-up pos-visita: mensagem
+// pronta e editavel, enviada pelo SEU WhatsApp, com o link do cliente dentro.
+async function vcAbrirConfirmacao(vcId, nome, whatsapp, quando) {
+  let link;
+  try { link = await _vcLinkCliente(vcId); }
+  catch(e) { toast("⚠️ Não consegui gerar o link: " + e.message, 4000); return; }
+
+  const primeiro = String(nome || "").split(" ")[0];
+  const msg = "Oi " + primeiro + "! 🌿\n\n"
+    + "Passando para confirmar sua visita à Fazenda Damata" + (quando ? " — " + quando : "") + ".\n\n"
+    + "Você consegue vir? É só tocar no link abaixo:\n" + link + "\n\n"
+    + "Por lá dá para confirmar, remarcar para outro horário ou cancelar, como ficar melhor para você.\n\n"
+    + "Qualquer dúvida, estamos à disposição! 🤍\nEquipe Fazenda Damata";
+
+  let m = document.getElementById("m-vc-confirmar");
+  if (!m) {
+    m = document.createElement("div");
+    m.id = "m-vc-confirmar";
+    m.className = "moverlay";
+    m.onclick = function(e) { if (e.target === this) m.classList.remove("open"); };
+    m.innerHTML = `<div class="modal-inner" style="max-width:500px;width:100%;">
+      <div style="font-size:18px;font-weight:800;margin-bottom:4px;">📲 Pedir confirmação</div>
+      <div id="vcc-sub" style="font-size:13px;color:var(--dl);margin-bottom:14px;"></div>
+      <label class="lbl">Mensagem (edite se quiser)</label>
+      <textarea id="vcc-msg" class="inp" rows="10" style="resize:vertical;font-size:13px;line-height:1.55;white-space:pre-wrap;"></textarea>
+      <div style="margin-top:6px;font-size:11px;color:var(--dl);">O link do cliente já vai na mensagem — ele confirma, remarca ou cancela por lá, e a lista atualiza sozinha.</div>
+      <div style="display:flex;gap:10px;margin-top:14px;">
+        <a id="vcc-wpp" href="#" target="_blank" style="flex:1;padding:12px;background:#25d366;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px;text-decoration:none;text-align:center;">📲 Enviar no WhatsApp</a>
+        <button onclick="document.getElementById('m-vc-confirmar').classList.remove('open')" style="padding:12px 18px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;">Agora não</button>
+      </div>
+    </div>`;
+    document.body.appendChild(m);
+  }
+  document.getElementById("vcc-msg").value = msg;
+  const num = _vcWaNumero(whatsapp);
+  document.getElementById("vcc-sub").textContent = num
+    ? "Para: " + nome + " · " + whatsapp
+    : "⚠️ Sem WhatsApp utilizável — copie a mensagem e envie à mão.";
+  const btn = document.getElementById("vcc-wpp");
+  btn.textContent = num ? "📲 Enviar no WhatsApp" : "📋 Copiar mensagem";
+  btn.style.opacity = num ? "1" : "0.75";
+  btn.onclick = function(e) {
+    e.preventDefault();
+    const txt = document.getElementById("vcc-msg").value;
+    if (num) window.open("https://wa.me/" + num + "?text=" + encodeURIComponent(txt), "_blank");
+    else { navigator.clipboard?.writeText(txt); toast("📋 Mensagem copiada!"); }
+    document.getElementById("m-vc-confirmar").classList.remove("open");
+  };
+  m.classList.add("open");
+}
+
+function vcConfirmacaoBadge(v, quando) {
   if (v.status !== "agendada") return "";
   const dia = t => new Date(t).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
   if (v.confirmada_em) {
@@ -4633,7 +4706,8 @@ function vcConfirmacaoBadge(v) {
   // Sem lembrete enviado nao mostra nada: o cliente ainda nao recebeu o link,
   // e marcar "sem confirmacao" seria cobrar resposta de pergunta nao feita.
   if (!v.lembrete_em) return "";
-  return `<div style="display:inline-block;font-size:10px;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 6px;margin-top:3px;font-weight:600;" title="Lembrete enviado em ${dia(v.lembrete_em)} e sem resposta até agora">⏳ Sem confirmação</div>`;
+  const arg = x => JSON.stringify(x == null ? "" : String(x));
+  return `<button onclick='vcAbrirConfirmacao(${arg(v.id)},${arg(v.nome)},${arg(v.whatsapp)},${arg(quando)})' title="Lembrete enviado em ${dia(v.lembrete_em)} e sem resposta — toque para cobrar no WhatsApp" style="display:inline-block;font-size:10px;background:#fef3c7;color:#92400e;border:none;border-radius:4px;padding:2px 6px;margin-top:3px;font-weight:600;cursor:pointer;font-family:inherit;">⏳ Sem confirmação · 📲 cobrar</button>`;
 }
 
 function vcDesfechoBadge(d) {
@@ -4731,8 +4805,8 @@ function _vcRenderAgendadas() {
       <tbody>${lista.map((v,i)=>`<tr style="background:${i%2?"var(--bg2)":"transparent"}">
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);font-weight:600;">${fmtSlot(v.slot_id)}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.nome ? `<button onclick='abrirHistoricoVisitante(${JSON.stringify(v.visitor_id||null)},${JSON.stringify(v.nome||"")},${JSON.stringify(v.whatsapp||null)})' style='background:none;border:none;cursor:pointer;color:var(--a);font-weight:600;font-size:13px;text-decoration:underline;text-underline-offset:2px;padding:0;'>${v.nome}</button>` : "—"}</td>
-        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.whatsapp?`<a href="https://wa.me/55${v.whatsapp.replace(/\D/g,'')}" target="_blank" style="color:var(--a);">${v.whatsapp}</a>`:"—"}</td>
-        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${statusLabel[v.status]||v.status}${v.feedback?` <span style="font-size:10px;background:${v.feedback==='interesse'?'#d1fae5':'#fee2e2'};color:${v.feedback==='interesse'?'#065f46':'#991b1b'};border-radius:4px;padding:1px 5px;margin-left:4px;">${v.feedback==='interesse'?'✅ Interesse':'❌ Sem interesse'}</span>`:''}${v.feedback==='sem_interesse'&&v.feedback_motivo?`<div style="font-size:10px;color:var(--dl);margin-top:2px;">${v.feedback_motivo}</div>`:''}${vcDesfechoBadge(v.desfecho)}${vcConfirmacaoBadge(v)}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${v.whatsapp?`<a href="https://wa.me/${_vcWaNumero(v.whatsapp)}" target="_blank" style="color:var(--a);">${v.whatsapp}</a>`:"—"}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid var(--br);">${statusLabel[v.status]||v.status}${v.feedback?` <span style="font-size:10px;background:${v.feedback==='interesse'?'#d1fae5':'#fee2e2'};color:${v.feedback==='interesse'?'#065f46':'#991b1b'};border-radius:4px;padding:1px 5px;margin-left:4px;">${v.feedback==='interesse'?'✅ Interesse':'❌ Sem interesse'}</span>`:''}${v.feedback==='sem_interesse'&&v.feedback_motivo?`<div style="font-size:10px;color:var(--dl);margin-top:2px;">${v.feedback_motivo}</div>`:''}${vcDesfechoBadge(v.desfecho)}${vcConfirmacaoBadge(v, fmtSlot(v.slot_id))}</td>
         <td style="padding:7px 10px;border-bottom:1px solid var(--br);">
           <div style="display:flex;align-items:center;gap:6px;">
           ${v.status === "agendada" ? `<button onclick="vcCopiarLink('${v.id}',this)" title="Copiar o link do cliente (confirmar, remarcar ou cancelar)" style="padding:4px 7px;background:none;border:1px solid var(--br);border-radius:6px;cursor:pointer;font-size:12px;color:var(--dk);line-height:1;white-space:nowrap;">🔗 Link</button>` : ''}
@@ -4913,8 +4987,8 @@ function vcAbrirFollowUp(vcId, nome, whatsapp) {
   wppBtn.onclick = function(e) {
     e.preventDefault();
     const txt = encodeURIComponent(document.getElementById("fup-msg").value);
-    const num = (whatsapp || "").replace(/\D/g, "");
-    if (num) window.open("https://wa.me/55" + num + "?text=" + txt, "_blank");
+    const num = _vcWaNumero(whatsapp);
+    if (num) window.open("https://wa.me/" + num + "?text=" + txt, "_blank");
     else { navigator.clipboard?.writeText(document.getElementById("fup-msg").value); toast("📋 Mensagem copiada!"); }
   };
   wppBtn.style.opacity = whatsapp ? "1" : "0.6";
