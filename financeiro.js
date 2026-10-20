@@ -817,6 +817,7 @@ function _extRenderTable(rows,filtered){
 // quitar um só. Cada linha aqui é quanto DESTA movimentação foi para
 // AQUELE título; o status do título sai da soma, recalculado no banco.
 let _ratMov=null, _ratAlocs=[], _ratTitulos=[], _ratAlocadoPorTitulo={}, _ratAgMap={}, _ratAfter=null;
+let _ratEventos=[], _ratEvFiltro="", _ratEvInfo=null;
 
 function closeRateio(){ document.getElementById("m-rateio").classList.remove("open"); }
 function _ratErr(e){ try{ const j=JSON.parse(e.message); return j.message||e.message; }catch(_){ return e.message||String(e); } }
@@ -841,13 +842,18 @@ async function openRateio(idExtrato, after){
     // se ele ainda cabe aqui é o saldo (valor menos o que já foi rateado),
     // não o status — e é o saldo que some quando o rateio fecha o título.
     const COLS="select=id,cod_evento,parcela,num_parcela,valor,vencimento,data_recebido,status";
-    const [mov, alocs, todas, titulos, agMap]=await Promise.all([
+    // Reabrir a mesma movimentação (depois de alocar) mantém o evento
+    // escolhido; trocar de movimentação começa do zero.
+    if(!_ratMov || _ratMov.id_extrato_c6!==idExtrato){ _ratEvFiltro=""; _ratEvInfo=null; }
+    const [mov, alocs, todas, titulos, agMap, eventos]=await Promise.all([
       dbGet("extrato_bancario","id_extrato_c6=eq."+encodeURIComponent(idExtrato)+"&select=id_extrato_c6,data_lancamento,titulo,descricao,entrada&limit=1"),
       dbGet("conciliacao_receber","extrato_id=eq."+encodeURIComponent(idExtrato)+"&select=id,titulo_id,valor&order=id.asc"),
       dbGetAll("conciliacao_receber","select=titulo_id,valor"),
       dbGetAll("contas_a_receber",COLS+"&valor=gt.0&order=vencimento.asc.nullslast"),
-      getAgendaMap()
+      getAgendaMap(),
+      _loadLkSrc("agenda")
     ]);
+    _ratEventos=eventos||[];
     if(!mov.length){ document.getElementById("rateio-body").innerHTML='<div class="empty"><div class="eicon">⚠️</div>Movimentação não encontrada.</div>'; return; }
     _ratMov=mov[0]; _ratAlocs=alocs||[]; _ratTitulos=titulos||[]; _ratAgMap=agMap;
     _ratAlocadoPorTitulo={};
@@ -896,12 +902,40 @@ function _ratRender(){
     || (_concTituloPago(a)
         ? String(b.data_recebido||"").localeCompare(String(a.data_recebido||""))
         : String(a.vencimento||"").localeCompare(String(b.vencimento||""))));
-  const opts=disponiveis.map(t=>{
+  // Escolher o evento primeiro é o caminho normal: a lista inteira passa de
+  // mil e setecentos títulos, e quem concilia já sabe de quem é o depósito.
+  const porEvento={};
+  disponiveis.forEach(t=>{ const k=t.cod_evento||""; porEvento[k]=(porEvento[k]||0)+1; });
+  const evOpt=e=>`<option value="${_esc(e.cod)}"${e.cod===_ratEvFiltro?" selected":""}>${_esc(e.nome_evento||e.cod)}${porEvento[e.cod]?` (${porEvento[e.cod]})`:""}</option>`;
+  const evComSaldo=_ratEventos.filter(e=>porEvento[e.cod]);
+  const evSemSaldo=_ratEventos.filter(e=>!porEvento[e.cod]);
+  const evOpts=`<option value="">— Todos os eventos (${disponiveis.length} títulos) —</option>`
+    +(evComSaldo.length?`<optgroup label="Com título em aberto">${evComSaldo.map(evOpt).join("")}</optgroup>`:"")
+    +(evSemSaldo.length?`<optgroup label="Sem título em aberto">${evSemSaldo.map(evOpt).join("")}</optgroup>`:"");
+
+  const doEvento=_ratEvFiltro?disponiveis.filter(t=>t.cod_evento===_ratEvFiltro):disponiveis;
+  const opts=doEvento.map(t=>{
     const parcial=_ratSaldo(t)<(+t.valor||0)-0.02;
     return `<option value="${t.id}" data-saldo="${_ratSaldo(t)}">${_esc(_ratLabel(t))}`
       +`${parcial?" — saldo "+fmt(_ratSaldo(t)):""}`
       +`${_concTituloPago(t)?" · já baixado "+fmtDate(t.data_recebido):""}</option>`;
   }).join("");
+
+  // Dinheiro que entrou sem parcela correspondente: cria o título no evento,
+  // já quitado por esta entrada, e soma o valor ao contrato. Só aparece com um
+  // evento escolhido e com sobra para cobrir o título inteiro — título criado
+  // pela metade ficaria NP e a próxima edição do parcelamento o apagaria.
+  const nomeEv=_ratEvFiltro?((_ratEvInfo&&_ratEvInfo.nome_evento)||_ratAgMap[_ratEvFiltro]||_ratEvFiltro):"";
+  const locAtual=Number((_ratEvInfo&&_ratEvInfo.valor_locacao)||0);
+  const blocoNova=(_ratEvFiltro&&sobra>0.02)?`
+    <div style="border-top:1px dashed var(--br);margin-top:14px;padding-top:12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Parcela que não está na lista</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <input class="inp" id="rat-nova-val" style="width:130px;margin-bottom:0;" value="${sobra.toFixed(2).replace(".",",")}"/>
+        <button class="btn-cancel" style="padding:9px 16px;" onclick="_ratCriarParcela()">+ Criar parcela em ${_esc(nomeEv)}</button>
+      </div>
+      <p style="font-size:11px;color:var(--dl);margin-top:8px;">Nasce quitada por esta entrada e soma ao valor do contrato${_ratEvInfo?`, que vai de ${fmt(locAtual)} para ${fmt(locAtual+sobra)}`:""}.</p>
+    </div>`:"";
 
   document.getElementById("rateio-body").innerHTML=`
     ${linhas?`<div class="table-wrap" style="margin-bottom:14px;"><table class="fin-table">
@@ -909,7 +943,8 @@ function _ratRender(){
       <tbody>${linhas}</tbody></table></div>`:'<p style="font-size:13px;color:var(--dl);margin-bottom:14px;">Esta movimentação ainda não foi rateada.</p>'}
     <div style="border-top:1px solid var(--br);padding-top:12px;">
       <div style="font-size:11px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">Adicionar título</div>
-      <input class="inp" id="rat-add-busca" placeholder="🔍 Filtrar por evento, parcela ou data..." style="margin-bottom:8px;" oninput="lkFilter(this,'rat-add-tit')"/>
+      <select class="inp" id="rat-add-ev" style="margin-bottom:8px;" onchange="_ratSetEvento(this.value)">${evOpts}</select>
+      <input class="inp" id="rat-add-busca" placeholder="🔍 Filtrar por parcela, valor ou data..." style="margin-bottom:8px;" oninput="lkFilter(this,'rat-add-tit')"/>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">
         <select class="inp" id="rat-add-tit" style="flex:1;min-width:260px;margin-bottom:0;" onchange="_ratSugereValor()">
           <option value="">— Escolha o título —</option>${opts}
@@ -918,7 +953,10 @@ function _ratRender(){
         <button class="btn-confirm" style="padding:9px 16px;" onclick="_ratAdicionar()">Alocar</button>
       </div>
       <div id="rat-err" style="display:none;color:var(--er);font-size:12px;margin-top:8px;"></div>
-      ${disponiveis.length?`<p style="font-size:11px;color:var(--dl);margin-top:8px;">${disponiveis.length} título${disponiveis.length!==1?"s":""} com saldo — os em aberto vêm primeiro, os já baixados depois.</p>`:'<p style="font-size:12px;color:var(--dl);margin-top:8px;">Nenhum título com saldo.</p>'}
+      ${doEvento.length
+        ?`<p style="font-size:11px;color:var(--dl);margin-top:8px;">${doEvento.length} título${doEvento.length!==1?"s":""} com saldo${_ratEvFiltro?" neste evento":""} — os em aberto vêm primeiro, os já baixados depois.</p>`
+        :`<p style="font-size:12px;color:var(--dl);margin-top:8px;">${_ratEvFiltro?"Este evento não tem título com saldo.":"Nenhum título com saldo."}</p>`}
+      ${blocoNova}
     </div>`;
   _ratSugereValor();
 }
@@ -934,6 +972,73 @@ function _ratSugereValor(){
   const sobra=Math.max(0,(+_ratMov.entrada||0)-alocado);
   const saldo=+opt.dataset.saldo||0;
   inp.value=Math.min(sobra,saldo).toFixed(2).replace(".",",");
+}
+
+// Escolher o evento é o que estreita a lista; o valor do contrato vem junto
+// porque é ele que muda se a parcela for criada aqui.
+async function _ratSetEvento(cod){
+  _ratEvFiltro=cod||""; _ratEvInfo=null;
+  if(_ratEvFiltro){
+    try{
+      const r=await dbGet("agenda","cod=eq."+encodeURIComponent(_ratEvFiltro)+"&select=cod,nome_evento,valor_locacao&limit=1");
+      _ratEvInfo=(r&&r[0])||null;
+    }catch(e){ /* sem o valor do contrato o bloco só deixa de mostrar o antes/depois */ }
+  }
+  _ratRender();
+}
+
+// Entrada sem parcela correspondente: cria o título no evento, aloca esta
+// entrada nele e soma o valor ao contrato. O título nasce coberto por inteiro
+// — se ficasse NP, sincronizarParcelasReceber() o trataria como sobra do
+// parcelamento e o apagaria na próxima edição do evento.
+async function _ratCriarParcela(){
+  const err=document.getElementById("rat-err");
+  err.style.display="none";
+  const cod=_ratEvFiltro;
+  if(!cod){ err.textContent="Escolha o evento primeiro."; err.style.display="block"; return; }
+  const alocado=_ratAlocs.reduce((a,x)=>a+(+x.valor||0),0);
+  const sobra=+(((+_ratMov.entrada||0)-alocado).toFixed(2));
+  const valor=_ratNum((document.getElementById("rat-nova-val")||{}).value)||sobra;
+  if(!(valor>0)){ err.textContent="Informe um valor maior que zero."; err.style.display="block"; return; }
+  if(valor>sobra+0.001){ err.textContent="Esta entrada só tem "+fmt(sobra)+" por alocar."; err.style.display="block"; return; }
+
+  const nome=(_ratEvInfo&&_ratEvInfo.nome_evento)||_ratAgMap[cod]||cod;
+  const locAtual=Number((_ratEvInfo&&_ratEvInfo.valor_locacao)||0);
+  if(!confirm(`Criar uma parcela de ${fmt(valor)} em "${nome}"?\n\n`
+    +`• O título nasce quitado por esta entrada de ${fmtDate(_ratMov.data_lancamento)}.\n`
+    +`• O valor do contrato vai de ${fmt(locAtual)} para ${fmt(locAtual+valor)}.`)) return;
+
+  let tid=null;
+  try{
+    const criado=await sbFetch("contas_a_receber",{method:"POST",prefer:"return=representation",body:[{
+      cod_evento: cod,
+      parcela: "Extra",
+      num_parcela: null,
+      valor: valor,
+      vencimento: _ratMov.data_lancamento,
+      mes_ano: (_ratMov.data_lancamento||"").slice(0,7).replace("-",""),
+      status: "NP",
+      aditivo_id: null,
+      obs: "Avulsa do extrato — "+(_ratMov.titulo||_ratMov.descricao||_ratMov.id_extrato_c6),
+    }]});
+    tid=(Array.isArray(criado)?criado[0]:criado)||null;
+    tid=tid&&tid.id;
+    if(!tid) throw new Error("O título não foi criado.");
+    await sbFetch("conciliacao_receber",{method:"POST",prefer:"return=minimal",
+      body:[{extrato_id:_ratMov.id_extrato_c6, titulo_id:tid, valor:valor}]});
+    await sbFetch("agenda?cod=eq."+encodeURIComponent(cod),{method:"PATCH",prefer:"return=minimal",
+      body:{valor_locacao: +((locAtual+valor).toFixed(2))}});
+  }catch(e){
+    // Título sem rateio é exatamente o que não pode sobrar: ele entraria na
+    // cobrança do evento como parcela em aberto que ninguém criou de propósito.
+    if(tid){ try{ await dbDelete("contas_a_receber","id=eq."+tid); }catch(_){ } }
+    err.textContent=_ratErr(e); err.style.display="block";
+    return;
+  }
+  cachedEvts=null; _agendaMap=null; _contratosCache=null; _lkCache["agenda"]=null;
+  await openRateio(_ratMov.id_extrato_c6);
+  if(_ratAfter)_ratAfter();
+  toast("✅ Parcela criada, conciliada e somada ao contrato");
 }
 
 async function _ratAdicionar(){
