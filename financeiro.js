@@ -1122,7 +1122,27 @@ async function _matchEntradas(entradas){
   const m=montarTitulosComSaldo(receber,alocs);
   _impAlocado=m.alocado; _impTitulos=m.titulos;
   _impAgMap=await getAgendaMap();
-  return entradas.map(row=>({...row, ...sugerirAlocacoes(row.entrada, row.data_lancamento, _impTitulos)}));
+
+  // Uma sugestão consome o saldo do título para as seguintes. Sem isto, cinco
+  // entradas de R$ 1.000 sugeriam todas a MESMA parcela de R$ 1.000 — cada
+  // linha olhando o saldo cheio — e o passo 2 travava pedindo correção linha a
+  // linha, justamente no caso comum de parcelas iguais do mesmo evento.
+  // Em ordem de data: a entrada mais antiga fica com a parcela mais próxima
+  // dela, e a seguinte encontra a próxima que ainda tem saldo.
+  const saldo={};
+  _impTitulos.forEach(t=>{ saldo[String(t.id)]=t._saldo; });
+  const sugeridas=new Array(entradas.length);
+  entradas.map((r,i)=>({r,i}))
+    .sort((a,b)=>String(a.r.data_lancamento||"").localeCompare(String(b.r.data_lancamento||"")))
+    .forEach(({r,i})=>{
+      const disponiveis=_impTitulos
+        .map(t=>({...t, _saldo:saldo[String(t.id)]||0}))
+        .filter(t=>t._saldo>0.02);
+      const s=sugerirAlocacoes(r.entrada, r.data_lancamento, disponiveis);
+      s._allocs.forEach(a=>{ saldo[String(a.titulo_id)]=(saldo[String(a.titulo_id)]||0)-a.valor; });
+      sugeridas[i]={...r, ...s};
+    });
+  return sugeridas;
 }
 
 function _normalize(s){return(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();}
