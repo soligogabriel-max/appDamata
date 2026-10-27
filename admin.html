@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.20b";</script>
+<script>var LL_VERSION="v2026.10.27a";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -4913,6 +4913,8 @@ async function vcAbrirEdicao(vcId) {
       <input type="hidden" id="vce-slot0" value="${v.slot_id || ''}">
       <input type="hidden" id="vce-desf0" value="${v.desfecho || ''}">
       <input type="hidden" id="vce-conf0" value="${v.confirmada_em ? 'sim' : ''}">
+      <input type="hidden" id="vce-stat0" value="${v.status || ''}">
+      <input type="hidden" id="vce-vid0"  value="${v.visitor_id || ''}">
       <input type="hidden" id="vce-nome0" value="${_vcAttr(v.nome)}">
       <input type="hidden" id="vce-wpp0"  value="${_vcAttr(v.whatsapp)}">
       <label class="lbl">Cliente</label>
@@ -4920,10 +4922,21 @@ async function vcAbrirEdicao(vcId) {
       <label class="lbl">WhatsApp</label>
       <input type="tel" id="vce-wpp" class="inp" value="${_vcAttr(v.whatsapp)}" placeholder="(11) 91234-5678">
       <label class="lbl">Data e horário</label>
-      <select id="vce-slot" class="inp">
+      <select id="vce-slot" class="inp" onchange="_vcAvaliaRemarca()">
         ${!v.slot_id ? '<option value="">— sem horário —</option>' : ''}
         ${slots.map(s => `<option value="${s.id}"${s.id === v.slot_id ? ' selected' : ''}>${fmtSlotOpt(s)}</option>`).join("")}
       </select>
+      <div id="vce-remarca-box" style="display:none;background:#FEF3C7;border:1px solid #FCD34D;border-radius:8px;padding:10px 12px;margin:-4px 0 12px;">
+        <div style="font-size:12px;font-weight:700;color:#92400E;margin-bottom:6px;">Esta visita já aconteceu</div>
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--dk);cursor:pointer;margin-bottom:5px;">
+          <input type="radio" name="vce-remarca" value="nova" checked style="margin-top:2px;accent-color:var(--a);">
+          <span><b>É uma segunda visita</b> — cria um registro novo no horário escolhido e mantém esta no histórico</span>
+        </label>
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--dk);cursor:pointer;">
+          <input type="radio" name="vce-remarca" value="mover" style="margin-top:2px;accent-color:var(--a);">
+          <span><b>Corrigir a data desta visita</b> — a data antiga é substituída</span>
+        </label>
+      </div>
       <label class="lbl">Desfecho <span style="font-weight:400;color:var(--dl);">— o que aconteceu depois da visita</span></label>
       <select id="vce-desfecho" class="inp">
         <option value="">— sem resposta ainda —</option>
@@ -4951,6 +4964,19 @@ async function vcAbrirEdicao(vcId) {
   }
 }
 
+const VC_JA_VISITADA = ["visitado_alta","visitado_baixa","realizada"];
+
+// A pergunta so aparece no caso ambiguo: mexer no horario de visita que ja
+// aconteceu. Antes isso remanejava o registro em silencio, e a visita
+// realizada — com status e feedback — virava a futura, sumindo do historico.
+function _vcAvaliaRemarca(){
+  const box = document.getElementById("vce-remarca-box"); if(!box) return;
+  const slot  = document.getElementById("vce-slot")?.value || "";
+  const slot0 = document.getElementById("vce-slot0")?.value || "";
+  const st0   = document.getElementById("vce-stat0")?.value || "";
+  box.style.display = (VC_JA_VISITADA.includes(st0) && slot && slot !== slot0) ? "" : "none";
+}
+
 async function vcSalvarEdicao() {
   const vcId   = document.getElementById("vce-id").value;
   const gcalId = document.getElementById("vce-gcal").value;
@@ -4968,10 +4994,15 @@ async function vcSalvarEdicao() {
     const desfecho  = document.getElementById("vce-desfecho").value || null;
     const desfecho0 = document.getElementById("vce-desf0").value || null;
     const slot0 = document.getElementById("vce-slot0")?.value || "";
+    const st0   = document.getElementById("vce-stat0")?.value || "";
+    // Segunda visita: o horario novo vira registro proprio e esta fica intacta.
+    const segunda = VC_JA_VISITADA.includes(st0) && slotId && slotId !== slot0 &&
+      (document.querySelector('input[name="vce-remarca"]:checked')?.value || "nova") === "nova";
+
     const patch = { status, obs: obs || null, desfecho, nome, whatsapp: wpp || null };
-    if (slotId) patch.slot_id = slotId;
+    if (slotId && !segunda) patch.slot_id = slotId;
     // Mudou de horario: a confirmacao era do horario antigo e nao vale mais.
-    if (slotId && slotId !== slot0) { patch.confirmada_em = null; patch.lembrete_em = null; }
+    if (slotId && slotId !== slot0 && !segunda) { patch.confirmada_em = null; patch.lembrete_em = null; }
     // Depois da regra acima de proposito: se voce marcou na tela, a sua
     // escolha vence o zeramento automatico da remarcacao.
     const conf  = document.getElementById("vce-conf")?.value || "";
@@ -4993,6 +5024,21 @@ async function vcSalvarEdicao() {
     await sbFetch("visitas_comerciais?id=eq." + vcId, { method:"PATCH", body:patch, prefer:"return=minimal" });
     // Remarcou: o evento tem que andar junto. Roda depois do PATCH porque a
     // function le a data nova direto do banco.
+    if (segunda) {
+      // Nasce limpa: sem feedback, desfecho, confirmacao nem evento da
+      // primeira — e' outra visita, nao a mesma em outra data.
+      const criada = await sbFetch("visitas_comerciais", { method:"POST", body:{
+        slot_id: slotId, nome, whatsapp: wpp || null, status: "agendada",
+        visitor_id: document.getElementById("vce-vid0")?.value || null
+      }});
+      const nv = Array.isArray(criada) ? criada[0] : criada;
+      if (nv?.id) await _syncVCGoogleCal(nv.id).catch(e=>toast("⚠️ GCal: "+e.message, 4000));
+      document.getElementById("m-vc-edit").classList.remove("open");
+      _vcLoadAgendadas();
+      toast("✅ Segunda visita criada. A primeira continua no histórico.");
+      return;
+    }
+
     const nome0 = document.getElementById("vce-nome0")?.value || "";
     const wpp0  = document.getElementById("vce-wpp0")?.value  || "";
     const mudouEvento = (slotId && slotId !== slot0) || nome !== nome0 || wpp !== wpp0;

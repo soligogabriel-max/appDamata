@@ -332,7 +332,12 @@ Deno.serve(async (req) => {
 
   // ── DELETE ──
   if (action === "delete") {
-    if (!google_cal_id) return json({ ok: true, msg: "Sem google_cal_id, nada a deletar." });
+    if (!google_cal_id) {
+      // Sem evento no Google ainda pode haver convite do cliente no Storage —
+      // visita que teve o evento apagado por fora, ou registro remanejado.
+      if (visita) await apagarIcsVisita(SB_URL, SB_SVC, visita.id);
+      return json({ ok: true, msg: "Sem google_cal_id; convite do cliente removido se existia." });
+    }
     const delRes = await fetch(`${BASE}/${google_cal_id}`, { method: "DELETE", headers: authH });
     // 410/404 = evento já não existe (apagado na mão, por exemplo): fim igual.
     if (!delRes.ok && delRes.status !== 404 && delRes.status !== 410) {
