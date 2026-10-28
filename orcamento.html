@@ -48,13 +48,17 @@ function aviso(titulo, texto){
 }
 
 (async function(){
-  var id = new URLSearchParams(location.search).get("id") || "";
-  if(!id){
-    aviso("Link inválido","Confira o link que você recebeu ou peça um novo à nossa equipe.");
+  var q = new URLSearchParams(location.search);
+  var t = q.get("t") || "";
+  if(!t){
+    // Links antigos iam com ?id=<sequencial>, o que permitia abrir o orçamento
+    // de qualquer outro cliente trocando o número. Não são mais atendidos.
+    aviso(q.get("id") ? "Este link não vale mais" : "Link inválido",
+          "Por segurança, trocamos o formato do link dos orçamentos. Peça um link novo à nossa equipe pelo WhatsApp (19) 99783-0437.");
     return;
   }
   try{
-    var r = await fetch(FN + "?id=" + encodeURIComponent(id));
+    var r = await fetch(FN + "?t=" + encodeURIComponent(t));
     var html = await r.text();
     if(!html || html.indexOf("<") === -1) throw new Error("resposta vazia");
     document.open(); document.write(html); document.close();
