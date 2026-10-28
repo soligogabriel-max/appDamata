@@ -1,6 +1,11 @@
 // Edge Function: orcamento-publico
 // Renderiza o orçamento como página HTML pública acessível pelo cliente.
-// GET ?id=UUID → página com os dados do orçamento
+// GET ?t=<uuid do token> → página com os dados do orçamento
+//
+// O acesso é pelo token aleatório, nunca pelo id: o id é bigint sequencial e
+// dava para enumerar os orçamentos de todos os clientes trocando o número do
+// link (reportado por um cliente em 28/10/2026). Links antigos com ?id= não
+// são atendidos — a página pede um link novo à equipe.
 
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -17,6 +22,12 @@ function fmtDate(d: string) {
   if (!d) return "";
   const [y, m, dd] = d.split("-");
   return `${dd}/${m}/${y}`;
+}
+
+// Uma mensagem só para link inválido, expirado ou inexistente: distinguir os
+// casos contaria a quem está sondando quais tokens existem.
+function invalido() {
+  return `<h1>Link inválido ou expirado</h1><p style="color:#888;margin-top:8px">Peça um link novo à nossa equipe pelo WhatsApp (19) 99783-0437.</p>`;
 }
 
 function page(body: string, title = "Orçamento – Fazenda Damata") {
@@ -68,17 +79,20 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
   const url = new URL(req.url);
-  const id = url.searchParams.get("id") ?? "";
+  const t = url.searchParams.get("t") ?? "";
 
-  if (!id) return page(`<h1>Link inválido</h1><p style="color:#888;margin-top:8px">Este link é inválido ou expirou.</p>`);
+  // Só uuid: barra o id sequencial e qualquer tentativa de pendurar filtro
+  // extra no PostgREST pela query string.
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID.test(t)) return page(invalido());
 
-  const res = await fetch(`${SB_URL}/rest/v1/orcamentos?id=eq.${id}&select=*`, {
+  const res = await fetch(`${SB_URL}/rest/v1/orcamentos?token=eq.${t}&select=*`, {
     headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
   });
   const rows = await res.json();
   const o = rows?.[0];
 
-  if (!o) return page(`<h1>Orçamento não encontrado</h1><p style="color:#888;margin-top:8px">Entre em contato: (19) 99783-0437</p>`);
+  if (!o) return page(invalido());
 
   const validade = o.validade ? fmtDate(o.validade) : "";
   const emitido = o.created_at ? fmtDate(o.created_at.slice(0, 10)) : "";

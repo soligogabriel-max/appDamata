@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     if (!id) return new Response(JSON.stringify({ error: "id obrigatório" }), { status: 400, headers: { ...CORS, "Content-Type": "application/json" } });
 
     // Busca orçamento
-    const res = await fetch(`${SB_URL}/rest/v1/orcamentos?id=eq.${id}&select=id,nome_contratante,whatsapp,tipo_evento,data_evento,valor_total`, {
+    const res = await fetch(`${SB_URL}/rest/v1/orcamentos?id=eq.${id}&select=id,token,nome_contratante,whatsapp,tipo_evento,data_evento,valor_total`, {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
     });
     const rows = await res.json();
@@ -47,7 +47,10 @@ Deno.serve(async (req) => {
     // do Supabase força content-type: text/plain e CSP sandbox no domínio
     // compartilhado, então o cliente que abria a função via código-fonte.
     // orcamento.html busca o HTML da função e renderiza.
-    const link = `https://fazendadamata.com/orcamento.html?id=${id}`;
+    // O link vai pelo token aleatório: com o id sequencial dava para abrir o
+    // orçamento de qualquer outro cliente trocando o número.
+    if (!o.token) return new Response(JSON.stringify({ error: "Orçamento sem token — rode supabase/orcamento_token.sql" }), { status: 500, headers: { ...CORS, "Content-Type": "application/json" } });
+    const link = `https://fazendadamata.com/orcamento.html?t=${o.token}`;
 
     // Envia template WhatsApp
     const wppRes = await fetch(`https://graph.facebook.com/v19.0/${PHONE_ID}/messages`, {

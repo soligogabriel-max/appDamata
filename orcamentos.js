@@ -91,8 +91,9 @@ function verOrcamento(id){
     <div style="font-size:11px;font-weight:700;color:var(--dl);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Itens orçados</div>
     ${itensTpl}
     <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;margin-top:4px;border-top:2px solid var(--br);"><span style="font-size:15px;font-weight:700;">Total</span><span style="font-size:20px;font-weight:700;color:var(--a);">${row.valor_total?fmt(row.valor_total):"—"}</span></div>
-    <div style="margin-top:10px;">
-      <button onclick="exportarOrcamentoPDF(${id})" style="width:100%;padding:9px;border:1.5px solid var(--a);color:var(--a);background:#fff;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">📄 Exportar orçamento em PDF</button>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="exportarOrcamentoPDF(${id})" style="flex:1;padding:9px;border:1.5px solid var(--a);color:var(--a);background:#fff;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">📄 Exportar em PDF</button>
+      ${row.whatsapp?`<button onclick="reenviarOrcamentoWpp(${id})" style="flex:1;padding:9px;border:1.5px solid #25D366;color:#128C4A;background:#fff;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">📱 Reenviar link</button>`:''}
     </div>
     <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
       <button onclick="efetivarOrcamento(${id});closeOrcDet()" style="flex:1;padding:7px;border:1px solid var(--a);color:#fff;background:var(--a);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">📄 Efetivar</button>
@@ -132,6 +133,28 @@ function editarOrcamento(id){
   showSc("orcamento");
   _orcStep();
 }
+/* Reenviar o link por WhatsApp. Virou necessário quando o link passou a ir
+   pelo token: todo link ?id= que já estava na mão dos clientes parou de valer,
+   e antes só o fim do wizard disparava o envio. */
+async function reenviarOrcamentoWpp(id){
+  const row=(_orcRowsCache||[]).find(r=>r.id===id);
+  if(!row){toast&&toast("Orçamento não encontrado.");return;}
+  if(!row.whatsapp){toast&&toast("Orçamento sem WhatsApp cadastrado.");return;}
+  if(!confirm("Reenviar o link do orçamento para "+row.whatsapp+"?")) return;
+  try{
+    const r=await fetch(SB_URL+"/functions/v1/enviar-orcamento-wpp",{
+      method:"POST",
+      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken,"Content-Type":"application/json"},
+      body:JSON.stringify({id})
+    });
+    const d=await r.json().catch(()=>({}));
+    if(r.ok&&d.ok) toast&&toast("📱 Link reenviado por WhatsApp!");
+    else toast&&toast("Falha ao reenviar: "+(d.error||("HTTP "+r.status)));
+  }catch(e){
+    toast&&toast("Falha ao reenviar: "+(e.message||e));
+  }
+}
+
 async function excluirOrcamento(id){
   if(!confirm("Excluir este orçamento permanentemente? Esta ação não pode ser desfeita.")) return;
   await sbFetch(`orcamentos?id=eq.${id}`,{method:"DELETE"});
