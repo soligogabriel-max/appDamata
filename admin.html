@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.28a";</script>
+<script>var LL_VERSION="v2026.11.10a";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -447,8 +447,13 @@
           <div class="sec-t" style="margin-bottom:0;">📄 Contratos</div>
           <button onclick="setTab('contratos');document.getElementById('contratos-gerador').style.display='block';document.getElementById('contratos-gerador').scrollIntoView({behavior:'smooth'})" style="background:var(--a);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:700;cursor:pointer;">+ Novo contrato</button>
         </div>
-        <div style="margin-bottom:12px;">
-          <input id="contratos-filtro" type="text" placeholder="Buscar por código, nome ou data…" oninput="filtrarContratos()" autocomplete="off" style="width:100%;max-width:400px;padding:8px 14px;border:1px solid var(--br);border-radius:8px;background:var(--s1);color:var(--dt);font-size:13px;outline:none;box-sizing:border-box;">
+        <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+          <input id="contratos-filtro" type="text" placeholder="Buscar por código, nome ou data…" oninput="filtrarContratos()" autocomplete="off" style="flex:1;min-width:200px;max-width:400px;padding:8px 14px;border:1px solid var(--br);border-radius:8px;background:var(--s1);color:var(--dt);font-size:13px;outline:none;box-sizing:border-box;">
+          <select id="contratos-nf" onchange="renderContratos(0)" style="display:none;padding:8px 10px;border:1px solid var(--br);border-radius:8px;background:var(--s1);color:var(--dt);font-size:13px;outline:none;">
+            <option value="">NF: todas</option>
+            <option value="com">Com NF</option>
+            <option value="sem">Sem NF</option>
+          </select>
         </div>
         <div id="contratos-list" style="overflow-x:auto;">
           <div style="color:var(--dl);padding:20px;text-align:center;font-size:13px;">Carregando…</div>
@@ -1703,6 +1708,30 @@
 </div>
 
 <!-- MODAL: TERMO ADITIVO -->
+<div class="moverlay" id="m-nf" onclick="if(event.target===this)closeNF()">
+  <div class="mbox" style="max-width:480px;">
+    <div class="mtitle">🧾 Registrar nota fiscal</div>
+    <div style="font-size:13px;color:var(--dm);margin-bottom:14px;">Contrato <b id="nf-cod"></b> — <span id="nf-nome"></span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px;">
+      <div><label class="lbl">Número da NFS-e</label><input class="inp" id="nf-numero" type="number" min="1" step="1" inputmode="numeric"></div>
+      <div><label class="lbl">Série</label><input class="inp" id="nf-serie" type="text" placeholder="E, 70000…"></div>
+      <div><label class="lbl">Valor (R$)</label><input class="inp" id="nf-valor" type="number" min="0" step="0.01" inputmode="decimal"></div>
+      <div><label class="lbl">Data de emissão</label><input class="inp" id="nf-data" type="date"></div>
+    </div>
+    <label class="lbl">Chave de acesso <span style="font-weight:400;color:var(--dl);">(opcional)</span></label>
+    <input class="inp" id="nf-chave" type="text" inputmode="numeric" placeholder="50 dígitos do portal nacional">
+    <label class="lbl">Link do PDF <span style="font-weight:400;color:var(--dl);">(opcional)</span></label>
+    <input class="inp" id="nf-pdf" type="url" placeholder="https://…">
+    <label class="lbl">Observação <span style="font-weight:400;color:var(--dl);">(opcional)</span></label>
+    <input class="inp" id="nf-obs" type="text" placeholder="Ex.: nota complementar, reemissão…">
+    <div id="nf-erro" style="display:none;font-size:12px;color:#A03030;margin-bottom:8px;"></div>
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn-confirm" id="nf-btn-ok" onclick="salvarNF()">Salvar nota</button>
+      <button class="btn-cancel" onclick="closeNF()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <div class="moverlay" id="m-aditivo" onclick="if(event.target===this)closeAditivo()">
   <div class="mbox" style="max-width:640px;">
     <div class="mtitle">📑 Termo Aditivo</div>
@@ -1857,6 +1886,13 @@
     <div id="evd-rec-wrap" style="display:none;background:var(--bg);border-radius:11px;padding:12px;margin-bottom:10px;border:1px solid var(--br);">
       <div class="iblbl">💰 Contas a receber</div>
       <div id="evd-rec-body" style="margin-top:6px;"></div>
+    </div>
+    <div id="evd-nf-wrap" style="display:none;background:var(--bg);border-radius:11px;padding:12px;margin-bottom:10px;border:1px solid var(--br);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div class="iblbl">🧾 Notas fiscais</div>
+        <button onclick="abrirNF(currentEvCod)" style="font-size:11px;padding:4px 10px;border-radius:8px;background:#e0f0ff;color:#1a4a7a;border:none;font-weight:700;cursor:pointer;">+ Registrar NF</button>
+      </div>
+      <div id="evd-nf-body" style="margin-top:6px;"></div>
     </div>
     <div id="evd-obs-interna-wrap" style="display:none;background:#fffbeb;border-radius:11px;padding:12px;margin-bottom:10px;border:1px solid #fcd34d;">
       <div class="iblbl" style="color:#92400e;">🔒 Observações Internas (Equipe)</div>
@@ -2044,7 +2080,7 @@ async function proximoCod(ano) {
 }
 
 // ── Helpers ──
-const SOFT_DELETE_TABLES = new Set(["agenda","aditivos","contas_a_receber","contas_a_pagar","pedidos","itens_pedido","inventario","visitas_tecnicas","vt_linhas","tabelas_preco"]);
+const SOFT_DELETE_TABLES = new Set(["agenda","aditivos","nfse_emitidas","contas_a_receber","contas_a_pagar","pedidos","itens_pedido","inventario","visitas_tecnicas","vt_linhas","tabelas_preco"]);
 function _addSoftFilter(table, query) {
   if(!SOFT_DELETE_TABLES.has(table)) return query;
   return query ? query + "&deleted_at=is.null" : "deleted_at=is.null";
@@ -3069,6 +3105,7 @@ function openEvDet(ev){
   const _seq = ++_evdSeq;
   loadEvDetItens(currentEvCod, _seq);
   loadEvDetReceber(currentEvCod, _seq);
+  loadEvDetNF(currentEvCod, _seq);
   document.getElementById("m-evdet").classList.add("open");
 }
 
@@ -3220,6 +3257,113 @@ async function saveObsInterna(){
     sp.style.display="inline"; setTimeout(()=>{sp.style.display="none";},2000);
   }catch(e){toast("Erro ao salvar obs.: "+e.message);}
 }
+// ── Notas fiscais do evento ──
+// Uma linha por nota em nfse_emitidas. O botao "Emitir NFS-e" nao grava nada:
+// a nota sai do portal nacional e o numero e registrado aqui a mao, como era
+// na planilha do FileMaker que este bloco substitui.
+const NF_SELECT = "id,cod_evento,numero,serie,valor,data_emissao,chave_acesso,pdf_url,obs";
+function _nfRotulo(n){ return "NF "+n.numero+(n.serie?"/"+_esc(n.serie):""); }
+function _nfLinhaDet(n){
+  return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;flex-wrap:wrap;">
+    <span style="font-weight:700;color:#1a4a7a;white-space:nowrap;">🧾 ${_nfRotulo(n)}</span>
+    <span style="color:var(--dm);white-space:nowrap;">${fmt(n.valor)}</span>
+    <span style="color:var(--dl);white-space:nowrap;">${fmtDate(n.data_emissao)}</span>
+    ${n.pdf_url?`<a href="${_esc(n.pdf_url)}" target="_blank" style="font-size:11px;font-weight:700;color:#166534;text-decoration:none;background:#dcfce7;padding:2px 8px;border-radius:99px;">PDF</a>`:""}
+    ${n.obs?`<span style="color:var(--dl);font-style:italic;">${_esc(n.obs)}</span>`:""}
+    <button onclick="apagarNF(${n.id})" title="Apagar registro da nota" style="margin-left:auto;padding:2px 7px;border:1px solid var(--er);border-radius:6px;background:#fff;color:var(--er);font-size:11px;cursor:pointer;">🗑</button>
+  </div>`;
+}
+async function loadEvDetNF(cod, seq) {
+  if(seq!==_evdSeq) return;
+  const wrap = document.getElementById("evd-nf-wrap");
+  const body = document.getElementById("evd-nf-body");
+  wrap.style.display = "none";
+  if(!cod || !effIsAdmin()) return;
+  body.innerHTML = '<div style="font-size:12px;color:var(--dl);">Carregando notas…</div>';
+  wrap.style.display = "block";
+  try {
+    const rows = await dbGet("nfse_emitidas","cod_evento=eq."+encodeURIComponent(cod)+"&select="+NF_SELECT+"&order=data_emissao.asc,numero.asc&limit=100");
+    if(seq!==_evdSeq) return;
+    if(!rows.length){
+      body.innerHTML = '<div style="font-size:12px;color:#b45309;font-weight:700;">Nenhuma nota registrada para este evento.</div>';
+      return;
+    }
+    const total = rows.reduce((s,r)=>s+(Number(r.valor)||0),0);
+    const contrato = Number(currentEvObj&&currentEvObj.valor_locacao)||0;
+    const dif = contrato - total;
+    body.innerHTML = rows.map(_nfLinhaDet).join("") +
+      `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0 0;border-top:1px solid var(--br);margin-top:4px;font-size:12px;">
+        <span style="color:var(--dl);">Total em notas</span>
+        <span style="font-weight:700;color:var(--dk);">${fmt(total)}</span>
+      </div>` +
+      (contrato&&Math.abs(dif)>=0.01?`<div style="font-size:11px;color:${dif>0?"#b45309":"var(--dl)"};margin-top:2px;">${dif>0?"Faltam "+fmt(dif)+" para cobrir o valor do contrato":"Notas somam "+fmt(-dif)+" acima do valor do contrato"} (${fmt(contrato)})</div>`:"");
+  } catch(e) {
+    if(seq!==_evdSeq) return;
+    body.innerHTML = '<div style="font-size:12px;color:#A03030;">Erro ao carregar notas: '+_esc(e.message)+'</div>';
+  }
+}
+let _nfCod = null;
+async function abrirNF(cod){
+  if(!cod || !effIsAdmin()) return;
+  _nfCod = cod;
+  const ev = (currentEvObj&&currentEvObj.cod===cod) ? currentEvObj : ((_contratosRows||[]).find(r=>r.cod===cod)||{});
+  document.getElementById("nf-cod").textContent = cod;
+  document.getElementById("nf-nome").textContent = ev.nome_evento||"";
+  document.getElementById("nf-numero").value = "";
+  document.getElementById("nf-valor").value = ev.valor_locacao ? Number(ev.valor_locacao).toFixed(2) : "";
+  document.getElementById("nf-data").value = localDate();
+  document.getElementById("nf-chave").value = "";
+  document.getElementById("nf-pdf").value = "";
+  document.getElementById("nf-obs").value = "";
+  document.getElementById("nf-erro").style.display = "none";
+  // Serie e numero seguem a ultima nota registrada: no portal nacional a
+  // numeracao e sequencial, entao o proximo numero quase sempre e o seguinte.
+  try {
+    const ult = await dbGet("nfse_emitidas","select=numero,serie&order=data_emissao.desc,numero.desc&limit=1");
+    if(ult.length){ document.getElementById("nf-serie").value = ult[0].serie||""; document.getElementById("nf-numero").value = (ult[0].numero||0)+1; }
+  } catch(_){}
+  document.getElementById("m-nf").classList.add("open");
+  document.getElementById("nf-numero").focus();
+}
+function closeNF(){ document.getElementById("m-nf").classList.remove("open"); }
+async function salvarNF(){
+  const erro = document.getElementById("nf-erro");
+  const show = m => { erro.textContent = m; erro.style.display = "block"; };
+  const numero = parseInt(document.getElementById("nf-numero").value, 10);
+  const serie  = document.getElementById("nf-serie").value.trim();
+  const valor  = parseFloat(document.getElementById("nf-valor").value);
+  const data   = document.getElementById("nf-data").value;
+  const chave  = document.getElementById("nf-chave").value.replace(/\s+/g,"");
+  const pdf    = document.getElementById("nf-pdf").value.trim();
+  const obs    = document.getElementById("nf-obs").value.trim();
+  if(!_nfCod) return show("Evento não identificado.");
+  if(!(numero>0)) return show("Informe o número da nota.");
+  if(!(valor>=0) || isNaN(valor)) return show("Informe o valor da nota.");
+  if(!data) return show("Informe a data de emissão.");
+  if(chave && !/^\d{50}$/.test(chave)) return show("A chave de acesso tem 50 dígitos numéricos.");
+  const btn = document.getElementById("nf-btn-ok");
+  btn.disabled = true;
+  try {
+    await dbInsert("nfse_emitidas",{ cod_evento:_nfCod, numero, serie: serie||null, valor, data_emissao:data,
+      chave_acesso: chave||null, pdf_url: pdf||null, obs: obs||null, origem:"manual" });
+    closeNF();
+    toast("🧾 Nota "+numero+(serie?"/"+serie:"")+" registrada no contrato "+_nfCod);
+    if(currentEvCod===_nfCod && document.getElementById("m-evdet").classList.contains("open")) loadEvDetNF(_nfCod, _evdSeq);
+    if(document.getElementById("p-contratos")?.classList.contains("on")) renderContratos();
+  } catch(e) {
+    show(/nfse_emitidas_serie_numero_uq/.test(e.message) ? "Já existe uma nota com esse número nessa série." : "Erro ao salvar: "+e.message);
+  } finally { btn.disabled = false; }
+}
+async function apagarNF(id){
+  if(!effIsAdmin() || !confirm("Apagar o registro desta nota? A nota em si continua válida na prefeitura; isto só remove o controle aqui.")) return;
+  try {
+    await dbDelete("nfse_emitidas","id=eq."+id);
+    toast("Registro da nota removido.");
+    if(document.getElementById("m-evdet").classList.contains("open")) loadEvDetNF(currentEvCod, _evdSeq);
+    if(document.getElementById("p-contratos")?.classList.contains("on")) renderContratos();
+  } catch(e) { toast("❌ Erro ao apagar: "+e.message); }
+}
+
 function closeEvDet(){document.getElementById("m-evdet").classList.remove("open");}
 function openEventDetail(ev){openEvDet(ev);}
 function editCurrentEvent(){closeEvDet();const ev=cachedEvts.find(e=>(e.id||e.cod)===currentEvId);if(ev)openNewEvent(ev);}
@@ -7270,6 +7414,32 @@ function contratoStatusBadge(st) {
 
 let _contratosRows = [];
 let _aditivosPorEvento = {};
+let _nfPorEvento = {};
+
+// "Com NF"/"Sem NF" recorta no servidor pelo conjunto de codigos que tem nota:
+// a tabela de notas e pequena (dezenas de linhas por ano), e assim a paginacao
+// da lista continua inteira. "Sem NF" ignora cancelados — nao ha nota a emitir.
+async function _contratosFiltroNF() {
+  const modo = document.getElementById("contratos-nf")?.value || "";
+  if (!modo || !effIsAdmin()) return "";
+  let cods = [];
+  try { cods = (await dbGetAll("nfse_emitidas","select=cod_evento")).map(n=>n.cod_evento); } catch(_) { return ""; }
+  cods = [...new Set(cods)];
+  if (modo === "com") return cods.length ? "&cod=in.(" + cods.join(",") + ")" : "&cod=eq.__nenhum__";
+  return "&status=neq.cancelado" + (cods.length ? "&cod=not.in.(" + cods.join(",") + ")" : "");
+}
+
+function _celulaNF(r) {
+  const nfs = _nfPorEvento[r.cod] || [];
+  if (!nfs.length) return `<span style="font-size:11px;font-weight:700;color:#b45309;background:#fef3c7;padding:2px 8px;border-radius:99px;white-space:nowrap;">sem NF</span>`;
+  const fmtD = d => { if(!d) return ""; const [y,m,dd]=d.split("-"); return dd+"/"+m+"/"+y.slice(2); };
+  return nfs.map(n => {
+    const txt = `🧾 ${_nfRotulo(n)} · ${fmtD(n.data_emissao)}`;
+    const st = "font-size:11px;font-weight:700;color:#1a4a7a;background:#e0f0ff;padding:2px 8px;border-radius:99px;white-space:nowrap;text-decoration:none;display:inline-block;margin:1px 0;";
+    return n.pdf_url ? `<a href="${_esc(n.pdf_url)}" target="_blank" title="${fmt(n.valor)} — abrir PDF" style="${st}">${txt}</a>`
+                     : `<span title="${fmt(n.valor)}" style="${st}">${txt}</span>`;
+  }).join(" ");
+}
 
 function _renderContratosTabela(rows) {
   const el = document.getElementById("contratos-list");
@@ -7283,6 +7453,7 @@ function _renderContratosTabela(rows) {
       <th style="padding:8px 12px;text-align:left;font-weight:600;">Evento</th>
       <th style="padding:8px 12px;text-align:left;font-weight:600;">Data</th>
       <th style="padding:8px 12px;text-align:left;font-weight:600;">Status do Contrato</th>
+      ${adm?`<th style="padding:8px 12px;text-align:left;font-weight:600;">NF</th>`:""}
       <th style="padding:8px 12px;text-align:left;font-weight:600;">Ações</th>
     </tr></thead>
     <tbody>${rows.map((r,i)=>`
@@ -7291,11 +7462,13 @@ function _renderContratosTabela(rows) {
         <td style="padding:8px 12px;">${r.nome_evento||"—"}</td>
         <td style="padding:8px 12px;white-space:nowrap;">${fmt(r.data_evento)}</td>
         <td style="padding:8px 12px;">${contratoStatusBadge(r.contrato_ok ? "assinado" : (r.assinatura_status||null))}${r.assinatura_pdf_url?` <a href="${r.assinatura_pdf_url}" target="_blank" style="margin-left:8px;font-size:11px;font-weight:700;color:#166534;text-decoration:none;background:#dcfce7;padding:2px 8px;border-radius:99px;white-space:nowrap;">✅ Ver PDF</a>`:""}</td>
+        ${adm?`<td style="padding:8px 12px;">${_celulaNF(r)}</td>`:""}
         <td style="padding:8px 12px;white-space:nowrap;display:flex;gap:4px;">
           <button onclick="_contratoAbrir('${r.cod}')" title="Visualizar evento" style="padding:4px 8px;border:1px solid var(--br);border-radius:6px;background:#fff;color:var(--dm);font-size:12px;cursor:pointer;">👁</button>
           ${adm?`<button onclick="_contratoEditar('${r.cod}')" title="Editar evento" style="padding:4px 8px;border:1px solid #3b82f6;border-radius:6px;background:#fff;color:#3b82f6;font-size:12px;cursor:pointer;">✏️</button>`:""}
           ${adm?`<button onclick="copiarLinkContrato('${r.cod}')" title="Copiar link do contrato" style="padding:4px 8px;border:1px solid var(--a);border-radius:6px;background:#fff;color:var(--a);font-size:12px;cursor:pointer;">🔗</button>`:""}
           ${adm&&(r.assinatura_status==="enviado"||r.assinatura_status==="assinado"||r.contrato_ok)?`<button onclick="abrirAditivo('${r.cod}')" title="Termo aditivo" style="padding:4px 8px;border:1px solid #7c3aed;border-radius:6px;background:#fff;color:#7c3aed;font-size:12px;cursor:pointer;">📑</button>`:""}
+          ${adm?`<button onclick="abrirNF('${r.cod}')" title="Registrar nota fiscal" style="padding:4px 8px;border:1px solid #1a4a7a;border-radius:6px;background:#fff;color:#1a4a7a;font-size:12px;cursor:pointer;">🧾</button>`:""}
           ${adm?`<button onclick="_contratoApagar('${r.cod}')" title="Apagar evento" style="padding:4px 8px;border:1px solid var(--er);border-radius:6px;background:#fff;color:var(--er);font-size:12px;cursor:pointer;">🗑</button>`:""}
           ${adm&&r.assinatura_doc_id&&!r.contrato_ok?`<button onclick="_verificarAutentique('${r.cod}',this)" title="Verificar assinatura no Autentique" style="padding:4px 8px;border:1px solid #7c3aed;border-radius:6px;background:#fff;color:#7c3aed;font-size:12px;cursor:pointer;">🔄</button>`:""}
         </td>
@@ -7325,7 +7498,7 @@ function _linhaAditivos(r, i) {
   }).join("");
   return `<tr style="background:${i%2===0?'var(--s1)':'var(--s2)'};border-bottom:1px solid var(--br);">
     <td></td>
-    <td colspan="4" style="padding:4px 12px 10px;font-size:12px;border-left:2px solid #ede9fe;">${linhas}</td>
+    <td colspan="${effIsAdmin()?5:4}" style="padding:4px 12px 10px;font-size:12px;border-left:2px solid #ede9fe;">${linhas}</td>
   </tr>`;
 }
 
@@ -7503,9 +7676,11 @@ async function renderContratos(pagina) {
     const escopo = (_userEventIds != null)
       ? (_userEventIds.length ? `&cod=in.(${_userEventIds.join(",")})` : "&cod=eq.__nenhum__")
       : "";
+    const nfSel = document.getElementById("contratos-nf");
+    if (nfSel) nfSel.style.display = effIsAdmin() ? "" : "none";
     let rows = await dbGet("agenda",
-      "select=cod,nome_evento,data_evento,assinatura_status,contrato_ok,assinatura_pdf_url,assinatura_doc_id" +
-      "&order=cod.desc&limit=" + lim + "&offset=" + off + escopo + _contratosFiltroQuery(q));
+      "select=cod,nome_evento,data_evento,valor_locacao,assinatura_status,contrato_ok,assinatura_pdf_url,assinatura_doc_id" +
+      "&order=cod.desc&limit=" + lim + "&offset=" + off + escopo + _contratosFiltroQuery(q) + await _contratosFiltroNF());
     _contratosTemMais = rows.length > CONTRATOS_POR_PAGINA;
     rows = rows.slice(0, CONTRATOS_POR_PAGINA);
     // Página vazia por ter passado do fim (ex.: apagaram registros): volta uma.
@@ -7524,6 +7699,18 @@ async function renderContratos(pagina) {
           "&order=numero.asc&limit=500");
         ads.forEach(a => { (_aditivosPorEvento[a.cod_evento] ||= []).push(a); });
       } catch(_) { /* a tabela de contratos nao depende disto para aparecer */ }
+    }
+
+    // Notas da pagina, como os aditivos: a coluna "NF" e a resposta para
+    // "qual evento ainda nao tem nota", a pergunta que a planilha respondia.
+    _nfPorEvento = {};
+    if (rows.length && effIsAdmin()) {
+      try {
+        const nfs = await dbGet("nfse_emitidas",
+          "cod_evento=in.(" + rows.map(r=>r.cod).join(",") + ")" +
+          "&select=" + NF_SELECT + "&order=data_emissao.asc,numero.asc&limit=500");
+        nfs.forEach(n => { (_nfPorEvento[n.cod_evento] ||= []).push(n); });
+      } catch(_) { /* sem a tabela a lista continua aparecendo */ }
     }
 
     _renderContratosTabela(rows);
