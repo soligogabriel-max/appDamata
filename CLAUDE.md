@@ -43,22 +43,26 @@ a chave publishable** — ver "Como verificar".
 
 - Projeto: `wwnndsprpofmgbklqdgg`
 - Chave publishable: `admin.html`, constante `SB_KEY` (é pública, está no HTML)
-- PAT em `~/.claude/damata-secrets`. O container é efêmero — se não existir,
-  pedir ao usuário e recriar:
-  `mkdir -p ~/.claude && printf 'PAT=TOKEN\n' > ~/.claude/damata-secrets`
+- PAT: salvo como network secret do ambiente cloud "Ambiente Cloud Padrão"
+  para o host `api.supabase.com` — o proxy injeta o header sozinho. Chamar
+  com `-H "Authorization: Bearer proxy-injected"` (qualquer valor; o proxy
+  substitui). Se der 401, o segredo não está neste ambiente: pedir via
+  `request_credential` (formulário seguro), nunca pelo chat. Fallback antigo:
+  `~/.claude/damata-secrets` com `PAT=TOKEN`.
 - DDL e leitura de catálogo só pela Management API (o PostgREST não alcança
   `pg_catalog`):
   ```bash
-  PAT=$(grep PAT ~/.claude/damata-secrets | cut -d= -f2)
   curl -s -X POST "https://api.supabase.com/v1/projects/wwnndsprpofmgbklqdgg/database/query" \
-    -H "Authorization: Bearer $PAT" -H "Content-Type: application/json" \
+    -H "Authorization: Bearer proxy-injected" -H "Content-Type: application/json" \
     -d '{"query": "SQL AQUI"}'
   ```
 - Tabela principal: `agenda`. Campos: `cod` (PK), `nome_evento`, `data_evento`,
   `data_fim`, `tipo_evento`, `valor_locacao`, `cin`, `cout`, `payments_json`,
   `spaces_json` (ambos **text** com JSON dentro), `cliente_json` (jsonb),
-  `assinatura_status`, `contrato_token`, `deleted_at`.
-- Soft-delete: `agenda`, `contas_a_receber`, `contas_a_pagar`, `pedidos`,
+  `assinatura_status`, `contrato_token`, `deleted_at`. `nf` é legado do
+  FileMaker (valor da NF em texto, com vírgula) — o controle de notas é a
+  tabela `nfse_emitidas` (uma linha por nota, `cod_evento` → `agenda.cod`).
+- Soft-delete: `agenda`, `nfse_emitidas`, `contas_a_receber`, `contas_a_pagar`, `pedidos`,
   `itens_pedido`, `inventario`, `visitas_tecnicas`, `vt_linhas`, `tabelas_preco`.
   `dbGet()` já filtra `deleted_at is null`; consultas manuais precisam filtrar.
 
