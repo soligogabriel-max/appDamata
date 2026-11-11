@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.10.28a";</script>
+<script>var LL_VERSION="v2026.11.11a";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -7744,6 +7744,13 @@ async function renderAgendaTabela(){
 let _relChart = null;
 let _origemChart = null;
 let _origemRows = [];
+function relToggle(i){
+  const det=document.getElementById("rel-det-"+i), seta=document.getElementById("rel-seta-"+i);
+  if(!det) return;
+  const aberto = det.style.display!=="none";
+  det.style.display = aberto ? "none" : "";
+  if(seta) seta.textContent = aberto ? "▸" : "▾";
+}
 function relLimparFiltro(){
   const de=document.getElementById("rel-de"); if(de) de.value="";
   const ate=document.getElementById("rel-ate"); if(ate) ate.value="";
@@ -7760,12 +7767,13 @@ async function renderRelatorio() {
     // Busca parcela 1 (data de fechamento) e agenda (valor_locacao = valor total do contrato)
     const [primeiras, agendaRows] = await Promise.all([
       dbGet("contas_a_receber","select=cod_evento,vencimento,data_recebido&parcela=eq.1&limit=5000"),
-      dbGet("agenda","select=cod,valor_locacao&limit=2000")
+      dbGet("agenda","select=cod,nome_evento,valor_locacao&limit=2000")
     ]);
 
     // Valor total do contrato por cod_evento (da agenda)
     const valorPorEvento = {};
-    agendaRows.forEach(r => { if(r.cod) valorPorEvento[r.cod] = r.valor_locacao || 0; });
+    const nomePorEvento = {};
+    agendaRows.forEach(r => { if(r.cod){ valorPorEvento[r.cod] = r.valor_locacao || 0; nomePorEvento[r.cod] = r.nome_evento || ""; } });
 
     // Data de fechamento por evento (da parcela 1)
     const dataFechamento = {};
@@ -7781,7 +7789,7 @@ async function renderRelatorio() {
 
     // Contratos = eventos que têm parcela 1 com data
     let contratos = Object.entries(dataFechamento).map(([cod, dataRef]) => ({
-      cod, dataRef, valor: valorPorEvento[cod] || 0
+      cod, dataRef, valor: valorPorEvento[cod] || 0, nome: nomePorEvento[cod] || ""
     }));
     if(relDe)  contratos = contratos.filter(c => c.dataRef.slice(0,7) >= relDe);
     if(relAte) contratos = contratos.filter(c => c.dataRef.slice(0,7) <= relAte);
@@ -7795,9 +7803,10 @@ async function renderRelatorio() {
     const grupos = {};
     contratos.forEach(c => {
       const key = agrupPor === "ano" ? c.dataRef.slice(0,4) : c.dataRef.slice(0,7);
-      if(!grupos[key]) grupos[key] = { total: 0, qtd: 0 };
+      if(!grupos[key]) grupos[key] = { total: 0, qtd: 0, itens: [] };
       grupos[key].total += c.valor;
       grupos[key].qtd++;
+      grupos[key].itens.push(c);
     });
 
     const keys = Object.keys(grupos).sort();
@@ -7848,15 +7857,34 @@ async function renderRelatorio() {
       }
     });
 
-    // Tabela
+    // Tabela — cada linha abre a lista dos contratos considerados no período
+    const escH = v => String(v==null?"":v).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
     tblWr.innerHTML = `<div class="table-wrap"><table class="fin-table">
-      <thead><tr><th>${agrupPor==="ano"?"Ano":"Mês"}</th><th>Contratos</th><th>Total</th><th>Ticket Médio</th></tr></thead>
-      <tbody>${keys.map(k=>`<tr>
-        <td style="font-weight:700;">${labelKey(k)}</td>
-        <td>${grupos[k].qtd}</td>
-        <td style="font-weight:700;color:var(--ok);">${fmt(grupos[k].total)}</td>
-        <td style="color:var(--dm);">${fmt(grupos[k].total/grupos[k].qtd)}</td>
-      </tr>`).join("")}</tbody>
+      <thead><tr><th style="width:28px;"></th><th>${agrupPor==="ano"?"Ano":"Mês"}</th><th>Contratos</th><th>Total</th><th>Ticket Médio</th></tr></thead>
+      <tbody>${keys.map((k,i)=>{
+        const itens = grupos[k].itens.slice().sort((a,b)=> a.dataRef<b.dataRef?-1:a.dataRef>b.dataRef?1:0);
+        return `<tr onclick="relToggle(${i})" style="cursor:pointer;" title="Clique para ver os contratos">
+          <td id="rel-seta-${i}" style="color:var(--dl);font-size:11px;text-align:center;">▸</td>
+          <td style="font-weight:700;">${labelKey(k)}</td>
+          <td>${grupos[k].qtd}</td>
+          <td style="font-weight:700;color:var(--ok);">${fmt(grupos[k].total)}</td>
+          <td style="color:var(--dm);">${fmt(grupos[k].total/grupos[k].qtd)}</td>
+        </tr>
+        <tr id="rel-det-${i}" style="display:none;background:var(--bg,#FAF8F4);">
+          <td></td>
+          <td colspan="4" style="padding:6px 10px 12px;">
+            <table class="fin-table" style="font-size:12px;">
+              <thead><tr><th>Cód.</th><th>Evento</th><th>Fechamento</th><th style="text-align:right;">Valor</th></tr></thead>
+              <tbody>${itens.map(c=>`<tr>
+                <td style="font-size:11px;color:var(--dl);white-space:nowrap;">${escH(c.cod)}</td>
+                <td style="font-weight:600;">${escH(c.nome)||"<span style=\"color:var(--dl);font-weight:400;\">(evento não encontrado)</span>"}</td>
+                <td style="white-space:nowrap;">${fmtDate(c.dataRef)}</td>
+                <td style="text-align:right;font-weight:600;color:#1A4A7C;white-space:nowrap;">${fmt(c.valor)}</td>
+              </tr>`).join("")}</tbody>
+            </table>
+          </td>
+        </tr>`;
+      }).join("")}</tbody>
     </table></div>`;
 
   } catch(e) {
