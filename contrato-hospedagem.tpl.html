@@ -276,6 +276,17 @@ function renderContract(){
 
   // Acomodações
   var ac=p.acomodacoes||{};
+  /* Hospedes e camas vem do inventario. Sem o dado, sai so a descricao. */
+  function acDet(i){
+    if(!i) return "";
+    var ps=[];
+    if(i.hospedes!=null&&i.hospedes!=="") ps.push("Hóspedes: "+esc(String(i.hospedes)));
+    if(i.camas) ps.push("Camas: "+esc(i.camas));
+    return ps.length?"<br><span style='font-size:.92em'>"+ps.join(" · ")+"</span>":"";
+  }
+  function acNota(){
+    return "<tr><td colspan='3' style='font-size:.92em'>"+esc('A LOCADORA poderá, caso julgue necessário, alterar qualquer das acomodações acima, realocando os hóspedes em outra acomodação do DAMATA, mediante comunicação ao(à) LOCATÁRIO(A).')+"</td></tr>";
+  }
   var acInfo=p.acomodacoesInfo||{};
   var acTbody=g("ac-table-body");
   if(acTbody){
@@ -283,8 +294,8 @@ function renderContract(){
       var checked=!!ac[m.pk];
       var nome=(acInfo[m.ik]&&acInfo[m.ik].nome)||m.pk;
       var desc=(acInfo[m.ik]&&acInfo[m.ik].desc)||"";
-      return "<tr><td style='text-align:center;'>"+(checked?"✔":"")+"</td><td style='text-align:center;'>"+(checked?"":"✔")+"</td><td><strong>"+esc(nome.toUpperCase())+":</strong> "+esc(desc)+"</td></tr>";
-    }).join("");
+      return "<tr><td style='text-align:center;'>"+(checked?"✔":"")+"</td><td style='text-align:center;'>"+(checked?"":"✔")+"</td><td><strong>"+esc(nome.toUpperCase())+":</strong> "+esc(desc)+acDet(acInfo[m.ik])+"</td></tr>";
+    }).join("")+acNota();
   }
 }
 

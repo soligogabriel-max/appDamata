@@ -422,6 +422,19 @@ function renderContract(){
     if(!i.nome||!i.desc) return;
     el.innerHTML='<strong>'+esc(i.nome.toUpperCase())+'</strong>: '+esc(i.desc);
   });
+  /* Hospedes e camas vem do inventario (Cadastros > Inventario). Quarto sem o
+     dado cadastrado sai so com a descricao, como antes — melhor omitir do que
+     afirmar capacidade errada num contrato. */
+  function _acDet(i){
+    if(!i) return "";
+    var ps=[];
+    if(i.hospedes!=null&&i.hospedes!=="") ps.push("Hóspedes: "+esc(String(i.hospedes)));
+    if(i.camas) ps.push("Camas: "+esc(i.camas));
+    return ps.length?"<br><span style='font-size:.92em'>"+ps.join(" · ")+"</span>":"";
+  }
+  function _acNota(){
+    return "<tr><td colspan='3' style='font-size:.92em'>"+esc('A LOCADORA poderá, caso julgue necessário, alterar qualquer das acomodações acima, realocando os hóspedes em outra acomodação do DAMATA, mediante comunicação ao(à) LOCATÁRIO(A).')+"</td></tr>";
+  }
   var _acCM=[{pk:"acLoft",ik:"acLoft"},{pk:"acCasa",ik:"acCasa"},{pk:"acSuiteAss",ik:"acSuiteAss"},
     {pk:"acSf1",ik:"acSf1"},{pk:"acSf2",ik:"acSf2"},{pk:"acSf3",ik:"acSf3"},
     {pk:"acSf4",ik:"acSf4"},{pk:"acSf5",ik:"acSf5"},
@@ -432,8 +445,8 @@ function renderContract(){
     var chk=!!p[m.pk];
     var nome=(_acInfo[m.ik]&&_acInfo[m.ik].nome)||m.pk;
     var desc=(_acInfo[m.ik]&&_acInfo[m.ik].desc)||"";
-    return "<tr><td style='text-align:center;font-weight:700'>"+(chk?"✓":"")+"</td><td style='text-align:center;font-weight:700'>"+(chk?"":"✓")+"</td><td><strong>"+esc(nome.toUpperCase())+"</strong>: "+esc(desc)+"</td></tr>";
-  }).join("");}
+    return "<tr><td style='text-align:center;font-weight:700'>"+(chk?"✓":"")+"</td><td style='text-align:center;font-weight:700'>"+(chk?"":"✓")+"</td><td><strong>"+esc(nome.toUpperCase())+"</strong>: "+esc(desc)+_acDet(_acInfo[m.ik])+"</td></tr>";
+  }).join("")+_acNota();}
   sn('fu1-s','fu1-n',p.fuBal);
   sn('fu2-s','fu2-n',(p.fuMesas||0)>0);tx('c-mesas',p.fuMesas||0);
   sn('fu3-s','fu3-n',(p.fuCad||0)>0);tx('c-cad',p.fuCad||0);

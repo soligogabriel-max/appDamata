@@ -272,7 +272,7 @@ Deno.serve(async (req) => {
   try {
     const cods = Object.values(AC_COD_MAP).join(",");
     const invRes = await fetch(
-      `${SB_URL}/rest/v1/inventario?cod=in.(${cods})&select=cod,descricao,descricao_orc&limit=50`,
+      `${SB_URL}/rest/v1/inventario?cod=in.(${cods})&select=cod,descricao,descricao_orc,hospedes,camas&limit=50`,
       { headers: sbH },
     );
     const inv = await invRes.json();
@@ -281,7 +281,10 @@ Deno.serve(async (req) => {
     const info: Record<string, unknown> = {};
     for (const [key, cod] of Object.entries(AC_COD_MAP)) {
       const it = invMap[cod] || {};
-      info[key] = { nome: it.descricao || key, desc: it.descricao_orc || "" };
+      info[key] = {
+        nome: it.descricao || key, desc: it.descricao_orc || "",
+        hospedes: it.hospedes ?? null, camas: it.camas || "",
+      };
     }
     preset.acomodacoesInfo = info;
   } catch (_) { /* template cai no nome padrão */ }

@@ -369,7 +369,7 @@ function autoNomeEvento(){
     base.exDesm=parseInt(document.getElementById("o-exDesm").value)||0;
     var _acCodMapEv={"acLoft":"000019","acCasa":"000006","acSuiteAss":"000022","acSf1":"000011","acSf2":"000012","acSf3":"000029","acSf4":"000030","acSf5":"000031","acSb1":"000013","acSb2":"000014","acSb3":"000015"};
     var _acInfoEv={};
-    Object.entries(_acCodMapEv).forEach(function(e){var cod=e[1];_acInfoEv[e[0]]={nome:_invDesc[cod]||cod,desc:_invDescOrc[cod]||""};});
+    Object.entries(_acCodMapEv).forEach(function(e){var cod=e[1];_acInfoEv[e[0]]={nome:_invDesc[cod]||cod,desc:_invDescOrc[cod]||"",hospedes:(_invHosp[cod]==null?null:_invHosp[cod]),camas:_invCamas[cod]||""};});
     base.acomodacoesInfo=_acInfoEv;
     base.catalogoInfo=_catalogoInfo();
   }
@@ -408,12 +408,13 @@ function descOf(it){
   return (it&&(it.descricao||it.cod_item))||"";
 }
 
-var _invDescOrc={};
+var _invDescOrc={},_invHosp={},_invCamas={};
 async function loadInventarioDesc(){
   try{
-    var inv=await sbGet("inventario?select=cod,descricao,descricao_orc&limit=1000");
-    _invDesc={};_invDescOrc={};
-    (inv||[]).forEach(function(r){_invDesc[r.cod]=r.descricao;_invDescOrc[r.cod]=r.descricao_orc||"";});
+    var inv=await sbGet("inventario?select=cod,descricao,descricao_orc,hospedes,camas&limit=1000");
+    _invDesc={};_invDescOrc={};_invHosp={};_invCamas={};
+    (inv||[]).forEach(function(r){_invDesc[r.cod]=r.descricao;_invDescOrc[r.cod]=r.descricao_orc||"";
+      _invHosp[r.cod]=(r.hospedes==null?null:r.hospedes);_invCamas[r.cod]=r.camas||"";});
   }catch(e){/* fallback usa descricao salva */}
   // Atualizar labels dos checkboxes
   var _ACG={loft:"000019",casa:"000006",suiteass:"000022",sf1:"000011",sf2:"000012",sf3:"000029",sf4:"000030",sf5:"000031",sb1:"000013",sb2:"000014",sb3:"000015"};
@@ -828,7 +829,7 @@ function collectPreset(){
     base.acSb3=_af.acSb3||document.getElementById("o-acSb3").checked;
     var _acCodMapEv={"acLoft":"000019","acCasa":"000006","acSuiteAss":"000022","acSf1":"000011","acSf2":"000012","acSf3":"000029","acSf4":"000030","acSf5":"000031","acSb1":"000013","acSb2":"000014","acSb3":"000015"};
     var _acInfoEv={};
-    Object.entries(_acCodMapEv).forEach(function(e){var cod=e[1];_acInfoEv[e[0]]={nome:_invDesc[cod]||cod,desc:_invDescOrc[cod]||""};});
+    Object.entries(_acCodMapEv).forEach(function(e){var cod=e[1];_acInfoEv[e[0]]={nome:_invDesc[cod]||cod,desc:_invDescOrc[cod]||"",hospedes:(_invHosp[cod]==null?null:_invHosp[cod]),camas:_invCamas[cod]||""};});
     base.acomodacoesInfo=_acInfoEv;
     base.catalogoInfo=_catalogoInfo();
   }

@@ -58,6 +58,10 @@ const CRUD_CFG = {
       {n:"exibir_orcamento", l:"Exibir no Orçamento",      t:"boolean"},
       {n:"imagem",           l:"Imagem (nome do arquivo)", t:"text"},
       {n:"descricao_orc",    l:"Descrição p/ Orçamento",  t:"text"},
+      // Saem no contrato, na secao Das Acomodacoes. Camas e' texto livre: a
+      // realidade dos quartos ("1 king + 1 sofa-cama") nao cabe num numero.
+      {n:"hospedes",         l:"Hóspedes (capacidade)",    t:"number"},
+      {n:"camas",            l:"Camas (ex.: 1 cama king)", t:"text"},
     ]
   },
   naturezas: {
