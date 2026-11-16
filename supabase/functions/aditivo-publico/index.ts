@@ -162,8 +162,31 @@ Deno.serve(async (req) => {
   const alteracoes = parseJson(ad.alteracoes_json, []) as Array<Record<string, unknown>>;
   const pmts = parseJson(ad.payments_json, []) as Array<Record<string, unknown>>;
 
-  const valorContrato = Number(ev.valor_locacao ?? 0);
+  // agenda.valor_locacao JA INCLUI este aditivo: salvarAditivo() soma o valor
+  // ao evento no instante em que o termo e gerado, antes do cliente abrir o
+  // link. Somar de novo aqui punha na clausula 3.1 um "passa de X para Y" com
+  // o aditivo contado duas vezes — num documento que vai para assinatura.
+  // O unico aditivo com valor ate hoje era de R$ 0,00, entao o erro nunca
+  // apareceu em producao; o primeiro aditivo com dinheiro teria sofrido.
+  //
+  // O caminho e o inverso: valor_locacao e o DEPOIS, e o antes sai da
+  // subtracao. Aditivos posteriores a este tambem ja entraram no valor do
+  // evento (um 2o termo pode nascer com o link do 1o ainda aberto), entao
+  // saem junto — senao o 1o termo passaria a exibir o valor do 2o.
   const valorAditivo = Number(ad.valor ?? 0);
+  let somaPosteriores = 0;
+  try {
+    const posRes = await fetch(
+      `${SB_URL}/rest/v1/aditivos?cod_evento=eq.${encodeURIComponent(ad.cod_evento)}` +
+        `&deleted_at=is.null&numero=gt.${Number(ad.numero) || 0}&select=valor`,
+      { headers: sbH },
+    );
+    if (posRes.ok) {
+      for (const r of await posRes.json()) somaPosteriores += Number(r.valor ?? 0);
+    }
+  } catch (_) { /* sem posteriores: segue com o valor do evento */ }
+  const valorTotal = Number(ev.valor_locacao ?? 0) - somaPosteriores;
+  const valorContrato = valorTotal - valorAditivo;
 
   const preset: Record<string, unknown> = {
     numero: ad.numero,
@@ -178,7 +201,7 @@ Deno.serve(async (req) => {
     contratoCout: ev.cout || "",
     valorContrato,
     valorAditivo,
-    valorTotal: valorContrato + valorAditivo,
+    valorTotal,
 
     itens: (Array.isArray(itens) ? itens : []).map((it) => ({
       descricao: it.descricao ?? "",
