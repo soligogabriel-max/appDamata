@@ -29,7 +29,10 @@ body:has(#tab-form:target) #tab-form{display:block}
 .ir{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #dbeafe}
 .ir:last-child{border-bottom:none}
 .ik{color:#64748b}.iv{color:#1e3a5f;font-weight:600}
-@media print{.np{display:none!important}body{background:white}.cp-wrap{box-shadow:none!important;padding:1.5cm 2cm!important;max-width:100%!important;border-radius:0!important}}
+/* A pagina abre na aba "Seus Dados", entao o termo esta escondido quando o
+   cliente manda imprimir pelo menu do navegador em vez do botao. Sem isto
+   sairia folha em branco: .np tira o formulario e o termo nao estaria ativo. */
+@media print{.np{display:none!important}#tab-preview{display:block!important}body{background:white}.cp-wrap{box-shadow:none!important;padding:1.5cm 2cm!important;max-width:100%!important;border-radius:0!important}}
 </style>
 </head>
 <body>
@@ -46,7 +49,7 @@ body:has(#tab-form:target) #tab-form{display:block}
   </div>
 </div>
 
-<div id="tab-form" class="tc np">
+<div id="tab-form" class="tc np active">
 <div style="max-width:600px;margin:0 auto;padding:24px 16px">
   <div id="evt-summary" style="display:none;margin-bottom:20px">
     <div style="background:#1e3a5f;color:white;border-radius:14px 14px 0 0;padding:14px 18px">
@@ -102,7 +105,7 @@ body:has(#tab-form:target) #tab-form{display:block}
 </div>
 </div>
 
-<div id="tab-preview" class="tc active">
+<div id="tab-preview" class="tc">
 <div style="max-width:800px;margin:0 auto;padding:20px 8px">
   <div class="np" style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
     <button onclick="window.print()" style="display:flex;align-items:center;gap:6px;background:#1e3a5f;color:white;border:none;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">

@@ -8,7 +8,14 @@
 <style>
 body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9}
 .cf{font-family:'Times New Roman',Georgia,serif}
-.tc{display:none}.tc.active{display:block}#tab-form:target,#tab-preview:target{display:block}
+.tc{display:none}.tc.active{display:block}
+/* fallback CSS-only para iOS quando JS esta bloqueado — mesmo conjunto de
+   regras do contrato de evento e do aditivo. Sem o par que esconde a outra
+   aba, trocar de aba sem JS empilhava formulario e contrato na mesma tela. */
+#tab-preview:target{display:block}
+body:has(#tab-preview:target) #tab-form{display:none}
+body:has(#tab-form:target) #tab-preview{display:none}
+body:has(#tab-form:target) #tab-form{display:block}
 .cp{font-size:10.5pt;line-height:1.7;text-align:justify;margin-bottom:8px}
 .ct{font-size:11pt;font-weight:700;text-transform:uppercase;margin:18px 0 8px}
 .sub{padding-left:20px}
@@ -22,7 +29,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9}
 .ir{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #dbeafe}
 .ir:last-child{border-bottom:none}
 .ik{color:#64748b}.iv{color:#1e3a5f;font-weight:600}
-@media print{.np{display:none!important}body{background:white}.cp-wrap{box-shadow:none!important;padding:1.5cm 2cm!important;max-width:100%!important;border-radius:0!important}.tb{page-break-inside:avoid}.ct{page-break-after:avoid}.cp{orphans:3;widows:3}}
+/* A pagina abre na aba "Seus Dados", entao o contrato esta escondido quando o
+   cliente manda imprimir pelo menu do navegador em vez do botao. Sem isto
+   sairia folha em branco: .np tira o formulario e o contrato nao estaria ativo. */
+@media print{.np{display:none!important}#tab-preview{display:block!important}body{background:white}.cp-wrap{box-shadow:none!important;padding:1.5cm 2cm!important;max-width:100%!important;border-radius:0!important}.tb{page-break-inside:avoid}.ct{page-break-after:avoid}.cp{orphans:3;widows:3}}
 </style>
 </head>
 <body>
@@ -36,12 +46,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9}
     <div style="flex:1"><div style="font-weight:700;font-size:15px;color:#1e293b">Contrato de Hospedagem DAMATA</div><div id="hdr-code" style="font-size:12px;color:#64748b"></div></div>
   </div>
   <div style="max-width:760px;margin:0 auto;padding:0 16px;display:flex;gap:24px">
-    <a href="#tab-form" onclick="showTab('form');return false" id="tbf" style="padding:10px 0;font-size:14px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:#64748b;text-decoration:none">Seus Dados</a>
-    <a href="#tab-preview" onclick="showTab('preview');return false" id="tbp" style="padding:10px 0;font-size:14px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid #1e3a5f;color:#1e3a5f;text-decoration:none">Contrato Completo</a>
+    <a href="#tab-form" onclick="showTab('form');return false" id="tbf" style="padding:10px 0;font-size:14px;font-weight:700;border:none;background:none;cursor:pointer;border-bottom:2px solid #1e3a5f;color:#1e3a5f;text-decoration:none">Seus Dados</a>
+    <a href="#tab-preview" onclick="showTab('preview');return false" id="tbp" style="padding:10px 0;font-size:14px;font-weight:500;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;color:#64748b;text-decoration:none">Contrato Completo</a>
   </div>
 </div>
 
-<div id="tab-form" class="tc np">
+<div id="tab-form" class="tc np active">
 <div style="max-width:600px;margin:0 auto;padding:24px 16px">
   <div id="evt-summary" style="display:none;margin-bottom:20px">
     <div style="background:#1e3a5f;color:white;border-radius:14px 14px 0 0;padding:14px 18px">
@@ -102,7 +112,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f1f5f9}
 </div>
 </div>
 
-<div id="tab-preview" class="tc active">
+<div id="tab-preview" class="tc">
 <div style="max-width:800px;margin:0 auto;padding:20px 8px">
   <div class="cp-wrap cf" style="background:white;border-radius:16px;box-shadow:0 2px 12px rgba(0,0,0,.1);padding:40px 48px;max-width:800px;margin:0 auto 20px">
 
