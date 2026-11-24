@@ -136,5 +136,8 @@ select cron.schedule('followup-orcamento-diario', '30 14 * * *', $job$
       'Content-Type', 'application/json',
       'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets
                                       where name = 'followup_orcamento' limit 1)),
-    body    := '{}'::jsonb)
+    body    := '{}'::jsonb,
+    -- padrão do pg_net é 5 s; cadastrar o template já estourou isso, e um
+    -- dia com 40 envios leva mais
+    timeout_milliseconds := 60000)
 $job$);
