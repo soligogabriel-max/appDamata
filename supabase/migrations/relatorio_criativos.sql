@@ -25,6 +25,7 @@ returns table(
   criativo text, fonte text, meio text, campanha text, ad_nome text,
   gasto numeric, impressoes bigint, cliques bigint,
   disp bigint, acessos bigint, orc bigint, vis bigint, wpp bigint,
+  pessoas bigint, abordados bigint, responderam bigint,
   fechados bigint, valor_fechado numeric,
   primeiro timestamptz, ultimo timestamptz
 )
@@ -69,6 +70,22 @@ begin
   v as (
     select a.chave, count(*) vis from visitas_comerciais x join atr a on a.session_id = x.visitor_id
      where x.created_at >= ini and x.status is distinct from 'cancelada' group by a.chave),
+  -- pessoas (telefones distintos) que orçaram, e quantas a casa abordou pelo
+  -- WhatsApp e quantas responderam. Foi o que separou pago de orgânico na
+  -- análise: a equipe aborda 39% dos leads de anúncio e 50% dos da bio, e
+  -- quem é abordado responde na mesma taxa. Chave por últimos 8 dígitos, como
+  -- no follow-up — ignora DDD e nono dígito.
+  tel as (
+    select distinct a.chave, right(regexp_replace(x.whatsapp, '\D', '', 'g'), 8) t
+      from orcamentos x join atr a on a.session_id = x.visitor_id
+     where x.created_at >= ini and length(regexp_replace(coalesce(x.whatsapp, ''), '\D', '', 'g')) >= 10),
+  p as (
+    select t.chave, count(*) pessoas,
+           count(*) filter (where exists (select 1 from wpp_mensagens m where m.direcao = 'enviada'
+                                            and m.created_at >= ini and right(regexp_replace(m.telefone, '\D', '', 'g'), 8) = t.t)) abordados,
+           count(*) filter (where exists (select 1 from wpp_mensagens m where m.direcao = 'recebida'
+                                            and m.created_at >= ini and right(regexp_replace(m.telefone, '\D', '', 'g'), 8) = t.t)) responderam
+      from tel t group by t.chave),
   -- contrato na agenda ligado ao orçamento daquele aparelho
   f as (
     select a.chave, count(*) fechados, sum(coalesce(ag.valor_locacao, 0)) valor
@@ -97,6 +114,7 @@ begin
          g.ad_nome,
          coalesce(g.gasto, 0), coalesce(g.impressoes, 0), coalesce(g.cliques, 0),
          coalesce(d.disp, 0), coalesce(d.acessos, 0), coalesce(o.orc, 0), coalesce(v.vis, 0), coalesce(w.wpp, 0),
+         coalesce(p.pessoas, 0), coalesce(p.abordados, 0), coalesce(p.responderam, 0),
          coalesce(f.fechados, 0),
          case when papel = 'admin' then coalesce(f.valor, 0) end,
          d.primeiro, d.ultimo
@@ -104,6 +122,7 @@ begin
     left join d on d.chave = i.chave
     left join o on o.chave = i.chave
     left join v on v.chave = i.chave
+    left join p on p.chave = i.chave
     left join f on f.chave = i.chave
     left join w on w.chave = i.chave
     left join g on g.chave = i.chave

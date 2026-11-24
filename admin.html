@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.11.24f";</script>
+<script>var LL_VERSION="v2026.11.24g";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -1062,6 +1062,7 @@
           Cada aparelho é atribuído ao criativo do seu <b>primeiro acesso com UTM</b> no período — quem chegou pelo reels e voltou pelo anúncio conta para o reels.
           O criativo é o <code>utm_content</code> do link; sem ele vale a campanha, e sem campanha a fonte. Gasto, impressões e cliques vêm da Meta (anúncios, sincronizados às 8h) e só existem para criativo com <code>utm_content</code> igual ao <code>ad.id</code>.
           Contrato fechado é evento novo na agenda ligado ao orçamento daquele aparelho.
+          <b>Abordados</b> são as pessoas (telefones distintos) com orçamento que receberam alguma mensagem pelo WhatsApp da casa no período, manual ou automática; <b>Responderam</b>, as que mandaram alguma mensagem de volta.
         </div>
 
         <div style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px;">
@@ -6105,6 +6106,7 @@ async function renderCriativos(){
       criativo:String(r.criativo||""), fonte:r.fonte||"", meio:r.meio||"", campanha:r.campanha||"", ad_nome:r.ad_nome||"",
       gasto:Number(r.gasto)||0, impressoes:Number(r.impressoes)||0, cliques:Number(r.cliques)||0,
       disp:Number(r.disp)||0, acessos:Number(r.acessos)||0, orc:Number(r.orc)||0, vis:Number(r.vis)||0, wpp:Number(r.wpp)||0,
+      pessoas:Number(r.pessoas)||0, abordados:Number(r.abordados)||0, responderam:Number(r.responderam)||0,
       fechados:Number(r.fechados)||0, valor:(r.valor_fechado==null ? null : Number(r.valor_fechado)||0),
       primeiro:r.primeiro||null, ultimo:r.ultimo||null
     })).filter(c=>c.disp>0 || c.gasto>0 || c.wpp>0);
@@ -6134,6 +6136,10 @@ const CR_COLS = [
   { k:"cpo",      rot:"R$/orç.",    v:c=>c.orc && c.gasto ? c.gasto/c.orc : null },
   { k:"vis",      rot:"Visitas",    v:c=>c.vis },
   { k:"wpp",      rot:"WhatsApp",   v:c=>c.wpp },
+  // abordados sobre pessoas: a parte que a casa controla. Responderam sobre
+  // abordados: a qualidade do lead.
+  { k:"abord",    rot:"Abordados",  v:c=>c.pessoas ? c.abordados/c.pessoas : null },
+  { k:"resp",     rot:"Responderam", v:c=>c.abordados ? c.responderam/c.abordados : null },
   { k:"fechados", rot:"Fechou",     v:c=>c.fechados },
   { k:"valor",    rot:"Valor fechado", v:c=>c.valor, admin:true },
   { k:"ultimo",   rot:"Último acesso", v:c=>c.ultimo ? new Date(c.ultimo).getTime() : null }
@@ -6214,6 +6220,8 @@ function _crDesenhaTabela(){
           ${td(c.orc&&c.gasto?brl(c.gasto/c.orc):"—", c.orc&&c.gasto?"var(--dk)":dim)}
           ${td(c.vis||"—", c.vis?"#1565C0":dim)}
           ${td(c.wpp||"—", c.wpp?"#2E7D52":dim)}
+          ${td(c.pessoas ? c.abordados+"/"+c.pessoas+'<div style="font-size:10px;font-weight:400;color:var(--dl);">'+Math.round(100*c.abordados/c.pessoas)+"%</div>" : "—", c.abordados?"var(--dk)":dim)}
+          ${td(c.abordados ? c.responderam+'<div style="font-size:10px;font-weight:400;color:var(--dl);">'+Math.round(100*c.responderam/c.abordados)+"%</div>" : "—", c.responderam?"#2E7D52":dim)}
           ${td(c.fechados||"—", c.fechados?"#2a6644":dim)}
           ${temValor ? td(c.valor?brl0(c.valor):"—", c.valor?"#2a6644":dim) : ""}
           ${td(fmtData(c.ultimo), dim)}
