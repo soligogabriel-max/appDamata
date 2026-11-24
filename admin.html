@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.11.24g";</script>
+<script>var LL_VERSION="v2026.11.24h";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -935,7 +935,7 @@
                  style="flex:1;min-width:220px;padding:7px 12px;border:1px solid var(--br);border-radius:8px;background:var(--bg2);color:var(--dk);font-size:13px;">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dl);cursor:pointer;white-space:nowrap;">
             <input type="checkbox" id="leads-ocultar" checked onchange="setLeadsFechados(this.checked)" style="cursor:pointer;">
-            Ocultar quem já fechou
+            Ocultar quem já fechou, fechou outro ou sem interesse
           </label>
         </div>
         <div id="leads-tabela" style="overflow-x:auto;"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
@@ -6466,7 +6466,7 @@ async function _leadsCarregar(dias) {
   const [visRows, orcRows, vcRows] = await Promise.all([
     dbGetAll("site_visits", "visited_at=gte."+sinceISO+"&select=visited_at,session_id,device,referrer,utm_source&order=visited_at.asc"),
     dbGetAll("orcamentos",  "created_at=gte."+sinceISO+"&select=id,created_at,visitor_id,whatsapp,nome_noiva,nome_noivo,nome_contratante,tipo_evento,data_evento,num_convidados,valor_total,status&order=created_at.asc"),
-    dbGet("visitas_comerciais", "select=visitor_id,whatsapp,status,created_at&limit=2000")
+    dbGet("visitas_comerciais", "select=visitor_id,whatsapp,status,created_at,desfecho,feedback&limit=2000")
   ]);
 
   // ── Acessos por sessão ──
@@ -6481,12 +6481,20 @@ async function _leadsCarregar(dias) {
   });
 
   // ── Visitas comerciais já marcadas, por WhatsApp e por visitor_id ──
+  // Guarda também o desfecho da visita MAIS RECENTE da pessoa: quem disse que
+  // fechou outro espaço ou parou de responder estava no topo da lista, porque
+  // visita marcada vale 20 pontos e prioridade na ordenação. Uma visita nova
+  // depois de um "não responde" volta a contar — por isso vale a última.
   const vcPorWpp = new Set(), vcPorVid = new Set();
+  const vcUltWpp = new Map(), vcUltVid = new Map();
   vcRows.forEach(v => {
     if (v.status === "cancelada") return;
     const d = _wppDigits(v.whatsapp);
     if (d) vcPorWpp.add(d);
     if (v.visitor_id) vcPorVid.add(v.visitor_id);
+    const info = { quando:v.created_at, desfecho:v.desfecho||null, feedback:v.feedback||null };
+    if (d && (!vcUltWpp.has(d) || vcUltWpp.get(d).quando < v.created_at)) vcUltWpp.set(d, info);
+    if (v.visitor_id && (!vcUltVid.has(v.visitor_id) || vcUltVid.get(v.visitor_id).quando < v.created_at)) vcUltVid.set(v.visitor_id, info);
   });
 
   // ── Orçamentos agrupados por pessoa ──
@@ -6534,9 +6542,16 @@ async function _leadsCarregar(dias) {
     });
     const wd = _wppDigits(l.whatsapp);
     l.temVisita = (wd && vcPorWpp.has(wd)) || [...l.vids].some(v => vcPorVid.has(v));
+    // desfecho da última visita: pelo WhatsApp, senão pelo aparelho
+    const ult = (wd && vcUltWpp.get(wd)) || [...l.vids].map(v => vcUltVid.get(v)).filter(Boolean).sort((a,b) => b.quando.localeCompare(a.quando))[0] || null;
+    l.desfecho = ult ? (ult.desfecho || (ult.feedback === "sem_interesse" ? "sem_interesse" : null)) : null;
+    // fechou outro espaço / sem interesse: lead morto. Não responde: esfriou,
+    // segue na lista mas lá embaixo.
+    l.perdido = l.desfecho === "fechou_outro" || l.desfecho === "sem_interesse";
+    l.naoResponde = l.desfecho === "nao_responde";
     l.ultimoToque = [l.ultOrc, l.ultVisita].filter(Boolean).sort().pop() || null;
     l.diasUlt = _leadDias(l.ultimoToque);
-    l.score = _leadScore(l);
+    l.score = l.perdido ? 0 : l.naoResponde ? Math.round(_leadScore(l) * 0.3) : _leadScore(l);
   });
 
   // ── Interesse sem orçamento: voltou ao site e nunca simulou ──
@@ -6587,7 +6602,7 @@ function _leadsPintar() {
   const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
   let linhas = _leadsRaw.leads.slice();
-  if (_leadsOcultarFechados) linhas = linhas.filter(l => !l.fechou);
+  if (_leadsOcultarFechados) linhas = linhas.filter(l => !l.fechou && !l.perdido);
   if (_leadsBusca) linhas = linhas.filter(l =>
     (l.nome||"").toLowerCase().includes(_leadsBusca) ||
     (l.whatsapp||"").toLowerCase().includes(_leadsBusca) ||
@@ -6597,8 +6612,10 @@ function _leadsPintar() {
                 valor:l=>l.valorMax, recente:l=>(l.diasUlt==null?9e9:-l.diasUlt),
                 nome:l=>(l.nome||"~").toLowerCase() }[_leadsSort] || (l=>l.score);
   linhas.sort((a,b) => {
-    // leads com visita marcada sempre acima dos sem visita
-    if (a.temVisita !== b.temVisita) return a.temVisita ? -1 : 1;
+    // leads com visita marcada sempre acima dos sem visita — salvo quem a
+    // visita já respondeu negativamente: esse perde a prioridade
+    const pa = a.temVisita && !a.perdido && !a.naoResponde, pb = b.temVisita && !b.perdido && !b.naoResponde;
+    if (pa !== pb) return pa ? -1 : 1;
     const va = key(a), vb = key(b);
     const cmp = typeof va === "string" ? va.localeCompare(vb) : va - vb;
     return _leadsDesc ? -cmp : cmp;
@@ -6606,7 +6623,7 @@ function _leadsPintar() {
   _leadsFiltrados = linhas;
 
   // ── Cards ──
-  const quentes = _leadsRaw.leads.filter(l => !l.fechou && l.score >= 60).length;
+  const quentes = _leadsRaw.leads.filter(l => !l.fechou && !l.perdido && l.score >= 60).length;
   const totalOrcs = _leadsRaw.leads.reduce((s,l) => s+l.orcs, 0);
   document.getElementById("leads-c-quentes").textContent = quentes;
   document.getElementById("leads-c-total").textContent   = _leadsRaw.leads.length;
@@ -6640,6 +6657,7 @@ function _leadsPintar() {
             <button onclick='abrirHistoricoVisitante(${JSON.stringify(vid)},${JSON.stringify(l.nome||"")},${JSON.stringify(l.whatsapp||null)})' style="background:none;border:none;padding:0;cursor:pointer;color:var(--a);font-weight:700;font-size:12px;text-align:left;text-decoration:underline;text-underline-offset:2px;">${nome}</button>
             ${l.fechou?' <span style="background:#d1fae5;color:#065f46;font-size:9px;border-radius:3px;padding:1px 4px;">✅ fechou</span>':''}
             ${l.temVisita?' <span style="background:#dbeafe;color:#1e40af;font-size:9px;border-radius:3px;padding:1px 4px;">📅 visita</span>':''}
+            ${l.desfecho==="fechou_outro"?' <span style="background:#fee2e2;color:#991b1b;font-size:9px;border-radius:3px;padding:1px 4px;">❌ fechou outro</span>':l.desfecho==="sem_interesse"?' <span style="background:#fee2e2;color:#991b1b;font-size:9px;border-radius:3px;padding:1px 4px;">🚫 sem interesse</span>':l.naoResponde?' <span style="background:#f3f4f6;color:#4b5563;font-size:9px;border-radius:3px;padding:1px 4px;">🔇 não responde</span>':''}
             ${l.vids.size>1?' <span style="background:var(--bg2);color:var(--dl);font-size:9px;border-radius:3px;padding:1px 4px;" title="mesma pessoa em mais de um aparelho">'+l.vids.size+' aparelhos</span>':''}
             ${sub?`<div style="font-size:10px;color:var(--dl);margin-top:2px;">${esc(sub)}</div>`:''}
           </td>
@@ -6691,11 +6709,11 @@ function _leadsPintar() {
 function exportarLeadsCSV() {
   if (!_leadsFiltrados.length) { alert("Nada para exportar."); return; }
   const cel = v => '"' + String(v==null?"":v).replace(/"/g,'""') + '"';
-  const linhas = [["Score","Lead","WhatsApp","Acessos","Orcamentos","Maior valor","Ultimo toque (dias)","Tipo","Data do evento","Convidados","Visita marcada","Fechou"].map(cel).join(";")];
+  const linhas = [["Score","Lead","WhatsApp","Acessos","Orcamentos","Maior valor","Ultimo toque (dias)","Tipo","Data do evento","Convidados","Visita marcada","Desfecho da visita","Fechou"].map(cel).join(";")];
   _leadsFiltrados.forEach(l => linhas.push([
     l.score, l.nome||"", l.whatsapp||"", l.acessos, l.orcs, (l.valorMax||0).toFixed(2).replace(".",","),
     l.diasUlt==null?"":l.diasUlt, l.tipo||"", l.dataEvento||"", l.convidados||"",
-    l.temVisita?"sim":"nao", l.fechou?"sim":"nao"
+    l.temVisita?"sim":"nao", l.desfecho||"", l.fechou?"sim":"nao"
   ].map(cel).join(";")));
   const blob = new Blob(["﻿"+linhas.join("\r\n")], {type:"text/csv;charset=utf-8;"});
   const a = document.createElement("a");
