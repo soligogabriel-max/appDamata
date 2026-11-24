@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.11.24c";</script>
+<script>var LL_VERSION="v2026.11.24d";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -331,6 +331,7 @@
         <button class="tab" onclick="setTab('visitas');closeGrps()" id="t-visitas">📊 Visitas do Site</button>
         <button class="tab" onclick="setTab('criativos');closeGrps()" id="t-criativos">📣 Criativos</button>
         <button class="tab" onclick="setTab('whatsapp');closeGrps()" id="t-whatsapp">💬 WhatsApp</button>
+        <button class="tab" onclick="setTab('wppauto');closeGrps()" id="t-wppauto">📨 Envios automáticos</button>
       </div>
     </div>
 
@@ -1125,9 +1126,13 @@
           </div>
         </div>
         <div style="margin-top:12px;font-size:11px;color:var(--dl);">Mensagens recebidas via WhatsApp Cloud API. Outbound via templates (lembretes automáticos).</div>
-        <div id="wpp-auto-bloco" style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px;">
+      </div>
+    </div>
+    <div id="p-wppauto" class="panel">
+      <div class="uwrap" style="max-width:960px">
+        <div id="wpp-auto-bloco">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
-            <div class="sec-t" style="font-size:15px;margin:0;">📨 Envios automáticos, dia a dia</div>
+            <div class="sec-t" style="margin:0;">📨 Envios automáticos de WhatsApp, dia a dia</div>
             <div style="margin-left:auto;display:flex;background:var(--bg2);border:1px solid var(--br);border-radius:8px;overflow:hidden;" id="wa-per"></div>
           </div>
           <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;" id="wa-cards"></div>
@@ -2190,7 +2195,7 @@ function _applyNavForRole(role){
     allSubTabs.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     document.getElementById("t-pedidos-eq").style.display="none";
     // desfaz o que a simulação de "trafego" esconde
-    ["t-leads","t-relatorio","t-relorc","t-whatsapp","t-visitas","t-agenda","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
+    ["t-leads","t-relatorio","t-relorc","t-whatsapp","t-wppauto","t-visitas","t-agenda","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     var wrapA=document.querySelector("#p-visitas .uwrap");
     if(wrapA) Array.from(wrapA.children).forEach(c=>{ c.style.display=""; c.style.borderTop=""; c.style.marginTop=""; });
   } else if(role==="trafego"){
@@ -2198,7 +2203,7 @@ function _applyNavForRole(role){
     // de anúncios — que é alimentado por RPC agregada, sem dado de cliente.
     allGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     var gr=document.getElementById("grp-relatorios"); if(gr) gr.style.display="";
-    ["t-dashboard","t-relatorio","t-relorc","t-whatsapp","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    ["t-dashboard","t-relatorio","t-relorc","t-whatsapp","t-wppauto","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     var tv=document.getElementById("t-visitas"); if(tv) tv.style.display="";
     var ta=document.getElementById("t-agenda"); if(ta) ta.style.display="none";
     document.getElementById("t-pedidos-eq").style.display="none";
@@ -2610,7 +2615,7 @@ const TAB_GRP={
   receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", conciliacao:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro", socios:"grp-financeiro",
   fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros", naturezas:"grp-cadastros", assessorias:"grp-cadastros",
   pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin",
-  relatorio:"grp-relatorios", relorc:"grp-relatorios", visitas:"grp-relatorios", whatsapp:"grp-relatorios", leads:"grp-relatorios", criativos:"grp-relatorios"
+  relatorio:"grp-relatorios", relorc:"grp-relatorios", visitas:"grp-relatorios", whatsapp:"grp-relatorios", leads:"grp-relatorios", criativos:"grp-relatorios", wppauto:"grp-relatorios"
 };
 function toggleGrp(id){
   const el=document.getElementById(id);
@@ -2637,7 +2642,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",conciliacao:"p-conciliacao",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",vc:"p-vc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas",whatsapp:"p-whatsapp",leads:"p-leads",funil:"p-funil",criativos:"p-criativos"};
+  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",conciliacao:"p-conciliacao",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",vc:"p-vc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas",whatsapp:"p-whatsapp",leads:"p-leads",funil:"p-funil",criativos:"p-criativos",wppauto:"p-wppauto"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(cfilter);
   if(t==="receber") renderReceber();
@@ -2665,7 +2670,8 @@ function setTab(t) {
   if(t==="criativos"){ renderCriativos(); crGerarLink(); }
   if(t==="leads") renderLeads();
   if(t==="funil") renderFunil();
-  if(t==="whatsapp"){ renderWhatsApp(); renderWppAuto(); }
+  if(t==="whatsapp") renderWhatsApp();
+  if(t==="wppauto") renderWppAuto();
   if(t==="dashboard") renderDashboard();
   if(t==="vc") renderVC();
 }
