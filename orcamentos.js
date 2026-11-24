@@ -85,6 +85,7 @@ function verOrcamento(id){
       <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Contratante</div><div style="font-weight:600;">${_esc(row.nome_contratante||"—")}</div></div>
       <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">WhatsApp</div><div style="font-weight:600;">${_esc(row.whatsapp||"—")}</div></div>
       ${row.email?`<div style="grid-column:span 2"><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">E-mail</div><div style="font-weight:600;">${_esc(row.email)}</div></div>`:""}
+      ${row.origem_lead?`<div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Origem</div><div style="font-weight:600;">${_esc(origemLeadRotulo(row.origem_lead))}</div></div>`:""}
       <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Solicitado em</div><div>${row.created_at?row.created_at.slice(0,10).split("-").reverse().join("/"):"—"}</div></div>
       <div><div style="font-size:10px;font-weight:700;color:var(--dl);text-transform:uppercase;letter-spacing:.8px;">Válido até</div><div>${row.validade?row.validade.split("-").reverse().join("/"):"—"}</div></div>
     </div>
@@ -120,7 +121,8 @@ function editarOrcamento(id){
     _selectedItems:(row.itens||[]).map(i=>({cod_item:i.cod,descricao:i.descricao,qty:i.qty||1,valor_unitario:i.valor_unitario||0,subtotal:i.subtotal||0})),
     _subtotal:row.valor_total||0,_discount:0,_discountPkg:null,
     _saved:true,_activePkg:null,_activePkgs:[],_uSel:{},_priceOv:{},_freeItems:[],_freeSeq:0,
-    _discountAuto:0,_discountPkgAuto:null,_discountManual:null,_dbId:row.id,_stage:row.status||"lead"
+    _discountAuto:0,_discountPkgAuto:null,_discountManual:null,_dbId:row.id,_stage:row.status||"lead",
+    origem_lead:row.origem_lead||null
   };
   // Item sem cod veio de uma linha livre: volta como linha livre, senão sumiria na reedição
   (row.itens||[]).forEach(i=>{
@@ -163,11 +165,17 @@ async function excluirOrcamento(id){
   renderOrcamentos();
 }
 let _orcRowsCache=[];
+// Lista fechada, igual à constraint do banco (agenda/orcamentos.origem_lead).
+const ORIGEM_LEAD_OPCOES=[["instagram", "Instagram (orgânico)"], ["anuncio", "Anúncio (Meta)"], ["google", "Google"], ["indicacao", "Indicação"], ["assessoria", "Assessoria / cerimonial"], ["cliente_antigo", "Já era cliente"], ["outro", "Outro"]];
+function origemLeadRotulo(k){ const o=ORIGEM_LEAD_OPCOES.find(x=>x[0]===k); return o?o[1]:(k||""); }
 async function efetivarOrcamento(id){
   const orc=(_orcRowsCache||[]).find(r=>r.id===id);
   if(!orc){toast&&toast("Orçamento não encontrado.");return;}
   // Marca como convertido
   try{ await sbFetch(`orcamentos?id=eq.${id}`,{method:"PATCH",body:{status:"convertido"}}); }catch(_){}
+  // Origem sugerida pelo banco (declarada no orçamento ou deduzida do UTM) —
+  // o gerador pré-seleciona e a equipe confirma. Falhar aqui não trava nada.
+  try{ orc.origem_sugerida=await sbFetch("rpc/sugerir_origem_lead",{method:"POST",body:{p_orc_id:id}}); }catch(_){ orc.origem_sugerida=null; }
   // Abre o gerador na aba Contratos e pré-preenche com os dados do orçamento
   setTab("contratos");
   const iframe=document.querySelector("#p-contratos iframe");
@@ -582,6 +590,8 @@ async function _orcUpsertLead(){
     itens:(_orc._selectedItems||[]).map(i=>({cod:i.cod_item,descricao:i.descricao,qty:i.qty,valor_unitario:i.valor_unitario,subtotal:i.subtotal})),
     valor_total:_orc.valor_total||null,
     validade:validade.toISOString().slice(0,10),
+    // no fluxo público vai undefined e a Edge Function descarta; só a equipe preenche
+    ...(_orc.origem_lead?{origem_lead:_orc.origem_lead}:{}),
     whatsapp:_orc.whatsapp||null,
     email:_orc.email||null,
     status:_orc._stage||"lead",
@@ -757,6 +767,8 @@ function _orcHTML1(){
     <input type="tel" id="orc-wpp" class="inp" value="${_orc.whatsapp||'+55 '}" placeholder="+55 (11) 99999-9999"/>
     <label class="lbl">E-mail</label>
     <input type="email" id="orc-email" class="inp" value="${_orc.email}" placeholder="seu@email.com"/>
+    ${_orcAdmin()?`<label class="lbl">Como chegou até nós? *</label>
+    <select id="orc-origem" class="inp"><option value="">— selecione —</option>${ORIGEM_LEAD_OPCOES.map(o=>`<option value="${o[0]}" ${_orc.origem_lead===o[0]?"selected":""}>${o[1]}</option>`).join("")}</select>`:""}
     <div id="orc-err1" class="err"></div>
   </div>
   <div class="orc-nav">
@@ -790,6 +802,9 @@ async function _orcNext1(){
   const wppErr=validarFmtWpp(wpp);
   if(wppErr){err.style.display="block";err.textContent=wppErr;return;}
   if(conv>450){err.style.display="block";err.textContent="Capacidade máxima: 450 convidados (Tumbergia). Entre em contato para eventos maiores.";return;}
+  // Só a equipe responde: o cliente no site já deixa o rastro no UTM.
+  const origEl=document.getElementById("orc-origem");
+  if(origEl){ if(!origEl.value){err.style.display="block";err.textContent="Informe como o cliente chegou até nós.";return;} _orc.origem_lead=origEl.value; }
   _orc.tipo_evento=tipo; _orc.data_evento=data; _orc.num_convidados=conv;
   const nvEl=document.getElementById("orc-noiva"); _orc.nome_noiva=nvEl?nvEl.value.trim():'';
   const noEl=document.getElementById("orc-noivo"); _orc.nome_noivo=noEl?noEl.value.trim():'';

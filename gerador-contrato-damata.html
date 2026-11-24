@@ -69,7 +69,7 @@ select.inp{cursor:pointer}
     <span class="lbl">Nome do Evento <span style="color:#475569;font-weight:400;text-transform:none;letter-spacing:0">(gerado automaticamente — editável)</span></span>
     <input class="inp" type="text" id="o-nome-evento" placeholder="Ex: Ana e Pedro - 22jun26">
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">
     <div>
       <span class="lbl">Tipo de Evento</span>
       <select class="inp" id="o-tipo">
@@ -81,6 +81,15 @@ select.inp{cursor:pointer}
       </select>
     </div>
     <div><span class="lbl">Código do Contrato</span><input class="inp" type="text" id="o-code" placeholder="Gerado automaticamente"></div>
+    <div>
+      <!-- Como o cliente chegou. Obrigatório ao salvar: é a única pergunta que
+           liga contrato a canal, e "fora do site" era metade dos contratos. -->
+      <span class="lbl">Como conheceu a fazenda *</span>
+      <select class="inp" id="o-origem">
+        <option value="">— selecione —</option>
+        <option value="instagram">Instagram (orgânico)</option><option value="anuncio">Anúncio (Meta)</option><option value="google">Google</option><option value="indicacao">Indicação</option><option value="assessoria">Assessoria / cerimonial</option><option value="cliente_antigo">Já era cliente</option><option value="outro">Outro</option>
+      </select>
+    </div>
     <div><span class="lbl">Observação</span><input class="inp" type="text" id="o-obs" placeholder="Obs interna"></div>
   </div>
 </div>
@@ -326,6 +335,9 @@ function prefillFromOrcamento(o){
   if(o.data_evento&&g("o-d1")) g("o-d1").value=o.data_evento;
   if(o.num_convidados&&g("o-num")) g("o-num").value=o.num_convidados;
   if(o.valor_total&&g("o-total")) g("o-total").value=Number(o.valor_total).toFixed(2);
+  // origem: o que a equipe declarou no orçamento, senão o que o UTM sugere
+  // (o admin manda em origem_sugerida). A equipe confirma ou troca.
+  if(g("o-origem")) g("o-origem").value=o.origem_lead||o.origem_sugerida||"";
   autoNomeEvento();
 }
 
@@ -648,9 +660,10 @@ function salvarNoSistema(){
   var noiva=v("o-noiva"),noivo=v("o-noivo");
   if(!noiva&&!noivo){alert("Preencha pelo menos o nome da noiva ou do noivo.");return;}
   if(!v("o-d1")){alert("Preencha a data do evento.");return;}
+  if(!v("o-origem")){alert("Preencha como o cliente conheceu a fazenda.");return;}
   var itens=collectItens();
   var preset={
-    code:v("o-code"),obs:v("o-obs"),
+    code:v("o-code"),obs:v("o-obs"),origemLead:v("o-origem")||null,
     date1:v("o-d1"),date2:v("o-d2"),cin:v("o-cin"),cout:v("o-cout"),
     total:v("o-total"),
     payments:payments.map(function(p){return{desc:p.desc,date:p.date,value:p.value};}),
@@ -688,8 +701,9 @@ async function gerarLinkContrato(){
   // Gera o preset completo (com flags derivados dos itens por código)
   var preset=collectPreset();
   // Salva no sistema automaticamente — inclui todos os flags para spaces_json correto
+  if(!v("o-origem")){alert("Preencha como o cliente conheceu a fazenda.");return;}
   var savePreset={
-    code:_gcEvt||v("o-code"),obs:v("o-obs"),
+    code:_gcEvt||v("o-code"),obs:v("o-obs"),origemLead:v("o-origem")||null,
     date1:v("o-d1"),date2:v("o-d2"),cin:v("o-cin"),cout:v("o-cout"),
     total:v("o-total"),
     payments:payments.map(function(p){return{desc:p.desc,date:p.date,value:p.value};}),
@@ -746,7 +760,7 @@ async function gerarLinkContrato(){
 function collectPreset(){
   var itens=collectItens();
   var base={
-    code:v("o-code"),obs:v("o-obs"),
+    code:v("o-code"),obs:v("o-obs"),origemLead:v("o-origem")||null,
     nomeEvento:v("o-nome-evento"),
     date1:v("o-d1"),date2:v("o-d2"),cin:v("o-cin"),cout:v("o-cout"),
     total:v("o-total"),
