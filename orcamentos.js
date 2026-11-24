@@ -417,9 +417,30 @@ function _orcDiscLine(o){
 
 let _orc={step:1,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_selectedItems:[],_subtotal:0,_discount:0,_discountPkg:null,_discountAuto:0,_discountPkgAuto:null,_discountManual:null,_saved:false,_activePkg:null,_activePkgs:[],_uSel:{},_priceOv:{},_freeItems:[],_freeSeq:0,_dbId:null,_stage:"lead"};
 
-function abrirVisitaDirecta(){
+/* O link do follow-up de orçamento chega com &t=<token>: busca o orçamento e
+   abre o agendamento com nome, WhatsApp e orc_id preenchidos. Sem isso a
+   visita nascia sem nome e sem telefone, e o visitor_id do celular da pessoa
+   (outro navegador) não casava com o do orçamento — a atribuição por
+   criativo perdia a visita. Token ruim ou rede fora: abre vazio, como antes. */
+async function _orcPrefillVisitaPorToken(t){
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t||"")) return null;
+  try{
+    const r=await fetch(SB_URL+"/functions/v1/orcamento-publico?t="+encodeURIComponent(t)+"&formato=json",{headers:{"apikey":SB_KEY}});
+    if(!r.ok) return null;
+    const o=await r.json();
+    return o&&o.id?o:null;
+  }catch(e){ return null; }
+}
+async function abrirVisitaDirecta(){
   // Abre o modal de orçamento já no step 4 (agendamento de visita) sem exigir dados
+  let pre=null;
+  try{ pre=await _orcPrefillVisitaPorToken(new URLSearchParams(window.location.search).get("t")); }catch(e){}
   _orc={step:4,tipo_evento:"",data_evento:"",num_convidados:"",nome_noiva:"",nome_noivo:"",nome_contratante:"",whatsapp:"",email:"",salao:"",pacote_cod:null,pacote_grupo_id:null,pacote_nome:"",pacote_valor:0,pacote_itens_desc:"",extras:{},_pacotes:[],_invItems:[],valor_total:0,_stage:"lead",_dbId:null};
+  if(pre){
+    _orc.nome_contratante=pre.nome_contratante||""; _orc.nome_noiva=pre.nome_noiva||""; _orc.nome_noivo=pre.nome_noivo||"";
+    _orc.whatsapp=pre.whatsapp||""; _orc.email=pre.email||"";
+    _orc._dbId=pre.id; _orc._visitorId=pre.visitor_id||null;
+  }
   const ov=document.getElementById("orc-overlay");
   const wrap=document.getElementById("orc-wizard-wrap");
   if(ov) ov.style.display="flex";

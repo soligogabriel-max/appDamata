@@ -84,7 +84,13 @@ Deno.serve(async (req) => {
   // Só uuid: barra o id sequencial e qualquer tentativa de pendurar filtro
   // extra no PostgREST pela query string.
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!UUID.test(t)) return page(invalido());
+  // ?formato=json: o agendamento de visita (admin.html?visita&t=TOKEN) pede só
+  // o necessário para abrir com nome, WhatsApp e orc_id preenchidos. Mesma
+  // regra de token inválido, mesma resposta opaca.
+  const comoJson = url.searchParams.get("formato") === "json";
+  const jsonResp = (b: unknown, status = 200) =>
+    new Response(JSON.stringify(b), { status, headers: { "Content-Type": "application/json", ...CORS } });
+  if (!UUID.test(t)) return comoJson ? jsonResp({}, 404) : page(invalido());
 
   const res = await fetch(`${SB_URL}/rest/v1/orcamentos?token=eq.${t}&select=*`, {
     headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
@@ -92,7 +98,17 @@ Deno.serve(async (req) => {
   const rows = await res.json();
   const o = rows?.[0];
 
-  if (!o) return page(invalido());
+  if (!o) return comoJson ? jsonResp({}, 404) : page(invalido());
+  if (comoJson) {
+    return jsonResp({
+      id: o.id,
+      nome: [o.nome_noiva, o.nome_noivo].filter(Boolean).join(" e ") || o.nome_contratante || "",
+      nome_contratante: o.nome_contratante || "",
+      nome_noiva: o.nome_noiva || "", nome_noivo: o.nome_noivo || "",
+      whatsapp: o.whatsapp || "", email: o.email || "",
+      visitor_id: o.visitor_id || null,
+    });
+  }
 
   const validade = o.validade ? fmtDate(o.validade) : "";
   const emitido = o.created_at ? fmtDate(o.created_at.slice(0, 10)) : "";
