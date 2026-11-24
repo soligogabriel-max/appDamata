@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.11.24b";</script>
+<script>var LL_VERSION="v2026.11.24c";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -1125,6 +1125,19 @@
           </div>
         </div>
         <div style="margin-top:12px;font-size:11px;color:var(--dl);">Mensagens recebidas via WhatsApp Cloud API. Outbound via templates (lembretes automáticos).</div>
+        <div id="wpp-auto-bloco" style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+            <div class="sec-t" style="font-size:15px;margin:0;">📨 Envios automáticos, dia a dia</div>
+            <div style="margin-left:auto;display:flex;background:var(--bg2);border:1px solid var(--br);border-radius:8px;overflow:hidden;" id="wa-per"></div>
+          </div>
+          <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;" id="wa-cards"></div>
+          <div style="position:relative;height:260px;margin-bottom:6px;"><canvas id="wa-chart"></canvas></div>
+          <div id="wa-legenda" style="display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11px;color:var(--dl);margin-bottom:14px;"></div>
+          <div id="wa-tabela" style="overflow-x:auto;"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
+          <div style="font-size:11px;color:var(--dl);margin-top:8px;line-height:1.5;">
+            Conta as mensagens enviadas pela Cloud API, classificadas pelo prefixo que cada automação grava em <code>wpp_mensagens</code>. "Respostas" são as mensagens recebidas no dia, de qualquer contato. Dias em branco não aparecem na tabela.
+          </div>
+        </div>
       </div>
     </div>
     <div id="p-fotoslanding" class="panel">
@@ -2652,7 +2665,7 @@ function setTab(t) {
   if(t==="criativos"){ renderCriativos(); crGerarLink(); }
   if(t==="leads") renderLeads();
   if(t==="funil") renderFunil();
-  if(t==="whatsapp") renderWhatsApp();
+  if(t==="whatsapp"){ renderWhatsApp(); renderWppAuto(); }
   if(t==="dashboard") renderDashboard();
   if(t==="vc") renderVC();
 }
@@ -6230,6 +6243,133 @@ async function crCopiarLink(){
   if(!out.value) crGerarLink();
   try { await navigator.clipboard.writeText(out.value); toast("Link copiado"); }
   catch(e){ out.select(); toast("Selecione e copie o link"); }
+}
+
+// ══════════════════════════════════════════
+// ENVIOS AUTOMÁTICOS DE WHATSAPP, DIA A DIA
+// Cada automação grava a mensagem enviada em wpp_mensagens com um prefixo
+// próprio ("[Orçamento]", "[Fazenda Damata]" para cobrança...). O painel
+// classifica por esse prefixo — não há coluna de tipo de automação, e criar
+// uma exigiria mexer em sete funções. A ordem das categorias é fixa: a cor
+// segue a categoria, nunca a posição no filtro.
+// ══════════════════════════════════════════
+let _waDias  = 30;
+let _waRows  = null;
+let _waChart = null;
+const WA_PERIODOS = [14, 30, 60, 90];
+const WA_CATS = [
+  { k:"orc",      rot:"Orçamento enviado",      cor:"#2a78d6", re:/^\[Orçamento\]/ },
+  { k:"cobranca", rot:"Cobrança",               cor:"#eb6834", re:/^\[(Fazenda Damata|Atraso)\]/ },
+  { k:"fu_orc",   rot:"Follow-up de orçamento", cor:"#1baf7a", re:/^\[Follow-up orçamento\]/ },
+  { k:"visita",   rot:"Visita (confirmação/lembrete)", cor:"#eda100", re:/^\[(Confirmação de visita|Lembrete de visita|Lembrete D-1)/ },
+  { k:"fu_vis",   rot:"Follow-up de visita",    cor:"#e87ba4", re:/^\[Follow-up automático\]/ },
+  { k:"auto",     rot:"Resposta automática",    cor:"#008300", re:/^Olá! 🌿/ },
+  { k:"outros",   rot:"Outros (equipe, manual)", cor:"#6250d6", re:/./ }
+];
+function _waCat(m){ const s=String(m||""); return (WA_CATS.find(c=>c.re.test(s))||WA_CATS[WA_CATS.length-1]).k; }
+
+function setWaPeriodo(d){ _waDias = d; renderWppAuto(); }
+
+async function renderWppAuto(){
+  const tabela = document.getElementById("wa-tabela");
+  if(!tabela) return;
+  const per = document.getElementById("wa-per");
+  if(per) per.innerHTML = WA_PERIODOS.map(n=>{
+    const on = n===_waDias;
+    return `<button onclick="setWaPeriodo(${n})" style="padding:4px 10px;border:none;cursor:pointer;font-size:12px;background:${on?"var(--a)":"transparent"};color:${on?"#fff":"var(--dl)"};font-weight:${on?"600":"400"};">${n}d</button>`;
+  }).join("");
+  tabela.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  try{
+    const since = new Date(); since.setDate(since.getDate()-_waDias+1); since.setHours(0,0,0,0);
+    _waRows = await dbGetAll("wpp_mensagens", "created_at=gte."+since.toISOString()+"&select=created_at,direcao,mensagem&order=created_at.asc");
+    _waDesenha(since);
+  }catch(e){
+    _waRows = null;
+    tabela.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar envios: '+e.message+'</div>';
+  }
+}
+
+function _waDesenha(since){
+  const tabela = document.getElementById("wa-tabela");
+  if(!tabela || !_waRows) return;
+  // um registro por dia do período, inclusive os vazios — o gráfico precisa do eixo inteiro
+  const dias = [];
+  for(let d=new Date(since); dias.length<_waDias; d.setDate(d.getDate()+1)) dias.push(localDate(d));
+  const porDia = new Map(dias.map(d=>[d, Object.fromEntries(WA_CATS.map(c=>[c.k,0]).concat([["recebidas",0],["total",0]]))]));
+  _waRows.forEach(r=>{
+    const d = utcToLocalDate(r.created_at);
+    const reg = porDia.get(d); if(!reg) return;
+    if(r.direcao==="recebida"){ reg.recebidas++; return; }
+    if(r.direcao!=="enviada") return;
+    reg[_waCat(r.mensagem)]++; reg.total++;
+  });
+  const tot = Object.fromEntries(WA_CATS.map(c=>[c.k,0]).concat([["recebidas",0],["total",0]]));
+  porDia.forEach(reg=>{ Object.keys(tot).forEach(k=>tot[k]+=reg[k]); });
+  const catsAtivas = WA_CATS.filter(c=>tot[c.k]>0);
+
+  // cards: total, respostas e as duas categorias que mais mandaram
+  const card = (v,rot,cor)=>`<div style="flex:1;min-width:120px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:12px 14px;text-align:center;">
+      <div style="font-size:22px;font-weight:700;color:${cor||"var(--dk)"};">${v}</div>
+      <div style="font-size:11px;color:var(--dl);margin-top:3px;font-weight:600;">${rot}</div></div>`;
+  const topo = [...catsAtivas].sort((a,b)=>tot[b.k]-tot[a.k]).slice(0,2);
+  const cards = document.getElementById("wa-cards");
+  if(cards) cards.innerHTML = card(tot.total.toLocaleString("pt-BR"), "Envios no período", "var(--a)")
+    + card(tot.recebidas.toLocaleString("pt-BR"), "Respostas recebidas", "#2E7D52")
+    + topo.map(c=>card(tot[c.k].toLocaleString("pt-BR"), c.rot)).join("");
+
+  const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+  const leg = document.getElementById("wa-legenda");
+  if(leg) leg.innerHTML = catsAtivas.map(c=>`<span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${c.cor};vertical-align:-1px;margin-right:4px;"></span>${esc(c.rot)}</span>`).join("")
+    + `<span><span style="display:inline-block;width:10px;height:2px;background:var(--dk);vertical-align:3px;margin-right:4px;"></span>Respostas recebidas</span>`;
+
+  _waDesenhaGrafico(dias, porDia, catsAtivas);
+
+  const comMov = dias.filter(d=>porDia.get(d).total||porDia.get(d).recebidas).reverse();
+  if(!comMov.length){
+    tabela.innerHTML = '<div class="empty"><div class="eicon">📭</div>Nenhuma mensagem no período.</div>';
+    return;
+  }
+  const th = (t,left)=>`<th style="text-align:${left?"left":"center"};padding:6px ${left?"6px":"4px"};border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;">${t}</th>`;
+  const td = (v,color)=>`<td style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--br);font-weight:600;font-size:12px;color:${color||"var(--dk)"};white-space:nowrap;">${v}</td>`;
+  const fmtDia = d=>{ const [y,m,dd]=d.split("-"); return dd+"/"+m; };
+  tabela.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+    <thead><tr style="background:var(--bg2);color:var(--dl);">${th("Dia",true)}${catsAtivas.map(c=>th(esc(c.rot))).join("")}${th("Total")}${th("Respostas")}</tr></thead>
+    <tbody>${comMov.map((d,i)=>{ const r=porDia.get(d); return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
+      <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;font-weight:600;color:var(--dk);">${fmtDia(d)}</td>
+      ${catsAtivas.map(c=>td(r[c.k]||"—", r[c.k]?"var(--dk)":"var(--dl)")).join("")}
+      ${td(r.total||"—", r.total?"var(--a)":"var(--dl)")}
+      ${td(r.recebidas||"—", r.recebidas?"#2E7D52":"var(--dl)")}
+    </tr>`;}).join("")}</tbody>
+    <tfoot><tr style="background:var(--bg2);">
+      <td style="padding:6px;font-size:12px;font-weight:700;color:var(--dk);">Total</td>
+      ${catsAtivas.map(c=>td(tot[c.k])).join("")}${td(tot.total,"var(--a)")}${td(tot.recebidas,"#2E7D52")}
+    </tr></tfoot></table>`;
+}
+
+// Barras empilhadas por categoria mais uma linha de respostas — mesma unidade
+// (mensagens por dia), um eixo só.
+function _waDesenhaGrafico(dias, porDia, cats){
+  const canvas = document.getElementById("wa-chart");
+  if(!canvas || typeof Chart==="undefined") return;
+  if(_waChart){ _waChart.destroy(); _waChart=null; }
+  const ink = getComputedStyle(document.documentElement).getPropertyValue("--dk").trim() || "#2E3C44";
+  const muted = getComputedStyle(document.documentElement).getPropertyValue("--dl").trim() || "#7A8F96";
+  const labels = dias.map(d=>{ const [y,m,dd]=d.split("-"); return dd+"/"+m; });
+  _waChart = new Chart(canvas, {
+    data: {
+      labels,
+      datasets: cats.map(c=>({ type:"bar", label:c.rot, data:dias.map(d=>porDia.get(d)[c.k]), backgroundColor:c.cor, borderColor:"#fff", borderWidth:{top:2}, stack:"envios", borderRadius:2, maxBarThickness:28 }))
+        .concat([{ type:"line", label:"Respostas recebidas", data:dias.map(d=>porDia.get(d).recebidas), borderColor:ink, backgroundColor:ink, borderWidth:2, pointRadius:3, pointHoverRadius:5, tension:0.2, fill:false }])
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false, interaction:{mode:"index", intersect:false},
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:ctx=>ctx.dataset.label+": "+ctx.parsed.y } } },
+      scales:{
+        x:{ stacked:true, grid:{display:false}, ticks:{color:muted, maxTicksLimit:15, font:{size:10}} },
+        y:{ stacked:true, beginAtZero:true, grid:{color:"rgba(0,0,0,.06)"}, ticks:{color:muted, precision:0, font:{size:10}} }
+      }
+    }
+  });
 }
 
 // ══════════════════════════════════════════
