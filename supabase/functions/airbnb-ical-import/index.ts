@@ -68,6 +68,17 @@ const comTraco = (d: string) => `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 
 const noites = (ini: string, fim: string) =>
   Math.round((Date.parse(fim + "T12:00:00Z") - Date.parse(ini + "T12:00:00Z")) / 86400000);
 
+// Noites de verdade, para cobranca. data_fim aqui e a ultima noite (inclusiva),
+// entao 05 -> 08 sao 4 noites. O noites() acima mede o vao entre as datas e
+// serve so de teto de seguranca; usar ele para faturar cobra uma noite a menos.
+const noitesDe = (ini: string, fim: string) =>
+  Math.round((Date.parse(fim + "T12:00:00Z") - Date.parse(ini + "T12:00:00Z")) / 86400000) + 1;
+
+// Marcas em obs_interna. Reserva cancelada ou remarcada nunca mexe no
+// financeiro sozinha: pode ja ter recebimento conciliado.
+const MARCA_FORA = "[Airbnb] reserva saiu do feed";
+const MARCA_MUDOU = "[Airbnb] datas mudaram no feed";
+
 export type Entrada = {
   uid: string;
   data_ini: string;   // inclusivo
@@ -155,20 +166,125 @@ Deno.serve(async (req) => {
 
   const svc = { apikey: SB_SVC, Authorization: `Bearer ${SB_SVC}`, "Content-Type": "application/json" };
 
-  // Data que já tem evento na agenda não ganha nada com um bloqueio em cima:
-  // ou é eco do nosso próprio feed, ou é bloqueio manual protegendo o evento.
+  // Diaria do a receber. Em app_config para mudar sem deploy.
+  let diaria = 4000;
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/app_config?chave=eq.airbnb_diaria&select=valor&limit=1`, { headers: svc });
+    const [row] = await r.json();
+    const n = Number(row?.valor);
+    if (Number.isFinite(n) && n > 0) diaria = n;
+  } catch (_) { /* fica no padrao */ }
+
   const aGravar: Entrada[] = [];
+  const criados: Array<Record<string, unknown>> = [];
+  const avisos: Array<Record<string, unknown>> = [];
+  const hoje = new Date().toISOString().slice(0, 10);
+
   for (const r of reservas) {
-    const url = `${SB_URL}/rest/v1/agenda?select=cod&deleted_at=is.null` +
+    const nome = `Airbnb ${r.data_ini.slice(8, 10)}${r.data_ini.slice(5, 7)}${r.data_ini.slice(0, 4)}`;
+    const noitesCobradas = noitesDe(r.data_ini, r.data_fim);
+    const checkout = isoMais(r.data_fim, 1);   // agenda.data_fim e a saida, nao a ultima noite
+    const venc = isoMais(r.data_ini, 1);       // segundo dia da estadia
+    const total = Number((diaria * noitesCobradas).toFixed(2));
+
+    // Evento que este import ja criou. Nao recriar — e nao deixar a regra de
+    // "ja existe evento na agenda" (abaixo) derrubar o bloqueio: a
+    // disponibilidade do site sai so da bloqueios_airbnb, evento da agenda
+    // nao esconde horario de visita.
+    const meuRes = await fetch(
+      `${SB_URL}/rest/v1/agenda?airbnb_uid=eq.${encodeURIComponent(r.uid)}` +
+      `&select=cod,data_evento,data_fim,obs_interna&limit=1`, { headers: svc });
+    const meu = meuRes.ok ? await meuRes.json().catch(() => []) : [];
+    if (Array.isArray(meu) && meu.length) {
+      const ev = meu[0];
+      // Remarcacao mantem o UID e troca as datas. Sinaliza, nao reescreve: a
+      // parcela pode ja estar recebida e conciliada no extrato.
+      const mudou = ev.data_evento !== r.data_ini || ev.data_fim !== checkout;
+      if (mudou && !seco && !(ev.obs_interna || "").includes(MARCA_MUDOU)) {
+        await fetch(`${SB_URL}/rest/v1/agenda?cod=eq.${encodeURIComponent(ev.cod)}`, {
+          method: "PATCH", headers: { ...svc, Prefer: "return=minimal" },
+          body: JSON.stringify({
+            obs_interna: `${ev.obs_interna || ""}\n${MARCA_MUDOU} (${hoje}): feed diz ${r.data_ini} a ${checkout}`.trim(),
+          }),
+        });
+      }
+      if (mudou) avisos.push({ cod: ev.cod, aviso: "datas mudaram", agenda: `${ev.data_evento} a ${ev.data_fim}`, feed: `${r.data_ini} a ${checkout}` });
+      r.motivo = mudou
+        ? `reserva (evento ${ev.cod} existe, datas divergem — sinalizado)`
+        : `reserva (evento ${ev.cod} ja criado)`;
+      aGravar.push(r);
+      continue;
+    }
+
+    // Evento de outra origem nas mesmas datas: eco do nosso proprio feed ou
+    // cadastro manual. Nao cria nem grava bloqueio em cima.
+    const url = `${SB_URL}/rest/v1/agenda?select=cod&deleted_at=is.null&airbnb_uid=is.null` +
       `&data_evento=lte.${r.data_fim}` +
       `&or=(data_fim.gte.${r.data_ini},and(data_fim.is.null,data_evento.gte.${r.data_ini}))&limit=1`;
     const res = await fetch(url, { headers: svc });
     const linhas = res.ok ? await res.json().catch(() => []) : [];
     if (Array.isArray(linhas) && linhas.length) {
       r.motivo = `ignorado: já existe evento na agenda (${linhas[0].cod}) nessas datas`;
-    } else {
-      aGravar.push(r);
+      continue;
     }
+
+    if (seco) {
+      r.motivo = `reserva (criaria "${nome}", ${noitesCobradas} noite(s), ${total} vencendo ${venc})`;
+      criados.push({ cod: "(dry)", nome, noites: noitesCobradas, valor: total, vencimento: venc, estadia: `${r.data_ini} a ${checkout}` });
+      aGravar.push(r);
+      continue;
+    }
+
+    // Codigo sem p_ano: a sequencia e a de criacao do evento, como no gerador.
+    const codRes = await fetch(`${SB_URL}/rest/v1/rpc/proximo_cod_contrato`, {
+      method: "POST", headers: svc, body: JSON.stringify({}),
+    });
+    const cod = codRes.ok ? await codRes.json().catch(() => null) : null;
+    if (typeof cod !== "string" || !cod) {
+      // Bloqueio entra de todo jeito: sem evento, ele e a unica coisa que
+      // segura a data contra agendamento de visita.
+      r.motivo = "erro: nao obtive o proximo codigo de contrato";
+      avisos.push({ uid: r.uid, aviso: "sem codigo, evento nao criado" });
+      aGravar.push(r);
+      continue;
+    }
+
+    // payments_json coerente com a parcela: sincronizarParcelasReceber() do
+    // admin reconcilia por numero de parcela, entao abrir e salvar o evento
+    // ajusta a linha em vez de duplicar.
+    const agRes = await fetch(`${SB_URL}/rest/v1/agenda`, {
+      method: "POST", headers: { ...svc, Prefer: "return=minimal" },
+      body: JSON.stringify({
+        cod, airbnb_uid: r.uid,
+        data_evento: r.data_ini, data_fim: checkout,
+        tipo_evento: "Hospedagem", nome_evento: nome, obs: nome,
+        valor_locacao: total, cin: "14:00", cout: "12:00",
+        spaces_json: "[]",
+        payments_json: JSON.stringify([{ desc: "Airbnb", date: venc, value: total.toFixed(2) }]),
+        obs_interna: `Criado automaticamente do feed do Airbnb (${hoje}) · ${r.uid}`,
+      }),
+    });
+    if (!agRes.ok) {
+      r.motivo = `erro ao criar evento: HTTP ${agRes.status}`;
+      avisos.push({ uid: r.uid, aviso: `agenda HTTP ${agRes.status}` });
+      aGravar.push(r);
+      continue;
+    }
+
+    const crRes = await fetch(`${SB_URL}/rest/v1/contas_a_receber`, {
+      method: "POST", headers: { ...svc, Prefer: "return=minimal" },
+      body: JSON.stringify({
+        cod_evento: cod, parcela: "1", num_parcela: "1",
+        valor: total, vencimento: venc,
+        mes_ano: venc.slice(0, 7).replace("-", ""),
+        obs: "Airbnb", status: "NP", aditivo_id: null,
+      }),
+    });
+    if (!crRes.ok) avisos.push({ cod, aviso: `a receber HTTP ${crRes.status} — evento criado sem parcela` });
+
+    r.motivo = `reserva (evento ${cod} criado, ${noitesCobradas} noite(s), vencimento ${venc})`;
+    criados.push({ cod, nome, noites: noitesCobradas, valor: total, vencimento: venc, estadia: `${r.data_ini} a ${checkout}` });
+    aGravar.push(r);
   }
 
   if (!seco) {
@@ -188,6 +304,23 @@ Deno.serve(async (req) => {
     await fetch(`${SB_URL}/rest/v1/bloqueios_airbnb${filtro}`, {
       method: "DELETE", headers: { ...svc, Prefer: "return=minimal" },
     });
+
+    // Evento criado daqui cuja reserva nao esta mais no feed: sinaliza, nunca
+    // apaga. Estadia passada sai do feed naturalmente, por isso so o futuro.
+    const uidsNoFeed = reservas.map((r) => r.uid);
+    const orfaosRes = await fetch(
+      `${SB_URL}/rest/v1/agenda?select=cod,airbnb_uid,obs_interna&airbnb_uid=not.is.null` +
+      `&deleted_at=is.null&data_evento=gt.${hoje}`, { headers: svc });
+    const orfaos = orfaosRes.ok ? await orfaosRes.json().catch(() => []) : [];
+    for (const ev of (Array.isArray(orfaos) ? orfaos : [])) {
+      if (uidsNoFeed.includes(ev.airbnb_uid)) continue;
+      if ((ev.obs_interna || "").includes(MARCA_FORA)) continue;
+      await fetch(`${SB_URL}/rest/v1/agenda?cod=eq.${encodeURIComponent(ev.cod)}`, {
+        method: "PATCH", headers: { ...svc, Prefer: "return=minimal" },
+        body: JSON.stringify({ obs_interna: `${ev.obs_interna || ""}\n${MARCA_FORA} (${hoje})`.trim() }),
+      });
+      avisos.push({ cod: ev.cod, aviso: "reserva saiu do feed — sinalizado, nada apagado" });
+    }
   }
 
   return json({
@@ -195,6 +328,9 @@ Deno.serve(async (req) => {
     seco,
     no_feed: entradas.length,
     importados: aGravar.length,
+    diaria,
+    criados,
+    avisos,
     detalhe: entradas.map((e) => ({
       de: e.data_ini, ate: e.data_fim, titulo: e.titulo, motivo: e.motivo,
     })),
