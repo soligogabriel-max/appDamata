@@ -1083,7 +1083,7 @@
                 <option value="reels">Reels</option>
                 <option value="story">Story</option>
                 <option value="bio">Link da bio</option>
-                <option value="paid">Anúncio pago (Meta)</option>
+                <option value="cpc">Anúncio pago (Meta)</option>
               </select>
             </label>
             <label style="font-size:11px;color:var(--dl);font-weight:600;display:flex;flex-direction:column;gap:4px;">Campanha (utm_campaign)
@@ -6057,7 +6057,7 @@ const CR_PERIODOS = [7, 14, 28, 60, 90, 180, 365];
 
 function setCrPeriodo(d){ _crDias = d; renderCriativos(); }
 
-function _crEhPago(c){ return /^\d+$/.test(c.criativo||"") || c.gasto > 0 || (c.meio||"").toLowerCase()==="paid"; }
+function _crEhPago(c){ return /^\d+$/.test(c.criativo||"") || c.gasto > 0 || /^(paid|cpc)$/i.test(c.meio||""); }
 
 async function renderCriativos(){
   const tabela = document.getElementById("cr-tabela");
@@ -6207,11 +6207,11 @@ function crGerarLink(){
   const fonte = _crSlug(g("crl-fonte").value) || "instagram";
   let camp = _crSlug(g("crl-camp").value);
   let crit = _crSlug(g("crl-crit").value);
-  const pago = meio==="paid";
+  const pago = meio==="cpc";          // utm_medium=cpc é o que os anúncios já mandam hoje
   // No anúncio a Meta preenche sozinha: ad.id vira a chave que casa com
   // ads_insights e traz gasto e cliques para a mesma linha do relatório.
   if(pago){ if(!crit) crit = "{{ad.id}}"; if(!camp) camp = "{{campaign.name}}"; }
-  const p = [["utm_source", fonte], ["utm_medium", pago ? "paid" : meio]];
+  const p = [["utm_source", fonte], ["utm_medium", meio]];
   if(camp) p.push(["utm_campaign", camp]);
   if(crit) p.push(["utm_content", crit]);
   const qs = p.map(([k,v])=>k+"="+(/\{\{.*\}\}/.test(v) ? v : encodeURIComponent(v))).join("&");
