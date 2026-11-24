@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.11.24h";</script>
+<script>var LL_VERSION="v2026.11.24i";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -327,6 +327,7 @@
         <button class="tab" onclick="setTab('funil');closeGrps()" id="t-funil">🔻 Funil de Vendas</button>
         <button class="tab" onclick="setTab('leads');closeGrps()" id="t-leads">🔥 Leads Quentes</button>
         <button class="tab" onclick="setTab('relatorio');closeGrps()" id="t-relatorio">📋 Faturamento</button>
+        <button class="tab" onclick="setTab('relassess');closeGrps()" id="t-relassess">🎗 Por Assessoria</button>
         <button class="tab" onclick="setTab('relorc');closeGrps()" id="t-relorc">💬 Orçamentos</button>
         <button class="tab" onclick="setTab('visitas');closeGrps()" id="t-visitas">📊 Visitas do Site</button>
         <button class="tab" onclick="setTab('criativos');closeGrps()" id="t-criativos">📣 Criativos</button>
@@ -1143,6 +1144,19 @@
           <div style="font-size:11px;color:var(--dl);margin-top:8px;line-height:1.5;">
             Conta as mensagens enviadas pela Cloud API, classificadas pelo prefixo que cada automação grava em <code>wpp_mensagens</code>. "Respostas" são as mensagens recebidas no dia, de qualquer contato. Dias em branco não aparecem na tabela.
           </div>
+        </div>
+      </div>
+    </div>
+    <div id="p-relassess" class="panel">
+      <div class="uwrap" style="max-width:1100px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+          <div class="sec-t" style="margin:0;">🎗 Eventos por Assessoria</div>
+          <div style="margin-left:auto;display:flex;background:var(--bg2);border:1px solid var(--br);border-radius:8px;overflow:hidden;" id="ra-modo"></div>
+        </div>
+        <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;" id="ra-cards"></div>
+        <div id="ra-tabela" style="overflow-x:auto;"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
+        <div style="font-size:11px;color:var(--dl);margin-top:8px;line-height:1.5;">
+          Ano pela data do evento. Conta todo evento da agenda que não foi apagado, inclusive os futuros. "Sem assessoria" são os eventos sem assessoria cadastrada. Ordem decrescente pelo total de eventos; clicar num ano reordena por ele.
         </div>
       </div>
     </div>
@@ -2196,7 +2210,7 @@ function _applyNavForRole(role){
     allSubTabs.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     document.getElementById("t-pedidos-eq").style.display="none";
     // desfaz o que a simulação de "trafego" esconde
-    ["t-leads","t-relatorio","t-relorc","t-whatsapp","t-wppauto","t-visitas","t-agenda","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
+    ["t-leads","t-relatorio","t-relassess","t-relorc","t-whatsapp","t-wppauto","t-visitas","t-agenda","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     var wrapA=document.querySelector("#p-visitas .uwrap");
     if(wrapA) Array.from(wrapA.children).forEach(c=>{ c.style.display=""; c.style.borderTop=""; c.style.marginTop=""; });
   } else if(role==="trafego"){
@@ -2204,7 +2218,7 @@ function _applyNavForRole(role){
     // de anúncios — que é alimentado por RPC agregada, sem dado de cliente.
     allGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     var gr=document.getElementById("grp-relatorios"); if(gr) gr.style.display="";
-    ["t-dashboard","t-relatorio","t-relorc","t-whatsapp","t-wppauto","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    ["t-dashboard","t-relatorio","t-relassess","t-relorc","t-whatsapp","t-wppauto","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     var tv=document.getElementById("t-visitas"); if(tv) tv.style.display="";
     var ta=document.getElementById("t-agenda"); if(ta) ta.style.display="none";
     document.getElementById("t-pedidos-eq").style.display="none";
@@ -2616,7 +2630,7 @@ const TAB_GRP={
   receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", conciliacao:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro", socios:"grp-financeiro",
   fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros", naturezas:"grp-cadastros", assessorias:"grp-cadastros",
   pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin",
-  relatorio:"grp-relatorios", relorc:"grp-relatorios", visitas:"grp-relatorios", whatsapp:"grp-relatorios", leads:"grp-relatorios", criativos:"grp-relatorios", wppauto:"grp-relatorios"
+  relatorio:"grp-relatorios", relorc:"grp-relatorios", visitas:"grp-relatorios", whatsapp:"grp-relatorios", leads:"grp-relatorios", criativos:"grp-relatorios", wppauto:"grp-relatorios", relassess:"grp-relatorios"
 };
 function toggleGrp(id){
   const el=document.getElementById(id);
@@ -2643,7 +2657,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",conciliacao:"p-conciliacao",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",vc:"p-vc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas",whatsapp:"p-whatsapp",leads:"p-leads",funil:"p-funil",criativos:"p-criativos",wppauto:"p-wppauto"};
+  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",conciliacao:"p-conciliacao",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",vc:"p-vc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas",whatsapp:"p-whatsapp",leads:"p-leads",funil:"p-funil",criativos:"p-criativos",wppauto:"p-wppauto",relassess:"p-relassess"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(cfilter);
   if(t==="receber") renderReceber();
@@ -2673,6 +2687,7 @@ function setTab(t) {
   if(t==="funil") renderFunil();
   if(t==="whatsapp") renderWhatsApp();
   if(t==="wppauto") renderWppAuto();
+  if(t==="relassess") renderRelAssessoria();
   if(t==="dashboard") renderDashboard();
   if(t==="vc") renderVC();
 }
@@ -6393,6 +6408,101 @@ function _waDesenhaGrafico(dias, porDia, cats){
       }
     }
   });
+}
+
+// ══════════════════════════════════════════
+// EVENTOS POR ASSESSORIA — anos em coluna, total no fim
+// Os contadores total_eventos/eventos_futuros da tabela assessorias são
+// cache e não têm ano; aqui conta direto da agenda, pela data do evento.
+// Datas-marcador (ano < 2000 ou > 2035) ficam de fora: são 15 registros com
+// 1900 e 3000 usados como "sem data".
+// ══════════════════════════════════════════
+let _raModo = "eventos";               // eventos | valor
+let _raOrd  = "total";                 // "total" ou um ano
+let _raDados = null;
+
+function setRaModo(m){ _raModo = m; _raDesenha(); }
+function raOrdenar(k){ _raOrd = k; _raDesenha(); }
+
+async function renderRelAssessoria(){
+  const tabela = document.getElementById("ra-tabela");
+  if(!tabela) return;
+  tabela.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  try{
+    const [evs, ass] = await Promise.all([
+      dbGetAll("agenda", "select=assessoria_cod,data_evento,valor_locacao&data_evento=not.is.null&order=data_evento.asc"),
+      dbGet("assessorias", "select=cod,nome&limit=1000")
+    ]);
+    const nomes = new Map((ass||[]).map(a=>[String(a.cod), a.nome||("Assessoria "+a.cod)]));
+    const linhas = new Map();            // chave -> {nome, porAno:{ano:{n,valor}}, n, valor}
+    const anos = new Set();
+    (evs||[]).forEach(e=>{
+      const ano = parseInt(String(e.data_evento||"").slice(0,4));
+      if(!ano || ano < 2000 || ano > 2035) return;
+      anos.add(ano);
+      const k = e.assessoria_cod != null ? String(e.assessoria_cod) : "__sem";
+      let l = linhas.get(k);
+      if(!l){ l = { k, nome: k==="__sem" ? "Sem assessoria" : (nomes.get(k) || ("Assessoria "+k)), porAno:{}, n:0, valor:0 }; linhas.set(k, l); }
+      const pa = l.porAno[ano] || (l.porAno[ano] = { n:0, valor:0 });
+      pa.n++; pa.valor += Number(e.valor_locacao)||0;
+      l.n++; l.valor += Number(e.valor_locacao)||0;
+    });
+    _raDados = { anos:[...anos].sort((a,b)=>a-b), linhas:[...linhas.values()] };
+    _raDesenha();
+  }catch(e){
+    _raDados = null;
+    tabela.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar: '+e.message+'</div>';
+  }
+}
+
+function _raDesenha(){
+  const tabela = document.getElementById("ra-tabela");
+  if(!tabela || !_raDados) return;
+  const modo = document.getElementById("ra-modo");
+  if(modo) modo.innerHTML = [["eventos","Eventos"],["valor","Valor (R$)"]].map(([k,r])=>{
+    const on = k===_raModo;
+    return `<button onclick="setRaModo('${k}')" style="padding:4px 12px;border:none;cursor:pointer;font-size:12px;background:${on?"var(--a)":"transparent"};color:${on?"#fff":"var(--dl)"};font-weight:${on?"600":"400"};">${r}</button>`;
+  }).join("");
+
+  const { anos, linhas } = _raDados;
+  const val = (l, ano) => { const c = ano==null ? l : (l.porAno[ano]||{n:0,valor:0}); return _raModo==="valor" ? c.valor : c.n; };
+  const fmt = v => !v ? "—" : _raModo==="valor" ? "R$ "+Math.round(v).toLocaleString("pt-BR") : String(v);
+  const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+
+  // ordem: decrescente pelo total de EVENTOS (ou pelo ano clicado); empate pelo nome
+  const chave = l => _raOrd==="total" ? l.n : (l.porAno[_raOrd]||{n:0}).n;
+  const ord = [...linhas].sort((a,b)=> chave(b)-chave(a) || a.nome.localeCompare(b.nome,"pt-BR"));
+
+  const totAno = ano => linhas.reduce((s,l)=>s+val(l,ano),0);
+  const totGeral = linhas.reduce((s,l)=>s+val(l,null),0);
+  const anoAtual = new Date().getFullYear();
+  const comAss = linhas.filter(l=>l.k!=="__sem");
+  const card = (v,rot)=>`<div style="flex:1;min-width:130px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:12px 14px;text-align:center;">
+      <div style="font-size:22px;font-weight:700;color:var(--a);">${v}</div><div style="font-size:11px;color:var(--dl);margin-top:3px;font-weight:600;">${rot}</div></div>`;
+  const cards = document.getElementById("ra-cards");
+  if(cards) cards.innerHTML = card(comAss.length, "Assessorias com evento")
+    + card(linhas.reduce((s,l)=>s+l.n,0).toLocaleString("pt-BR"), "Eventos no total")
+    + card(ord[0] ? esc(ord[0].nome) : "—", "Maior parceira")
+    + card((()=>{ const t=linhas.reduce((s,l)=>s+l.n,0), c=comAss.reduce((s,l)=>s+l.n,0); return t? Math.round(100*c/t)+"%":"—"; })(), "Eventos com assessoria");
+
+  const th = (t,k,left)=>`<th ${k?`onclick="raOrdenar('${k}')" title="Ordenar por ${t}"`:""} style="text-align:${left?"left":"center"};padding:6px ${left?"8px":"6px"};border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;${k?"cursor:pointer;user-select:none;":""}${String(k)===String(_raOrd)?"color:var(--a);":""}${k==anoAtual?"background:var(--al);":""}">${t}${String(k)===String(_raOrd)?" ▼":""}</th>`;
+  const td = (v,forte,destaque)=>`<td style="text-align:center;padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;font-weight:${forte?"700":"600"};color:${v==="—"?"var(--dl)":forte?"var(--a)":"var(--dk)"};white-space:nowrap;${destaque?"background:var(--al);":""}">${v}</td>`;
+
+  tabela.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+    <thead><tr style="background:var(--bg2);color:var(--dl);">
+      <th style="text-align:center;padding:6px;border-bottom:1px solid var(--br);font-size:11px;">#</th>
+      ${th("Assessoria",null,true)}${anos.map(a=>th(String(a),a)).join("")}${th("Total","total")}
+    </tr></thead>
+    <tbody>${ord.map((l,i)=>`<tr style="background:${i%2?"var(--bg2)":"transparent"};${l.k==="__sem"?"color:var(--dl);font-style:italic;":""}">
+      <td style="text-align:center;padding:5px 6px;border-bottom:1px solid var(--br);font-size:11px;color:var(--dl);">${i+1}</td>
+      <td style="padding:5px 8px;border-bottom:1px solid var(--br);font-size:12px;font-weight:600;color:var(--dk);white-space:nowrap;">${esc(l.nome)}</td>
+      ${anos.map(a=>td(fmt(val(l,a)), false, a===anoAtual)).join("")}
+      ${td(fmt(val(l,null)), true)}
+    </tr>`).join("")}</tbody>
+    <tfoot><tr style="background:var(--bg2);">
+      <td></td><td style="padding:6px 8px;font-size:12px;font-weight:700;color:var(--dk);">Total</td>
+      ${anos.map(a=>td(fmt(totAno(a)), true, a===anoAtual)).join("")}${td(fmt(totGeral), true)}
+    </tr></tfoot></table>`;
 }
 
 // ══════════════════════════════════════════
