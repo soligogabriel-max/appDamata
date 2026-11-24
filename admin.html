@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.11.15a";</script>
+<script>var LL_VERSION="v2026.11.24a";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -329,6 +329,7 @@
         <button class="tab" onclick="setTab('relatorio');closeGrps()" id="t-relatorio">📋 Faturamento</button>
         <button class="tab" onclick="setTab('relorc');closeGrps()" id="t-relorc">💬 Orçamentos</button>
         <button class="tab" onclick="setTab('visitas');closeGrps()" id="t-visitas">📊 Visitas do Site</button>
+        <button class="tab" onclick="setTab('criativos');closeGrps()" id="t-criativos">📣 Criativos</button>
         <button class="tab" onclick="setTab('whatsapp');closeGrps()" id="t-whatsapp">💬 WhatsApp</button>
       </div>
     </div>
@@ -1019,6 +1020,84 @@
           </div>
           <div id="ads-tabela" style="overflow-x:auto;"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
           <div style="font-size:11px;color:var(--dl);margin-top:8px;line-height:1.5;">Gasto e cliques vêm da Meta, sincronizados todo dia às 8h. Orçamentos e visitas são atribuídos ao anúncio do <b>primeiro acesso</b> do dispositivo dentro do período, pelo <code>utm_content</code>. Anúncio com cliques e nenhum acesso no site está gastando sem deixar rastro — foi assim que metade da verba de jul/ago sumiu. <b>WhatsApp</b> conta quem chegou por anúncio de clique-para-WhatsApp (pelo <code>referral</code> da Meta), invisível para o site.</div>
+        </div>
+      </div>
+    </div>
+    <div id="p-criativos" class="panel">
+      <div class="uwrap" style="max-width:1040px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+          <div class="sec-t" style="margin:0;">📣 Performance por Criativo</div>
+          <div style="margin-left:auto;display:flex;background:var(--bg2);border:1px solid var(--br);border-radius:8px;overflow:hidden;" id="cr-per"></div>
+        </div>
+        <div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:120px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:12px 14px;text-align:center;">
+            <div style="font-size:22px;font-weight:700;color:var(--a);" id="cr-c-disp">—</div>
+            <div style="font-size:11px;color:var(--dl);margin-top:3px;font-weight:600;">Aparelhos que chegaram por criativo</div>
+          </div>
+          <div style="flex:1;min-width:120px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:12px 14px;text-align:center;">
+            <div style="font-size:22px;font-weight:700;color:#2E7D52;" id="cr-c-orc">—</div>
+            <div style="font-size:11px;color:var(--dl);margin-top:3px;font-weight:600;">Orçamentos atribuídos</div>
+          </div>
+          <div style="flex:1;min-width:120px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:12px 14px;text-align:center;">
+            <div style="font-size:22px;font-weight:700;color:#2a6644;" id="cr-c-fech">—</div>
+            <div style="font-size:11px;color:var(--dl);margin-top:3px;font-weight:600;">Contratos fechados</div>
+          </div>
+          <div style="flex:1;min-width:120px;background:var(--bg2);border:1px solid var(--br);border-radius:12px;padding:12px 14px;text-align:center;">
+            <div style="font-size:22px;font-weight:700;color:var(--dk);" id="cr-c-valor">—</div>
+            <div style="font-size:11px;color:var(--dl);margin-top:3px;font-weight:600;">Valor fechado</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+          <input id="cr-busca" type="text" placeholder="Filtrar criativo, campanha, fonte…" oninput="_crDesenhaTabela()" style="flex:1;min-width:180px;padding:6px 10px;border:1px solid var(--br);border-radius:8px;background:var(--bg2);color:var(--dk);font-size:12px;">
+          <select id="cr-tipo" onchange="_crDesenhaTabela()" style="padding:6px 10px;border:1px solid var(--br);border-radius:8px;background:var(--bg2);color:var(--dk);font-size:12px;cursor:pointer;">
+            <option value="">Pago e orgânico</option>
+            <option value="pago">Só pago</option>
+            <option value="organico">Só orgânico</option>
+          </select>
+          <button onclick="renderCriativos()" style="padding:6px 14px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dl);">↻ Atualizar</button>
+        </div>
+        <div id="cr-tabela" style="overflow-x:auto;"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
+        <div style="font-size:11px;color:var(--dl);margin-top:8px;line-height:1.5;">
+          Cada aparelho é atribuído ao criativo do seu <b>primeiro acesso com UTM</b> no período — quem chegou pelo reels e voltou pelo anúncio conta para o reels.
+          O criativo é o <code>utm_content</code> do link; sem ele vale a campanha, e sem campanha a fonte. Gasto, impressões e cliques vêm da Meta (anúncios, sincronizados às 8h) e só existem para criativo com <code>utm_content</code> igual ao <code>ad.id</code>.
+          Contrato fechado é evento novo na agenda ligado ao orçamento daquele aparelho.
+        </div>
+
+        <div style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px;">
+          <div class="sec-t" style="font-size:15px;margin:0 0 6px;">🔗 Gerar link rastreado</div>
+          <div style="font-size:11px;color:var(--dl);margin-bottom:12px;line-height:1.5;">Cole este link no post, no story, na bio ou no anúncio. É o que liga o criativo ao que acontece depois no site.</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:10px;">
+            <label style="font-size:11px;color:var(--dl);font-weight:600;display:flex;flex-direction:column;gap:4px;">Destino
+              <select id="crl-dest" onchange="crGerarLink()" style="padding:6px 10px;border:1px solid var(--br);border-radius:8px;background:var(--bg2);color:var(--dk);font-size:12px;">
+                <option value="https://fazendadamata.com/">Site (página inicial)</option>
+                <option value="https://fazendadamata.com/admin.html?orcamento">Orçamento online</option>
+                <option value="https://fazendadamata.com/admin.html?visita">Agendar visita</option>
+              </select>
+            </label>
+            <label style="font-size:11px;color:var(--dl);font-weight:600;display:flex;flex-direction:column;gap:4px;">Fonte (utm_source)
+              <input id="crl-fonte" value="instagram" oninput="crGerarLink()" style="padding:6px 10px;border:1px solid var(--br);border-radius:8px;background:var(--bg2);color:var(--dk);font-size:12px;">
+            </label>
+            <label style="font-size:11px;color:var(--dl);font-weight:600;display:flex;flex-direction:column;gap:4px;">Formato (utm_medium)
+              <select id="crl-meio" onchange="crGerarLink()" style="padding:6px 10px;border:1px solid var(--br);border-radius:8px;background:var(--bg2);color:var(--dk);font-size:12px;">
+                <option value="post">Post no feed</option>
+                <option value="reels">Reels</option>
+                <option value="story">Story</option>
+                <option value="bio">Link da bio</option>
+                <option value="paid">Anúncio pago (Meta)</option>
+              </select>
+            </label>
+            <label style="font-size:11px;color:var(--dl);font-weight:600;display:flex;flex-direction:column;gap:4px;">Campanha (utm_campaign)
+              <input id="crl-camp" placeholder="ex.: casamento-2027" oninput="crGerarLink()" style="padding:6px 10px;border:1px solid var(--br);border-radius:8px;background:var(--bg2);color:var(--dk);font-size:12px;">
+            </label>
+            <label style="font-size:11px;color:var(--dl);font-weight:600;display:flex;flex-direction:column;gap:4px;">Criativo (utm_content)
+              <input id="crl-crit" placeholder="ex.: reels-por-do-sol-01" oninput="crGerarLink()" style="padding:6px 10px;border:1px solid var(--br);border-radius:8px;background:var(--bg2);color:var(--dk);font-size:12px;">
+            </label>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input id="crl-out" readonly onclick="this.select()" style="flex:1;min-width:240px;padding:8px 10px;border:1px solid var(--br);border-radius:8px;background:var(--bg);color:var(--dk);font-size:12px;font-family:monospace;">
+            <button onclick="crCopiarLink()" style="padding:8px 16px;background:var(--a);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;">Copiar</button>
+          </div>
+          <div id="crl-dica" style="font-size:11px;color:var(--dl);margin-top:8px;line-height:1.5;"></div>
         </div>
       </div>
     </div>
@@ -2518,7 +2597,7 @@ const TAB_GRP={
   receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", conciliacao:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro", socios:"grp-financeiro",
   fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros", naturezas:"grp-cadastros", assessorias:"grp-cadastros",
   pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin",
-  relatorio:"grp-relatorios", relorc:"grp-relatorios", visitas:"grp-relatorios", whatsapp:"grp-relatorios", leads:"grp-relatorios"
+  relatorio:"grp-relatorios", relorc:"grp-relatorios", visitas:"grp-relatorios", whatsapp:"grp-relatorios", leads:"grp-relatorios", criativos:"grp-relatorios"
 };
 function toggleGrp(id){
   const el=document.getElementById(id);
@@ -2545,7 +2624,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",conciliacao:"p-conciliacao",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",vc:"p-vc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas",whatsapp:"p-whatsapp",leads:"p-leads",funil:"p-funil"};
+  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",conciliacao:"p-conciliacao",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",vc:"p-vc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas",whatsapp:"p-whatsapp",leads:"p-leads",funil:"p-funil",criativos:"p-criativos"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(cfilter);
   if(t==="receber") renderReceber();
@@ -2570,6 +2649,7 @@ function setTab(t) {
   if(t==="naturezas") renderNaturezas();
   if(t==="socios") renderContaSocios();
   if(t==="visitas"){ if(effIsAdmin()) renderVisitas(); renderAnuncios(); }
+  if(t==="criativos"){ renderCriativos(); crGerarLink(); }
   if(t==="leads") renderLeads();
   if(t==="funil") renderFunil();
   if(t==="whatsapp") renderWhatsApp();
@@ -5959,6 +6039,195 @@ function _adsDesenhaTabela(){
           ${td(ctr.toFixed(1).replace(".",",")+"%")}
         </tr>`;}).join("")}</tbody>
     </table>`;
+}
+
+// ══════════════════════════════════════════
+// PERFORMANCE POR CRIATIVO
+// O relatório de anúncios acima só vê utm_content numérico (ad.id da Meta) e
+// para no WhatsApp. Este agrupa por qualquer utm_content — post, reels, story,
+// bio, anúncio — e vai até o contrato na agenda. Tudo agregado no banco pela
+// RPC relatorio_criativos (security definer): o papel 'trafego' recebe só
+// contagens, e o valor fechado vem null para ele.
+// ══════════════════════════════════════════
+let _crDias  = 90;
+let _crCache = null;                               // linhas da RPC, para filtrar/ordenar sem ir ao banco
+let _crOrd   = { col:"fechados", dir:"desc" };
+
+const CR_PERIODOS = [7, 14, 28, 60, 90, 180, 365];
+
+function setCrPeriodo(d){ _crDias = d; renderCriativos(); }
+
+function _crEhPago(c){ return /^\d+$/.test(c.criativo||"") || c.gasto > 0 || (c.meio||"").toLowerCase()==="paid"; }
+
+async function renderCriativos(){
+  const tabela = document.getElementById("cr-tabela");
+  if(!tabela) return;
+  const per = document.getElementById("cr-per");
+  if(per) per.innerHTML = CR_PERIODOS.map(n=>{
+    const on = n===_crDias;
+    return `<button onclick="setCrPeriodo(${n})" style="padding:4px 10px;border:none;cursor:pointer;font-size:12px;background:${on?"var(--a)":"transparent"};color:${on?"#fff":"var(--dl)"};font-weight:${on?"600":"400"};">${n}d</button>`;
+  }).join("");
+  tabela.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  ["cr-c-disp","cr-c-orc","cr-c-fech","cr-c-valor"].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent="—";});
+  try{
+    const rows = await sbFetch("rpc/relatorio_criativos", {method:"POST", body:{p_dias:_crDias}});
+    _crCache = (rows||[]).map(r=>({
+      criativo:String(r.criativo||""), fonte:r.fonte||"", meio:r.meio||"", campanha:r.campanha||"", ad_nome:r.ad_nome||"",
+      gasto:Number(r.gasto)||0, impressoes:Number(r.impressoes)||0, cliques:Number(r.cliques)||0,
+      disp:Number(r.disp)||0, acessos:Number(r.acessos)||0, orc:Number(r.orc)||0, vis:Number(r.vis)||0, wpp:Number(r.wpp)||0,
+      fechados:Number(r.fechados)||0, valor:(r.valor_fechado==null ? null : Number(r.valor_fechado)||0),
+      primeiro:r.primeiro||null, ultimo:r.ultimo||null
+    })).filter(c=>c.disp>0 || c.gasto>0 || c.wpp>0);
+    _crDesenhaTabela();
+  }catch(e){
+    _crCache = null;
+    tabela.innerHTML='<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar criativos: '+e.message+'</div>';
+  }
+}
+
+function crOrdenar(col){
+  const o = CR_COLS.find(c=>c.k===col); if(!o) return;
+  if(_crOrd.col===col) _crOrd.dir = _crOrd.dir==="desc" ? "asc" : "desc";
+  else _crOrd = { col, dir: o.txt ? "asc" : "desc" };
+  _crDesenhaTabela();
+}
+
+// `v` devolve null para o que não dá para medir (R$/orçamento sem orçamento),
+// e null vai sempre para o fim, em qualquer sentido.
+const CR_COLS = [
+  { k:"criativo", rot:"Criativo",   txt:true, v:c=>(c.ad_nome||c.criativo).toLowerCase() },
+  { k:"gasto",    rot:"Gasto",      v:c=>c.gasto },
+  { k:"cliques",  rot:"Cliques",    v:c=>c.cliques },
+  { k:"disp",     rot:"No site",    v:c=>c.disp },
+  { k:"acessos",  rot:"Acessos",    v:c=>c.acessos },
+  { k:"orc",      rot:"Orç.",       v:c=>c.orc },
+  { k:"cpo",      rot:"R$/orç.",    v:c=>c.orc && c.gasto ? c.gasto/c.orc : null },
+  { k:"vis",      rot:"Visitas",    v:c=>c.vis },
+  { k:"wpp",      rot:"WhatsApp",   v:c=>c.wpp },
+  { k:"fechados", rot:"Fechou",     v:c=>c.fechados },
+  { k:"valor",    rot:"Valor fechado", v:c=>c.valor, admin:true },
+  { k:"ultimo",   rot:"Último acesso", v:c=>c.ultimo ? new Date(c.ultimo).getTime() : null }
+];
+
+function _crDesenhaTabela(){
+  const tabela = document.getElementById("cr-tabela");
+  if(!tabela || !_crCache) return;
+  const brl = v => "R$ " + Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const brl0 = v => "R$ " + Math.round(Number(v||0)).toLocaleString("pt-BR");
+  const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const setTxt=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+
+  const temValor = _crCache.some(c=>c.valor!=null);          // 'trafego' recebe null
+  const busca = (document.getElementById("cr-busca")?.value||"").trim().toLowerCase();
+  const tipo  = document.getElementById("cr-tipo")?.value||"";
+  const vis = _crCache.filter(c=>{
+    if(tipo==="pago" && !_crEhPago(c)) return false;
+    if(tipo==="organico" && _crEhPago(c)) return false;
+    if(!busca) return true;
+    return [c.criativo,c.ad_nome,c.campanha,c.fonte,c.meio].join(" ").toLowerCase().includes(busca);
+  });
+
+  // Cards somam o que está na tela, para o filtro responder "quanto o orgânico fechou?"
+  setTxt("cr-c-disp", vis.reduce((s,c)=>s+c.disp,0).toLocaleString("pt-BR"));
+  setTxt("cr-c-orc",  String(vis.reduce((s,c)=>s+c.orc,0)));
+  setTxt("cr-c-fech", String(vis.reduce((s,c)=>s+c.fechados,0)));
+  setTxt("cr-c-valor", temValor ? brl0(vis.reduce((s,c)=>s+(c.valor||0),0)) : "—");
+
+  if(!_crCache.length){
+    tabela.innerHTML='<div class="empty"><div class="eicon">📣</div>Nenhum acesso com UTM no período. Gere um link rastreado abaixo e use nos posts e anúncios.</div>';
+    return;
+  }
+  if(!vis.length){
+    tabela.innerHTML='<div class="empty"><div class="eicon">🔍</div>Nenhum criativo bate com o filtro.</div>';
+    return;
+  }
+
+  const cols = CR_COLS.filter(c=>!c.admin || temValor);
+  const ord = cols.find(c=>c.k===_crOrd.col) || cols[0];
+  const sinal = _crOrd.dir==="asc" ? 1 : -1;
+  const linhas = [...vis].sort((x,y)=>{
+    const a = ord.v(x), b = ord.v(y);
+    if(a===null || b===null) return a===b ? 0 : (a===null ? 1 : -1);
+    if(ord.txt) return sinal * String(a).localeCompare(String(b), "pt-BR");
+    return sinal * (a - b);
+  });
+
+  const seta = c => c.k===_crOrd.col ? (_crOrd.dir==="asc" ? " ▲" : " ▼") : "";
+  const cabec = c => `<th onclick="crOrdenar('${c.k}')" title="Ordenar por ${esc(c.rot)}" style="text-align:${c.txt?"left":"center"};padding:6px ${c.txt?"6px":"4px"};border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;cursor:pointer;user-select:none;">${esc(c.rot)}${seta(c)}</th>`;
+  const td = (v,color)=>`<td style="text-align:center;padding:5px 4px;border-bottom:1px solid var(--br);font-weight:600;font-size:12px;color:${color||"var(--dk)"};white-space:nowrap;">${v}</td>`;
+  const dim = "var(--dl)";
+  const fmtData = ts => ts ? new Date(ts).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}) : "—";
+
+  tabela.innerHTML=`<table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="background:var(--bg2);color:var(--dl);">${cols.map(cabec).join("")}</tr></thead>
+      <tbody>${linhas.map((c,i)=>{
+        const pago = _crEhPago(c);
+        const badge = pago
+          ? '<span style="background:#E3ECF7;color:#1F3F6E;font-size:9px;border-radius:3px;padding:1px 5px;margin-left:6px;vertical-align:middle;">PAGO</span>'
+          : '<span style="background:#D8EDE2;color:#2A4A3A;font-size:9px;border-radius:3px;padding:1px 5px;margin-left:6px;vertical-align:middle;">ORGÂNICO</span>';
+        // Gasto na Meta sem nenhum aparelho chegando: link do anúncio sem UTM,
+        // ou campanha de mensagem. É gasto que este relatório não consegue seguir.
+        const semRastro = pago && c.cliques>20 && c.disp===0;
+        const sub = c.ad_nome
+          ? esc(c.campanha||"")
+          : esc([c.fonte, c.meio].filter(Boolean).join(" / ") + (c.campanha && c.campanha!==c.criativo ? " · "+c.campanha : ""));
+        return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
+          <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;">
+            <div style="font-weight:600;color:var(--dk);">${esc(c.ad_nome||c.criativo)}${badge}${semRastro?' <span title="Cliques cobrados, nenhum acesso no site" style="background:#FDECEA;color:#C62828;font-size:9px;border-radius:3px;padding:1px 5px;vertical-align:middle;">SEM RASTRO</span>':''}</div>
+            <div style="font-size:10px;color:var(--dl);">${c.ad_nome ? '<span style="font-family:monospace;">'+esc(c.criativo)+'</span>'+(sub?' · '+sub:'') : sub}</div>
+          </td>
+          ${td(c.gasto?brl(c.gasto):"—", c.gasto?"var(--dk)":dim)}
+          ${td(c.cliques?c.cliques.toLocaleString("pt-BR"):"—", c.cliques?"var(--dk)":dim)}
+          ${td(c.disp?c.disp.toLocaleString("pt-BR"):"—", c.disp?"var(--dk)":dim)}
+          ${td(c.acessos?c.acessos.toLocaleString("pt-BR"):"—", c.acessos?"var(--dk)":dim)}
+          ${td(c.orc||"—", c.orc?"#2E7D52":dim)}
+          ${td(c.orc&&c.gasto?brl(c.gasto/c.orc):"—", c.orc&&c.gasto?"var(--dk)":dim)}
+          ${td(c.vis||"—", c.vis?"#1565C0":dim)}
+          ${td(c.wpp||"—", c.wpp?"#2E7D52":dim)}
+          ${td(c.fechados||"—", c.fechados?"#2a6644":dim)}
+          ${temValor ? td(c.valor?brl0(c.valor):"—", c.valor?"#2a6644":dim) : ""}
+          ${td(fmtData(c.ultimo), dim)}
+        </tr>`;}).join("")}</tbody>
+    </table>`;
+}
+
+// ── Gerador de link rastreado ──
+// Os valores saem normalizados (minúsculas, sem acento, hífen no lugar de
+// espaço): "Reels Pôr do Sol" e "reels-por-do-sol" têm que cair na mesma linha.
+function _crSlug(s){
+  return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().trim()
+    .replace(/[^a-z0-9{}._-]+/g,"-").replace(/^-+|-+$/g,"");
+}
+
+function crGerarLink(){
+  const g = id => document.getElementById(id);
+  if(!g("crl-out")) return;
+  const dest  = g("crl-dest").value;
+  const meio  = g("crl-meio").value;
+  const fonte = _crSlug(g("crl-fonte").value) || "instagram";
+  let camp = _crSlug(g("crl-camp").value);
+  let crit = _crSlug(g("crl-crit").value);
+  const pago = meio==="paid";
+  // No anúncio a Meta preenche sozinha: ad.id vira a chave que casa com
+  // ads_insights e traz gasto e cliques para a mesma linha do relatório.
+  if(pago){ if(!crit) crit = "{{ad.id}}"; if(!camp) camp = "{{campaign.name}}"; }
+  const p = [["utm_source", fonte], ["utm_medium", pago ? "paid" : meio]];
+  if(camp) p.push(["utm_campaign", camp]);
+  if(crit) p.push(["utm_content", crit]);
+  const qs = p.map(([k,v])=>k+"="+(/\{\{.*\}\}/.test(v) ? v : encodeURIComponent(v))).join("&");
+  g("crl-out").value = dest + (dest.includes("?") ? "&" : "?") + qs;
+  g("crl-dica").innerHTML = pago
+    ? 'No Gerenciador de Anúncios, cole só a parte depois do <b>?</b> em <i>Parâmetros de URL</i> do anúncio. Os <code>{{ }}</code> a Meta troca pelo id real na hora do clique, e o gasto daquele anúncio aparece na mesma linha.'
+    : (crit ? 'Um link por criativo: o <b>utm_content</b> é o que separa um post do outro na tabela acima.'
+            : '<span style="color:#b45309;">Sem criativo, a linha vai aparecer pela campanha ou pela fonte — preencha para medir cada post separadamente.</span>');
+}
+
+async function crCopiarLink(){
+  const out = document.getElementById("crl-out");
+  if(!out) return;
+  if(!out.value) crGerarLink();
+  try { await navigator.clipboard.writeText(out.value); toast("Link copiado"); }
+  catch(e){ out.select(); toast("Selecione e copie o link"); }
 }
 
 // ══════════════════════════════════════════
