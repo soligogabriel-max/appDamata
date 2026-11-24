@@ -43,16 +43,37 @@ a chave publishable** — ver "Como verificar".
 
 - Projeto: `wwnndsprpofmgbklqdgg`
 - Chave publishable: `admin.html`, constante `SB_KEY` (é pública, está no HTML)
-- PAT em `~/.claude/damata-secrets`. O container é efêmero — se não existir,
-  pedir ao usuário e recriar:
-  `mkdir -p ~/.claude && printf 'PAT=TOKEN\n' > ~/.claude/damata-secrets`
+- **O proxy do ambiente já autentica em `api.supabase.com`**: o PAT está
+  salvo como segredo de rede do ambiente (header `Authorization`) e é
+  injetado em toda chamada. **Não mandar header de Authorization** e não
+  pedir o token ao usuário. Se uma chamada sem header voltar 401/403, aí sim
+  pedir o segredo pelo formulário de credencial (`request_credential`, host
+  `api.supabase.com`), nunca colado no chat nem gravado em arquivo. Vale para
+  o "Ambiente Cloud Padrão" e para o Default — já aconteceu de uma sessão
+  pedir o PAT por reflexo, sem testar antes se o acesso já funcionava.
 - DDL e leitura de catálogo só pela Management API (o PostgREST não alcança
   `pg_catalog`):
   ```bash
-  PAT=$(grep PAT ~/.claude/damata-secrets | cut -d= -f2)
   curl -s -X POST "https://api.supabase.com/v1/projects/wwnndsprpofmgbklqdgg/database/query" \
-    -H "Authorization: Bearer $PAT" -H "Content-Type: application/json" \
-    -d '{"query": "SQL AQUI"}'
+    -H "Content-Type: application/json" -d '{"query": "SQL AQUI"}'
+  ```
+  No ambiente Default só `api.supabase.com` passa; o host REST
+  `wwnndsprpofmgbklqdgg.supabase.co` é bloqueado pelo proxy. Verificação como
+  `anon` vai então pela Management API (`SET LOCAL ROLE anon`, ver "Como
+  verificar"). Para `curl` direto no REST, a sessão precisa nascer no
+  "Ambiente Cloud Padrão" (rede irrestrita; uma sessão em andamento não é
+  movida para lá).
+- Simular um usuário logado dentro de uma transação: montar o claim **antes**
+  do `SET LOCAL ROLE` — depois dele o RLS de `app_users` esconde o e-mail e
+  `get_my_role()` volta null:
+  ```sql
+  BEGIN;
+  SELECT set_config('request.jwt.claims', json_build_object('email',
+    (select email from app_users where role='admin' and status='approved' limit 1),
+    'role','authenticated')::text, true);
+  SET LOCAL ROLE authenticated;
+  SELECT * FROM relatorio_criativos(90);
+  ROLLBACK;
   ```
 - Tabela principal: `agenda`. Campos: `cod` (PK), `nome_evento`, `data_evento`,
   `data_fim`, `tipo_evento`, `valor_locacao`, `cin`, `cout`, `payments_json`,
@@ -84,7 +105,6 @@ Página HTML tem que ser servida do `fazendadamata.com`; a função devolve JSON
 Deploy:
 ```bash
 curl -s -X POST "https://api.supabase.com/v1/projects/wwnndsprpofmgbklqdgg/functions/deploy?slug=NOME" \
-  -H "Authorization: Bearer $PAT" \
   -F 'metadata={"entrypoint_path":"index.ts","name":"NOME","verify_jwt":false}' \
   -F "file=@supabase/functions/NOME/index.ts;type=application/typescript"
 ```
@@ -133,6 +153,7 @@ Ler o código não basta — hoje já quebrou produção duas vezes assim. Exerc
 contra o ambiente real:
 
 - **Leituras públicas**: replicar a chamada com a chave publishable via `curl`
+  (só onde o host REST passa; no Default, usar `SET LOCAL ROLE anon` abaixo)
 - **Escritas**: simular como `anon` sem persistir —
   `BEGIN; SET LOCAL ROLE anon; <comando>; ROLLBACK;` pela Management API.
   Cuidado: `UPDATE` sem política afeta 0 linhas **sem erro** — medir com
