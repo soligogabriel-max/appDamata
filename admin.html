@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.11.28a";</script>
+<script>var LL_VERSION="v2026.11.28b";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -1193,6 +1193,26 @@
         </div>
         <div id="st-resultado" style="display:none;background:var(--bg2);border:1px solid var(--br);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.6;"></div>
         <div id="st-tabela" style="overflow-x:auto;"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
+        <div id="radar-bloco" style="border-top:1px solid var(--br);margin-top:28px;padding-top:20px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
+            <div class="sec-t" style="font-size:15px;margin:0;">📡 Radar: o que saiu da curva nos perfis acompanhados</div>
+            <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+              <button onclick="radarAcao('dry')" style="padding:6px 14px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dk);">👀 Testar agora</button>
+              <button onclick="radarAcao('varrer')" style="padding:6px 14px;background:var(--a);border:none;border-radius:8px;cursor:pointer;font-size:12px;color:#fff;font-weight:600;">📡 Varrer e avisar</button>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--dl);margin-bottom:12px;line-height:1.5;">
+            Todo dia às 9h15 a função lê os últimos 25 posts de cada perfil. Post da última semana com engajamento (curtidas + 3 × comentários) de pelo menos 3× a mediana do perfil vira alerta no WhatsApp da equipe, com o link, uma vez só. O repost é pelo app, com o sticker e o crédito. Só conta profissional é lida.
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+            <input id="radar-novo" type="text" placeholder="@perfil para acompanhar" onkeydown="if(event.key==='Enter')radarAdd()" style="flex:1;min-width:180px;padding:6px 10px;border:1px solid var(--br);border-radius:8px;background:var(--bg2);color:var(--dk);font-size:12px;">
+            <select id="radar-novo-tipo" style="padding:6px 10px;border:1px solid var(--br);border-radius:8px;background:var(--bg2);color:var(--dk);font-size:12px;"><option value="referencia">Referência</option><option value="parceiro">Parceiro</option></select>
+            <button onclick="radarAdd()" style="padding:6px 14px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dk);">+ Adicionar</button>
+          </div>
+          <div id="radar-perfis" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;"></div>
+          <div id="radar-resultado" style="display:none;background:var(--bg2);border:1px solid var(--br);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.6;"></div>
+          <div id="radar-tabela" style="overflow-x:auto;"></div>
+        </div>
       </div>
     </div>
     <div id="p-fotoslanding" class="panel">
@@ -2723,7 +2743,7 @@ function setTab(t) {
   if(t==="whatsapp") renderWhatsApp();
   if(t==="wppauto") renderWppAuto();
   if(t==="relassess") renderRelAssessoria();
-  if(t==="stories") renderStories();
+  if(t==="stories"){ renderStories(); renderRadar(); }
   if(t==="dashboard") renderDashboard();
   if(t==="vc") renderVC();
 }
@@ -6661,6 +6681,68 @@ function _stDesenha(rows){
         ${td(`<span style="background:${bg};color:${cor};font-size:10px;border-radius:4px;padding:2px 6px;font-weight:600;">${rot}</span>`)}
         ${td(m.reach??"—", m.reach!=null?"var(--dk)":"var(--dl)")}${td(m.replies??"—", m.replies?"#2E7D52":"var(--dl)")}${td(m.navigation??"—")}${td(m.profile_visits??"—")}
       </tr>`;}).join("")}</tbody></table>`;
+}
+
+// ── Radar do Instagram ──
+// Perfis em radar_perfis, posts e alertas em radar_posts; a leitura mora na
+// Edge Function radar-instagram (cron 9h15). Os botões chamam com o JWT do admin.
+async function renderRadar(){
+  const box = document.getElementById("radar-perfis"), tab = document.getElementById("radar-tabela");
+  if(!box || !tab) return;
+  const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");
+  try{
+    const desde = new Date(); desde.setDate(desde.getDate()-30);
+    const [perfis, posts] = await Promise.all([
+      sbFetch("radar_perfis?select=username,tipo,ativo,seguidores,ultima_leitura,ultimo_erro&order=tipo,username"),
+      sbFetch("radar_posts?viral=eq.true&publicado_em=gte."+desde.toISOString()+"&select=username,permalink,media_type,publicado_em,curtidas,comentarios,razao,avisado_em,legenda&order=publicado_em.desc&limit=60")
+    ]);
+    box.innerHTML = (perfis||[]).map(p=>{
+      const cor = p.ultimo_erro ? "#C62828" : p.tipo==="parceiro" ? "#2A4A3A" : "#1F3F6E";
+      const bg  = p.ultimo_erro ? "#FDECEA" : p.tipo==="parceiro" ? "#D8EDE2" : "#E3ECF7";
+      const tit = p.ultimo_erro ? "Erro na última leitura: "+p.ultimo_erro : (p.seguidores ? p.seguidores.toLocaleString("pt-BR")+" seguidores" : "ainda não lido");
+      return `<span title="${esc(tit)}" style="display:inline-flex;align-items:center;gap:6px;background:${bg};color:${cor};font-size:11px;border-radius:999px;padding:3px 8px 3px 10px;${p.ativo?"":"opacity:.5;"}">
+        @${esc(p.username)}${p.ultimo_erro?" ⚠️":""}<button onclick="radarRemover('${esc(p.username)}')" title="Tirar do radar" style="background:none;border:none;color:inherit;cursor:pointer;font-size:12px;line-height:1;padding:0;">✕</button></span>`;
+    }).join("") || '<span style="font-size:12px;color:var(--dl);">Nenhum perfil no radar.</span>';
+    if(!(posts||[]).length){ tab.innerHTML = '<div style="font-size:12px;color:var(--dl);padding:8px 0;">Nada saiu da curva nos últimos 30 dias.</div>'; return; }
+    const th = t=>`<th style="text-align:left;padding:6px;border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;">${t}</th>`;
+    const td = (v,c)=>`<td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;text-align:center;color:${c||"var(--dk)"};white-space:nowrap;">${v}</td>`;
+    const fmtDia = d=>new Date(d).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"});
+    tab.innerHTML = `<table style="width:100%;border-collapse:collapse;"><thead><tr style="background:var(--bg2);color:var(--dl);">${th("Data")}${th("Perfil")}${th("Post")}${th("Curtidas")}${th("Coment.")}${th("× mediana")}${th("Avisado")}</tr></thead>
+      <tbody>${posts.map((p,i)=>`<tr style="background:${i%2?"var(--bg2)":"transparent"}">
+        ${td(fmtDia(p.publicado_em))}${td("@"+esc(p.username))}
+        <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;"><a href="${esc(p.permalink)}" target="_blank" style="color:var(--a);font-weight:600;">${esc(p.media_type||"post")}</a>${p.legenda?`<div style="font-size:10px;color:var(--dl);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.legenda)}</div>`:""}</td>
+        ${td(Number(p.curtidas).toLocaleString("pt-BR"))}${td(p.comentarios)}${td(Number(p.razao).toFixed(1).replace(".",",")+"×","#c2410c")}${td(p.avisado_em?"✅ "+fmtDia(p.avisado_em):"—", p.avisado_em?"#2E7D52":"var(--dl)")}
+      </tr>`).join("")}</tbody></table>`;
+  }catch(e){ tab.innerHTML = '<div style="font-size:12px;color:var(--er);">Erro ao carregar o radar: '+e.message+'</div>'; }
+}
+async function radarAdd(){
+  const inp = document.getElementById("radar-novo");
+  const u = (inp?.value||"").replace(/^@/,"").replace(/^https?:\/\/(www\.)?instagram\.com\//,"").replace(/\/.*$/,"").trim().toLowerCase();
+  if(!u) return;
+  try{ await sbFetch("radar_perfis",{method:"POST",body:{username:u, tipo:document.getElementById("radar-novo-tipo")?.value||"referencia"},prefer:"return=minimal"}); inp.value=""; toast("@"+u+" entrou no radar"); renderRadar(); }
+  catch(e){ toast("Falha: "+e.message); }
+}
+async function radarRemover(u){
+  if(!confirm("Tirar @"+u+" do radar? O histórico de posts dele também sai.")) return;
+  try{ await sbFetch("radar_perfis?username=eq."+encodeURIComponent(u),{method:"DELETE",prefer:"return=minimal"}); renderRadar(); }
+  catch(e){ toast("Falha: "+e.message); }
+}
+async function radarAcao(acao){
+  const box = document.getElementById("radar-resultado");
+  box.style.display=""; box.innerHTML="⏳ Lendo os perfis, leva até um minuto…";
+  const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+  try{
+    const r = await fetch(SB_URL+"/functions/v1/radar-instagram",{method:"POST",headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken,"Content-Type":"application/json"},body:JSON.stringify({acao})});
+    const d = await r.json().catch(()=>({error:"resposta inválida (HTTP "+r.status+")"}));
+    if(d.error){ box.innerHTML='<span style="color:var(--er);">'+esc(d.error)+'</span>'; return; }
+    const perfis = (d.perfis||[]).map(p=>p.erro?`<span style="color:var(--er);">@${esc(p.perfil)}: ${esc(p.erro)}</span>`:`@${esc(p.perfil)} (${p.posts} posts, mediana ${p.mediana}${p.virais?`, <b>${p.virais} fora da curva</b>`:""})`).join(" · ");
+    const virais = d.virais||[];
+    box.innerHTML = (acao==="dry"
+      ? `<b>${virais.length} post(s) fora da curva</b> na última semana${virais.length?": "+virais.map(v=>`<a href="${esc(v.permalink)}" target="_blank" style="color:var(--a);">@${esc(v.username)} ${esc(v.data)} (${v.curtidas} curtidas, ${Number(v.razao).toFixed(1)}×)${v.ja_avisado?" ✅":""}</a>`).join(" · "):"."}`
+      : `<b>${d.virais_novos} aviso(s)</b> enviados à equipe.`+((d.avisos||[]).some(a=>a.erro)?' <span style="color:var(--er);">'+esc((d.avisos.find(a=>a.erro)||{}).erro)+'</span>':""))
+      + `<div style="color:var(--dl);margin-top:6px;">${perfis}</div>`;
+    if(acao==="varrer") renderRadar();
+  }catch(e){ box.innerHTML='<span style="color:var(--er);">Falha: '+e.message+'</span>'; }
 }
 
 // ══════════════════════════════════════════
