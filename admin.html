@@ -1170,7 +1170,7 @@
           </label>
         </div>
         <div style="font-size:11px;color:var(--dl);margin-bottom:14px;line-height:1.5;">
-          Todo dia um post do feed vira story: melhor desempenho primeiro, sem repetir em 60 dias, e nunca no dia em que a equipe já publicou story à mão. Carrossel vai pela primeira foto, Reels pela capa. A API não põe sticker, link nem enquete — vai só a imagem.
+          Todo dia um post do feed (últimos 5 anos) vira story: melhor desempenho primeiro, sem repetir em 60 dias, e nunca no dia em que a equipe já publicou story à mão. Carrossel vai pela primeira foto, Reels pela capa. A API não põe sticker, link nem enquete — vai só a imagem.
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
           <button onclick="stAcao('diagnostico')" style="padding:6px 14px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dk);">🔎 Diagnóstico do token</button>
@@ -6592,8 +6592,8 @@ function _stResumo(acao, d, http){
   }
   if(acao==="dry"){
     return `<b>Hoje sairia:</b> ${post(d.escolhido)}<br>`
-      + `<span style="color:var(--dl);">${d.feed} posts no feed dos últimos 12 meses, ${d.elegiveis} elegíveis · automação ${d.ativo?"ligada":"pausada"}`
-      + (d.equipe_ja_postou_hoje ? " · <b>a equipe já publicou story hoje, o cron não publicaria</b>" : "") + "</span>";
+      + `<span style="color:var(--dl);">${d.feed} posts no feed dos últimos 5 anos, ${d.elegiveis} elegíveis · automação ${d.ativo?"ligada":"pausada"}`
+      + (d.rodizio ? " · todos já saíram nos últimos 60 dias, entrou o rodízio" : "") + (d.equipe_ja_postou_hoje ? " · <b>a equipe já publicou story hoje, o cron não publicaria</b>" : "") + "</span>";
   }
   if(acao==="publicar"){
     if(d.pulado) return "Não publicou: "+esc(d.pulado)+".";

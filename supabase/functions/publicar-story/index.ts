@@ -3,7 +3,7 @@
 // publicação do Instagram, e no dia seguinte colhe as métricas do story.
 // A grade é o feed: não há planilha nem arte nova.
 //
-// Regra de escolha: posts dos últimos 12 meses, melhor desempenho primeiro
+// Regra de escolha: posts dos últimos 5 anos, melhor desempenho primeiro
 // (curtidas + 3 × comentários), sem repetir o mesmo post em 60 dias. Se a
 // equipe já publicou story à mão no dia, não publica — o dia é dela.
 // Carrossel vai pela primeira foto; vídeo e Reels, pela capa (a API de
@@ -36,7 +36,7 @@ const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 const GRAPH = "https://graph.facebook.com/v21.0";
-const MESES_JANELA = 12;      // posts elegíveis
+const MESES_JANELA = 60;      // posts elegíveis: o feed tem 216 posts e só 1 nos últimos 12 meses — o repertório é de 2022 a 2024
 const DIAS_SEM_REPETIR = 60;
 const FUSO_MS = -3 * 3600 * 1000;   // Brasília, sem horário de verão
 
@@ -109,7 +109,7 @@ async function lerFeed(ig: string, token: string): Promise<Post[]> {
   const limite = new Date(); limite.setMonth(limite.getMonth() - MESES_JANELA);
   const posts: Post[] = [];
   let path = `${ig}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,children{media_type,media_url}&limit=50`;
-  for (let pag = 0; pag < 8 && path; pag++) {
+  for (let pag = 0; pag < 12 && path; pag++) {
     const d = await graph(path, token);
     for (const p of (d.data || []) as Post[]) {
       if (new Date(p.timestamp) < limite) return posts;
@@ -152,12 +152,20 @@ function sb(sbUrl: string, key: string) {
 // ── Escolha do post do dia ──
 async function escolher(ig: string, token: string, db: ReturnType<typeof sb>) {
   const feed = await lerFeed(ig, token);
+  const comImagem = feed.filter((p) => imagemDoPost(p));
+  // último dia em que cada post saiu como story, em todo o histórico
+  const hist: Array<{ media_id: string; dia: string }> = await db.get(`stories_auto?status=eq.publicado&select=media_id,dia&order=dia.desc&limit=2000`);
+  const ultimoUso = new Map<string, string>();
+  hist.forEach((h) => { if (!ultimoUso.has(h.media_id)) ultimoUso.set(h.media_id, h.dia); });
   const desde = new Date(); desde.setDate(desde.getDate() - DIAS_SEM_REPETIR);
-  const usados: Array<{ media_id: string }> = await db.get(`stories_auto?status=eq.publicado&dia=gte.${desde.toISOString().slice(0, 10)}&select=media_id`);
-  const bloqueados = new Set(usados.map((u) => u.media_id));
-  const elegiveis = feed.filter((p) => !bloqueados.has(p.id) && imagemDoPost(p));
+  const corte = desde.toISOString().slice(0, 10);
+  const elegiveis = comImagem.filter((p) => !(ultimoUso.get(p.id) && ultimoUso.get(p.id)! >= corte));
   elegiveis.sort((a, b) => score(b) - score(a) || b.timestamp.localeCompare(a.timestamp));
-  return { feed: feed.length, elegiveis: elegiveis.length, escolhido: elegiveis[0] || null };
+  if (elegiveis[0]) return { feed: feed.length, elegiveis: elegiveis.length, rodizio: false, escolhido: elegiveis[0] };
+  // Todos saíram nos últimos 60 dias: o feed é menor que a janela (21 posts
+  // em 5 anos). Em vez de calar, volta o que saiu há mais tempo — rodízio.
+  const fila = [...comImagem].sort((a, b) => (ultimoUso.get(a.id) || "").localeCompare(ultimoUso.get(b.id) || "") || score(b) - score(a));
+  return { feed: feed.length, elegiveis: 0, rodizio: true, escolhido: fila[0] || null };
 }
 
 // Story à mão hoje? A API lista os stories no ar; se algum é de hoje e não é
@@ -219,7 +227,20 @@ Deno.serve(async (req) => {
       const conta = await descobrirConta(TOKEN, IG_FIX).catch((e) => ({ erro: String(e.message) }));
       const concedidas = (perms.data || []).filter((p: { status: string }) => p.status === "granted").map((p: { permission: string }) => p.permission);
       const precisa = ["instagram_basic", "instagram_content_publish", "instagram_manage_insights"];
-      return json({ ok: true, conta, permissoes: concedidas, faltam: precisa.filter((p) => !concedidas.includes(p)), permissoes_raw: perms.error || undefined });
+      // amostra do feed: quantos posts a conta tem e os 12 mais recentes que a
+      // API entrega — para ver se o que ela devolve bate com o que está no perfil
+      let feed: unknown = null;
+      if ((conta as { ig_user_id?: string }).ig_user_id) {
+        const ig = (conta as { ig_user_id: string }).ig_user_id;
+        try {
+          const u = await graph(`${ig}?fields=media_count,followers_count`, TOKEN);
+          const m = await graph(`${ig}/media?fields=id,media_type,media_product_type,timestamp,like_count,comments_count&limit=12`, TOKEN);
+          feed = { media_count: u.media_count, seguidores: u.followers_count,
+            recentes: (m.data || []).map((x: Post & { media_product_type?: string }) => ({ data: x.timestamp.slice(0, 10), tipo: x.media_type, produto: x.media_product_type, curtidas: x.like_count, comentarios: x.comments_count })),
+            tem_mais: !!m.paging?.next };
+        } catch (e) { feed = { erro: String(e instanceof Error ? e.message : e) }; }
+      }
+      return json({ ok: true, conta, permissoes: concedidas, faltam: precisa.filter((p) => !concedidas.includes(p)), feed, permissoes_raw: perms.error || undefined });
     }
 
     const cfg: Array<{ valor: { ativo?: boolean } }> = await db.get(`app_config?chave=eq.stories_auto&select=valor`);
@@ -230,7 +251,7 @@ Deno.serve(async (req) => {
     if (acao === "dry") {
       const sel = await escolher(ig, TOKEN, db);
       const manual = await equipeJaPostouHoje(ig, TOKEN, db).catch(() => null);
-      return json({ ok: true, dry: true, conta, ativo, equipe_ja_postou_hoje: manual, feed: sel.feed, elegiveis: sel.elegiveis,
+      return json({ ok: true, dry: true, conta, ativo, equipe_ja_postou_hoje: manual, feed: sel.feed, elegiveis: sel.elegiveis, rodizio: sel.rodizio,
         escolhido: sel.escolhido ? resumoPost(sel.escolhido) : null });
     }
 
