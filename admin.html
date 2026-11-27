@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.11.24i";</script>
+<script>var LL_VERSION="v2026.11.27a";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -333,6 +333,7 @@
         <button class="tab" onclick="setTab('criativos');closeGrps()" id="t-criativos">📣 Criativos</button>
         <button class="tab" onclick="setTab('whatsapp');closeGrps()" id="t-whatsapp">💬 WhatsApp</button>
         <button class="tab" onclick="setTab('wppauto');closeGrps()" id="t-wppauto">📨 Envios automáticos</button>
+        <button class="tab" onclick="setTab('stories');closeGrps()" id="t-stories">📲 Stories automáticos</button>
       </div>
     </div>
 
@@ -1158,6 +1159,28 @@
         <div style="font-size:11px;color:var(--dl);margin-top:8px;line-height:1.5;">
           Ano pela data do evento. Conta todo evento da agenda que não foi apagado, inclusive os futuros. "Sem assessoria" são os eventos sem assessoria cadastrada. Ordem decrescente pelo total de eventos; clicar num ano reordena por ele.
         </div>
+      </div>
+    </div>
+    <div id="p-stories" class="panel">
+      <div class="uwrap" style="max-width:960px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap;">
+          <div class="sec-t" style="margin:0;">📲 Stories automáticos</div>
+          <label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dl);cursor:pointer;white-space:nowrap;">
+            <input type="checkbox" id="st-ativo" onchange="stSetAtivo(this.checked)" style="cursor:pointer;"> Publicar todo dia às 10h
+          </label>
+        </div>
+        <div style="font-size:11px;color:var(--dl);margin-bottom:14px;line-height:1.5;">
+          Todo dia um post do feed vira story: melhor desempenho primeiro, sem repetir em 60 dias, e nunca no dia em que a equipe já publicou story à mão. Carrossel vai pela primeira foto, Reels pela capa. A API não põe sticker, link nem enquete — vai só a imagem.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+          <button onclick="stAcao('diagnostico')" style="padding:6px 14px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dk);">🔎 Diagnóstico do token</button>
+          <button onclick="stAcao('dry')" style="padding:6px 14px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dk);">👀 Qual post sairia hoje</button>
+          <button onclick="stAcao('publicar')" style="padding:6px 14px;background:var(--a);border:none;border-radius:8px;cursor:pointer;font-size:12px;color:#fff;font-weight:600;">📤 Publicar agora</button>
+          <button onclick="stAcao('metricas')" style="padding:6px 14px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dk);">📈 Colher métricas</button>
+          <button onclick="renderStories()" style="margin-left:auto;padding:6px 14px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dl);">↻ Atualizar</button>
+        </div>
+        <div id="st-resultado" style="display:none;background:var(--bg2);border:1px solid var(--br);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.6;"></div>
+        <div id="st-tabela" style="overflow-x:auto;"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
       </div>
     </div>
     <div id="p-fotoslanding" class="panel">
@@ -2210,7 +2233,7 @@ function _applyNavForRole(role){
     allSubTabs.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     document.getElementById("t-pedidos-eq").style.display="none";
     // desfaz o que a simulação de "trafego" esconde
-    ["t-leads","t-relatorio","t-relassess","t-relorc","t-whatsapp","t-wppauto","t-visitas","t-agenda","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
+    ["t-leads","t-relatorio","t-relassess","t-relorc","t-whatsapp","t-wppauto","t-stories","t-visitas","t-agenda","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display=""; });
     var wrapA=document.querySelector("#p-visitas .uwrap");
     if(wrapA) Array.from(wrapA.children).forEach(c=>{ c.style.display=""; c.style.borderTop=""; c.style.marginTop=""; });
   } else if(role==="trafego"){
@@ -2218,7 +2241,7 @@ function _applyNavForRole(role){
     // de anúncios — que é alimentado por RPC agregada, sem dado de cliente.
     allGroups.forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     var gr=document.getElementById("grp-relatorios"); if(gr) gr.style.display="";
-    ["t-dashboard","t-relatorio","t-relassess","t-relorc","t-whatsapp","t-wppauto","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
+    ["t-dashboard","t-relatorio","t-relassess","t-relorc","t-whatsapp","t-wppauto","t-stories","t-funil"].forEach(id=>{ var el=document.getElementById(id); if(el) el.style.display="none"; });
     var tv=document.getElementById("t-visitas"); if(tv) tv.style.display="";
     var ta=document.getElementById("t-agenda"); if(ta) ta.style.display="none";
     document.getElementById("t-pedidos-eq").style.display="none";
@@ -2630,7 +2653,7 @@ const TAB_GRP={
   receber:"grp-financeiro", pagar:"grp-financeiro", fluxo:"grp-financeiro", conciliacao:"grp-financeiro", extrato:"grp-financeiro", fluxoreal:"grp-financeiro", socios:"grp-financeiro",
   fornec:"grp-cadastros", inventario:"grp-cadastros", tabelaspreco:"grp-cadastros", naturezas:"grp-cadastros", assessorias:"grp-cadastros",
   pend:"grp-admin", users:"grp-admin", fotoslanding:"grp-admin",
-  relatorio:"grp-relatorios", relorc:"grp-relatorios", visitas:"grp-relatorios", whatsapp:"grp-relatorios", leads:"grp-relatorios", criativos:"grp-relatorios", wppauto:"grp-relatorios", relassess:"grp-relatorios"
+  relatorio:"grp-relatorios", relorc:"grp-relatorios", visitas:"grp-relatorios", whatsapp:"grp-relatorios", leads:"grp-relatorios", criativos:"grp-relatorios", wppauto:"grp-relatorios", relassess:"grp-relatorios", stories:"grp-relatorios"
 };
 function toggleGrp(id){
   const el=document.getElementById(id);
@@ -2657,7 +2680,7 @@ function setTab(t) {
   document.querySelectorAll(".tgrp-btn").forEach(b=>b.classList.remove("on"));
   if(TAB_GRP[t]) document.querySelector("#"+TAB_GRP[t]+" .tgrp-btn")?.classList.add("on");
   document.querySelectorAll(".panel").forEach(p=>p.classList.remove("on"));
-  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",conciliacao:"p-conciliacao",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",vc:"p-vc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas",whatsapp:"p-whatsapp",leads:"p-leads",funil:"p-funil",criativos:"p-criativos",wppauto:"p-wppauto",relassess:"p-relassess"};
+  const map={dashboard:"p-dashboard",agenda:"p-agenda",pend:"p-pend",users:"p-users",receber:"p-receber",pagar:"p-pagar",fluxo:"p-fluxo",conciliacao:"p-conciliacao",extrato:"p-extrato",fornec:"p-fornec",assessorias:"p-assessorias",inventario:"p-inventario",fluxoreal:"p-fluxoreal",relatorio:"p-relatorio",relorc:"p-relorc",vc:"p-vc",contratos:"p-contratos",pedidos:"p-pedidos",vt:"p-vt",tabelaspreco:"p-tabelaspreco",fotoslanding:"p-fotoslanding",orcamentos:"p-orcamentos",naturezas:"p-naturezas",socios:"p-socios",visitas:"p-visitas",whatsapp:"p-whatsapp",leads:"p-leads",funil:"p-funil",criativos:"p-criativos",wppauto:"p-wppauto",relassess:"p-relassess",stories:"p-stories"};
   document.getElementById(map[t]).classList.add("on");
   if(t==="agenda") renderCal(cfilter);
   if(t==="receber") renderReceber();
@@ -2688,6 +2711,7 @@ function setTab(t) {
   if(t==="whatsapp") renderWhatsApp();
   if(t==="wppauto") renderWppAuto();
   if(t==="relassess") renderRelAssessoria();
+  if(t==="stories") renderStories();
   if(t==="dashboard") renderDashboard();
   if(t==="vc") renderVC();
 }
@@ -6503,6 +6527,109 @@ function _raDesenha(){
       <td></td><td style="padding:6px 8px;font-size:12px;font-weight:700;color:var(--dk);">Total</td>
       ${anos.map(a=>td(fmt(totAno(a)), true, a===anoAtual)).join("")}${td(fmt(totGeral), true)}
     </tr></tfoot></table>`;
+}
+
+// ══════════════════════════════════════════
+// STORIES AUTOMÁTICOS — diário de bordo e botões
+// A publicação mora na Edge Function publicar-story (cron 10h). Esta tela
+// lê a tabela stories_auto e chama a função com o JWT do admin, que ela
+// aceita ao lado do segredo do cron.
+// ══════════════════════════════════════════
+async function renderStories(){
+  const tabela = document.getElementById("st-tabela");
+  if(!tabela) return;
+  tabela.innerHTML = '<div class="empty"><div class="eicon">⏳</div>Carregando...</div>';
+  try{
+    const [cfg, rows] = await Promise.all([
+      sbFetch("app_config?chave=eq.stories_auto&select=valor"),
+      sbFetch("stories_auto?select=dia,media_id,permalink,legenda,imagem_url,tipo_post,score,story_id,status,erro,metricas,publicado_em&order=dia.desc,publicado_em.desc&limit=120")
+    ]);
+    const chk = document.getElementById("st-ativo");
+    if(chk) chk.checked = !(cfg && cfg[0] && cfg[0].valor && cfg[0].valor.ativo === false);
+    _stDesenha(rows||[]);
+  }catch(e){
+    tabela.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar: '+e.message+'</div>';
+  }
+}
+
+async function stSetAtivo(on){
+  try{
+    const r = await sbFetch("app_config?chave=eq.stories_auto&select=chave");
+    if(r && r.length) await sbFetch("app_config?chave=eq.stories_auto",{method:"PATCH",body:{valor:{ativo:!!on}},prefer:"return=minimal"});
+    else await sbFetch("app_config",{method:"POST",body:{chave:"stories_auto",valor:{ativo:!!on}},prefer:"return=minimal"});
+    toast(on ? "Stories automáticos ligados" : "Stories automáticos pausados");
+  }catch(e){ toast("Falha ao salvar: "+e.message); renderStories(); }
+}
+
+async function stAcao(acao){
+  if(acao==="publicar" && !confirm("Publicar um story no Instagram agora?")) return;
+  const box = document.getElementById("st-resultado");
+  box.style.display = ""; box.innerHTML = "⏳ Chamando a função…";
+  try{
+    const r = await fetch(SB_URL+"/functions/v1/publicar-story",{
+      method:"POST",
+      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+_authToken,"Content-Type":"application/json"},
+      body:JSON.stringify({acao})
+    });
+    const d = await r.json().catch(()=>({error:"resposta inválida (HTTP "+r.status+")"}));
+    box.innerHTML = _stResumo(acao, d, r.status);
+    if(acao==="publicar" || acao==="metricas") renderStories();
+  }catch(e){ box.innerHTML = '<span style="color:var(--er);">Falha: '+e.message+'</span>'; }
+}
+
+// Traduz a resposta da função para a equipe, sem despejar JSON na tela.
+function _stResumo(acao, d, http){
+  const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+  if(d.error) return '<span style="color:var(--er);">'+esc(d.error)+'</span>';
+  const post = p => p ? `<a href="${esc(p.permalink)}" target="_blank" style="color:var(--a);font-weight:600;">post de ${esc(p.data)}</a> (${esc(p.tipo)}, ${p.curtidas} curtidas, ${p.comentarios} comentários)`
+    + (p.legenda ? `<div style="color:var(--dl);">“${esc(p.legenda)}…”</div>` : "")
+    + (p.imagem ? `<img src="${esc(p.imagem)}" style="max-height:140px;border-radius:8px;margin-top:6px;display:block;">` : "") : "—";
+  if(acao==="diagnostico"){
+    const c = d.conta||{};
+    return `<b>Conta:</b> ${c.erro ? '<span style="color:var(--er);">'+esc(c.erro)+'</span>' : "@"+esc(c.username)+" (id "+esc(c.ig_user_id)+")"+(c.pagina?" via página "+esc(c.pagina):"")}<br>`
+      + `<b>Permissões do token:</b> ${(d.permissoes||[]).map(esc).join(", ")||"nenhuma"}<br>`
+      + (d.faltam && d.faltam.length ? `<b style="color:var(--er);">Faltam:</b> ${d.faltam.map(esc).join(", ")}` : '<b style="color:var(--ok);">Tudo o que precisa está liberado.</b>');
+  }
+  if(acao==="dry"){
+    return `<b>Hoje sairia:</b> ${post(d.escolhido)}<br>`
+      + `<span style="color:var(--dl);">${d.feed} posts no feed dos últimos 12 meses, ${d.elegiveis} elegíveis · automação ${d.ativo?"ligada":"pausada"}`
+      + (d.equipe_ja_postou_hoje ? " · <b>a equipe já publicou story hoje, o cron não publicaria</b>" : "") + "</span>";
+  }
+  if(acao==="publicar"){
+    if(d.pulado) return "Não publicou: "+esc(d.pulado)+".";
+    if(d.erro) return '<span style="color:var(--er);">Erro ao publicar: '+esc(d.erro)+'</span><br>'+post(d.post);
+    return "<b>Publicado</b> em @"+esc(d.conta)+": "+post(d.publicado);
+  }
+  if(acao==="metricas"){
+    if(!d.coletados) return "Nenhum story pendente de métricas.";
+    return "<b>"+d.coletados+" story(s) atualizados.</b> " + (d.lista||[]).map(l=>esc(l.dia)+": "+(l.erro?'<span style="color:var(--er);">'+esc(l.erro)+'</span>':"alcance "+(l.reach??"—")+", respostas "+(l.replies??"—"))).join(" · ");
+  }
+  return "HTTP "+http;
+}
+
+function _stDesenha(rows){
+  const tabela = document.getElementById("st-tabela");
+  const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+  if(!rows.length){ tabela.innerHTML='<div class="empty"><div class="eicon">📲</div>Nenhum story automático ainda. Use "Qual post sairia hoje" para testar.</div>'; return; }
+  const badge = s => ({publicado:["#D8EDE2","#2A4A3A","publicado"], erro:["#FDECEA","#C62828","erro"], pulado:["#F1F2F4","#6B7280","pulado"], dry:["#E3ECF7","#1F3F6E","teste"]}[s]||["#F1F2F4","#6B7280",s]);
+  const th = t=>`<th style="text-align:left;padding:6px;border-bottom:1px solid var(--br);font-size:11px;white-space:nowrap;">${t}</th>`;
+  const td = (v,c)=>`<td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;text-align:center;color:${c||"var(--dk)"};white-space:nowrap;">${v}</td>`;
+  const fmtDia = d=>{ const [y,m,dd]=String(d).split("-"); return dd+"/"+m+"/"+y.slice(2); };
+  tabela.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+    <thead><tr style="background:var(--bg2);color:var(--dl);">${th("Dia")}${th("Post")}${th("Status")}${th("Alcance")}${th("Respostas")}${th("Navegação")}${th("Visitas ao perfil")}</tr></thead>
+    <tbody>${rows.map((r,i)=>{ const [bg,cor,rot]=badge(r.status); const m=r.metricas||{};
+      return `<tr style="background:${i%2?"var(--bg2)":"transparent"}">
+        <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;font-weight:600;white-space:nowrap;">${fmtDia(r.dia)}</td>
+        <td style="padding:5px 6px;border-bottom:1px solid var(--br);font-size:12px;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            ${r.imagem_url?`<img src="${esc(r.imagem_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px;flex:none;">`:""}
+            <div>${r.permalink?`<a href="${esc(r.permalink)}" target="_blank" style="color:var(--a);font-weight:600;">${esc(r.tipo_post||"post")}</a>`:esc(r.erro||"—")}
+              ${r.legenda?`<div style="font-size:10px;color:var(--dl);max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.legenda)}</div>`:""}
+              ${r.status==="erro"&&r.permalink?`<div style="font-size:10px;color:var(--er);">${esc(r.erro)}</div>`:""}
+            </div></div></td>
+        ${td(`<span style="background:${bg};color:${cor};font-size:10px;border-radius:4px;padding:2px 6px;font-weight:600;">${rot}</span>`)}
+        ${td(m.reach??"—", m.reach!=null?"var(--dk)":"var(--dl)")}${td(m.replies??"—", m.replies?"#2E7D52":"var(--dl)")}${td(m.navigation??"—")}${td(m.profile_visits??"—")}
+      </tr>`;}).join("")}</tbody></table>`;
 }
 
 // ══════════════════════════════════════════
