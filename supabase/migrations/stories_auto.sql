@@ -80,7 +80,7 @@ select cron.schedule('stories-auto-publicar', '0 13 * * *', $job$
       'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets
                                       where name = 'stories_auto' limit 1)),
     body    := '{"acao":"publicar"}'::jsonb,
-    timeout_milliseconds := 60000)
+    timeout_milliseconds := 120000)   -- a lista de marcados leva ~35 s
 $job$);
 
 select cron.unschedule('stories-auto-metricas')
@@ -93,7 +93,7 @@ select cron.schedule('stories-auto-metricas', '30 13 * * *', $job$
       'Authorization', 'Bearer ' || (select decrypted_secret from vault.decrypted_secrets
                                       where name = 'stories_auto' limit 1)),
     body    := '{"acao":"metricas"}'::jsonb,
-    timeout_milliseconds := 60000)
+    timeout_milliseconds := 120000)   -- a lista de marcados leva ~35 s
 $job$);
 
 -- coluna acrescentada depois da primeira aplicação

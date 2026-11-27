@@ -37,7 +37,7 @@
      admin.html novo com o .js/.css velho em cache e a tela fica pela metade —
      foi assim que o botão de exportar PDF não apareceu depois do deploy.
      document.write mantém a ordem síncrona de carga que os módulos exigem. -->
-<script>var LL_VERSION="v2026.11.27a";</script>
+<script>var LL_VERSION="v2026.11.28a";</script>
 <script>document.write('<link rel="stylesheet" href="admin.css?v='+encodeURIComponent(LL_VERSION)+'"/>');</script>
 </head>
 <body>
@@ -1178,6 +1178,18 @@
           <button onclick="stAcao('publicar')" style="padding:6px 14px;background:var(--a);border:none;border-radius:8px;cursor:pointer;font-size:12px;color:#fff;font-weight:600;">📤 Publicar agora</button>
           <button onclick="stAcao('metricas')" style="padding:6px 14px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dk);">📈 Colher métricas</button>
           <button onclick="renderStories()" style="margin-left:auto;padding:6px 14px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dl);">↻ Atualizar</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:12px;">
+          <label style="font-size:11px;color:var(--dl);font-weight:600;display:flex;flex-direction:column;gap:4px;">Autores permitidos (um por linha; vazio = todos que marcaram a fazenda)
+            <textarea id="st-permitidos" rows="3" placeholder="@fotografo&#10;@decoradora" style="padding:6px 10px;border:1px solid var(--br);border-radius:8px;background:var(--bg2);color:var(--dk);font-size:12px;font-family:monospace;resize:vertical;"></textarea>
+          </label>
+          <label style="font-size:11px;color:var(--dl);font-weight:600;display:flex;flex-direction:column;gap:4px;">Autores bloqueados (nunca entram)
+            <textarea id="st-bloqueados" rows="3" placeholder="@perfil" style="padding:6px 10px;border:1px solid var(--br);border-radius:8px;background:var(--bg2);color:var(--dk);font-size:12px;font-family:monospace;resize:vertical;"></textarea>
+          </label>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dl);cursor:pointer;"><input type="checkbox" id="st-so-proprios" style="cursor:pointer;"> Só posts próprios (ignora os marcados)</label>
+          <button onclick="stSalvarFiltro()" style="margin-left:auto;padding:6px 14px;background:var(--bg2);border:1px solid var(--br);border-radius:8px;cursor:pointer;font-size:12px;color:var(--dk);">💾 Salvar filtro de autores</button>
         </div>
         <div id="st-resultado" style="display:none;background:var(--bg2);border:1px solid var(--br);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:12px;line-height:1.6;"></div>
         <div id="st-tabela" style="overflow-x:auto;"><div class="empty"><div class="eicon">⏳</div>Carregando...</div></div>
@@ -6544,21 +6556,38 @@ async function renderStories(){
       sbFetch("app_config?chave=eq.stories_auto&select=valor"),
       sbFetch("stories_auto?select=dia,media_id,permalink,legenda,imagem_url,tipo_post,score,story_id,status,erro,metricas,publicado_em&order=dia.desc,publicado_em.desc&limit=120")
     ]);
+    const v = (cfg && cfg[0] && cfg[0].valor) || {};
     const chk = document.getElementById("st-ativo");
-    if(chk) chk.checked = !(cfg && cfg[0] && cfg[0].valor && cfg[0].valor.ativo === false);
+    if(chk) chk.checked = v.ativo !== false;
+    const g = id=>document.getElementById(id);
+    if(g("st-permitidos")) g("st-permitidos").value = (v.autores_permitidos||[]).map(a=>"@"+a).join("\n");
+    if(g("st-bloqueados")) g("st-bloqueados").value = (v.autores_bloqueados||[]).map(a=>"@"+a).join("\n");
+    if(g("st-so-proprios")) g("st-so-proprios").checked = v.so_proprios === true;
     _stDesenha(rows||[]);
   }catch(e){
     tabela.innerHTML = '<div class="empty"><div class="eicon">⚠️</div>Erro ao carregar: '+e.message+'</div>';
   }
 }
 
+// O valor em app_config é um JSON só (ativo + filtro de autores): lê, mescla
+// e grava, para um campo não apagar o outro.
+async function _stGravarCfg(mudancas){
+  const r = await sbFetch("app_config?chave=eq.stories_auto&select=valor");
+  const atual = (r && r[0] && r[0].valor) || {};
+  const valor = Object.assign({}, atual, mudancas);
+  if(r && r.length) await sbFetch("app_config?chave=eq.stories_auto",{method:"PATCH",body:{valor},prefer:"return=minimal"});
+  else await sbFetch("app_config",{method:"POST",body:{chave:"stories_auto",valor},prefer:"return=minimal"});
+}
 async function stSetAtivo(on){
+  try{ await _stGravarCfg({ativo:!!on}); toast(on ? "Stories automáticos ligados" : "Stories automáticos pausados"); }
+  catch(e){ toast("Falha ao salvar: "+e.message); renderStories(); }
+}
+async function stSalvarFiltro(){
+  const lista = id => (document.getElementById(id)?.value||"").split(/[\n,; ]+/).map(a=>a.replace(/^@/,"").trim().toLowerCase()).filter(Boolean);
   try{
-    const r = await sbFetch("app_config?chave=eq.stories_auto&select=chave");
-    if(r && r.length) await sbFetch("app_config?chave=eq.stories_auto",{method:"PATCH",body:{valor:{ativo:!!on}},prefer:"return=minimal"});
-    else await sbFetch("app_config",{method:"POST",body:{chave:"stories_auto",valor:{ativo:!!on}},prefer:"return=minimal"});
-    toast(on ? "Stories automáticos ligados" : "Stories automáticos pausados");
-  }catch(e){ toast("Falha ao salvar: "+e.message); renderStories(); }
+    await _stGravarCfg({ autores_permitidos: lista("st-permitidos"), autores_bloqueados: lista("st-bloqueados"), so_proprios: !!document.getElementById("st-so-proprios")?.checked });
+    toast("Filtro de autores salvo");
+  }catch(e){ toast("Falha ao salvar: "+e.message); }
 }
 
 async function stAcao(acao){
@@ -6581,7 +6610,7 @@ async function stAcao(acao){
 function _stResumo(acao, d, http){
   const esc = x=>String(x==null?"":x).replace(/&/g,"&amp;").replace(/</g,"&lt;");
   if(d.error) return '<span style="color:var(--er);">'+esc(d.error)+'</span>';
-  const post = p => p ? `<a href="${esc(p.permalink)}" target="_blank" style="color:var(--a);font-weight:600;">post de ${esc(p.data)}</a> (${esc(p.tipo)}, ${p.curtidas} curtidas, ${p.comentarios} comentários)`
+  const post = p => p ? `<a href="${esc(p.permalink)}" target="_blank" style="color:var(--a);font-weight:600;">post de ${esc(p.data)}</a> (${esc(p.tipo)}${p.autor&&p.autor!=="próprio"?", de @"+esc(p.autor):""}, ${p.curtidas} curtidas, ${p.comentarios} comentários)`
     + (p.legenda ? `<div style="color:var(--dl);">“${esc(p.legenda)}…”</div>` : "")
     + (p.imagem ? `<img src="${esc(p.imagem)}" style="max-height:140px;border-radius:8px;margin-top:6px;display:block;">` : "") : "—";
   if(acao==="diagnostico"){
@@ -6592,7 +6621,9 @@ function _stResumo(acao, d, http){
   }
   if(acao==="dry"){
     return `<b>Hoje sairia:</b> ${post(d.escolhido)}<br>`
+      + ((d.proximos||[]).length ? `<div style="margin:6px 0;color:var(--dl);">Na fila: ${d.proximos.map(p=>`<a href="${esc(p.permalink)}" target="_blank" style="color:var(--dk);">${esc(p.data)}${p.autor&&p.autor!=="próprio"?" @"+esc(p.autor):""} (${p.curtidas})</a>`).join(" · ")}</div>` : "")
       + `<span style="color:var(--dl);">${d.feed} posts no feed dos últimos 5 anos, ${d.elegiveis} elegíveis · automação ${d.ativo?"ligada":"pausada"}`
+      + (d.filtro ? (d.filtro.so_proprios ? " · só posts próprios" : d.filtro.permitidos.length ? " · autores permitidos: "+d.filtro.permitidos.map(a=>"@"+esc(a)).join(", ") : " · todos os autores que marcaram") : "")
       + (d.rodizio ? " · todos já saíram nos últimos 60 dias, entrou o rodízio" : "") + (d.equipe_ja_postou_hoje ? " · <b>a equipe já publicou story hoje, o cron não publicaria</b>" : "") + "</span>";
   }
   if(acao==="publicar"){

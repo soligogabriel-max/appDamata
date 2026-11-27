@@ -113,29 +113,44 @@ async function descobrirConta(token: string, fixo: string) {
 // `ordenado`: a lista de mídia vem do mais novo para o mais velho e dá para
 // parar na primeira fora da janela; a de marcados não garante ordem, então
 // lê tudo e filtra.
-async function lerLista(path: string, token: string, limite: Date, extra: Partial<Post>, ordenado = true): Promise<Post[]> {
+async function lerLista(path: string, token: string, limite: Date, extra: Partial<Post>, ordenado = true, maxPag = 12): Promise<Post[]> {
   const posts: Post[] = [];
-  for (let pag = 0; pag < 12 && path; pag++) {
+  for (let pag = 0; pag < maxPag && path; pag++) {
     const d = await graph(path, token);
     for (const p of (d.data || []) as Post[]) {
       if (new Date(p.timestamp) < limite) { if (ordenado) return posts; continue; }
       posts.push({ ...p, ...extra });
     }
+    // `next` vem com a URL inteira, e numa versão da API que não é a fixada
+    // aqui (v25 quando pedimos v21): tira qualquer prefixo de versão.
     const next = d.paging?.next as string | undefined;
-    path = next ? next.replace(`${GRAPH}/`, "").replace(/([?&])access_token=[^&]*&?/, "$1") : "";
+    path = next ? next.replace(/^https:\/\/graph\.facebook\.com\/v\d+\.\d+\//, "").replace(/([?&])access_token=[^&]*&?/, "$1") : "";
   }
   return posts;
 }
 let _erroMarcados = "";   // último erro da lista de marcados, para o diagnóstico mostrar
+let _filtroAutores = { permitidos: new Set<string>(), bloqueados: new Set<string>(), soProprios: false };
+function autorOk(p: Post) {
+  if (!p.marcado) return true;
+  if (_filtroAutores.soProprios) return false;
+  const u = (p.username || "").toLowerCase();
+  if (_filtroAutores.bloqueados.has(u)) return false;
+  return _filtroAutores.permitidos.size === 0 || _filtroAutores.permitidos.has(u);
+}
+let _tempos = { proprios_ms: 0, marcados_ms: 0 };
 async function lerFeed(ig: string, token: string): Promise<Post[]> {
   _erroMarcados = "";
+  const t0 = Date.now();
   const limite = new Date(); limite.setMonth(limite.getMonth() - MESES_JANELA);
   const campos = "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count";
   const proprios = await lerLista(`${ig}/media?fields=${campos},children{media_type,media_url}&limit=50`, token, limite, { marcado: false });
+  const t1 = Date.now();
   let marcados: Post[] = [];
   try {
-    marcados = await lerLista(`${ig}/tags?fields=${campos},username,children{media_type,media_url}&limit=50`, token, limite, { marcado: true }, false);
+    // a lista de marcados é lenta na Meta: páginas de 100 e no máximo 6 (600 posts)
+    marcados = await lerLista(`${ig}/tags?fields=${campos},username,children{media_type,media_url}&limit=100`, token, limite, { marcado: true }, false, 6);
   } catch (e) { console.warn("[publicar-story] lista de marcados falhou:", e); _erroMarcados = String(e instanceof Error ? e.message : e); }
+  _tempos = { proprios_ms: t1 - t0, marcados_ms: Date.now() - t1 };
   const vistos = new Set(proprios.map((p) => p.id));
   return proprios.concat(marcados.filter((p) => !vistos.has(p.id)));
 }
@@ -171,7 +186,7 @@ function sb(sbUrl: string, key: string) {
 // ── Escolha do post do dia ──
 async function escolher(ig: string, token: string, db: ReturnType<typeof sb>) {
   const feed = await lerFeed(ig, token);
-  const comImagem = feed.filter((p) => imagemDoPost(p));
+  const comImagem = feed.filter((p) => imagemDoPost(p) && autorOk(p));
   // último dia em que cada post saiu como story, em todo o histórico
   const hist: Array<{ media_id: string; dia: string }> = await db.get(`stories_auto?status=eq.publicado&select=media_id,dia&order=dia.desc&limit=2000`);
   const ultimoUso = new Map<string, string>();
@@ -257,6 +272,7 @@ Deno.serve(async (req) => {
           const m = await graph(`${ig}/media?fields=id,media_type,media_product_type,timestamp,like_count,comments_count&limit=12`, TOKEN);
           const tudo = await lerFeed(ig, TOKEN);
           feed = { media_count: u.media_count, seguidores: u.followers_count,
+            tempos: _tempos,
             na_janela: { proprios: tudo.filter((p) => !p.marcado).length, marcados: tudo.filter((p) => p.marcado).length, erro_marcados: _erroMarcados || undefined,
               por_autor: Object.entries(tudo.filter((p) => p.marcado).reduce((m: Record<string, number>, p) => { m[p.username || "?"] = (m[p.username || "?"] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8) },
             recentes: (m.data || []).map((x: Post & { media_product_type?: string }) => ({ data: x.timestamp.slice(0, 10), tipo: x.media_type, produto: x.media_product_type, curtidas: x.like_count, comentarios: x.comments_count })),
@@ -266,8 +282,13 @@ Deno.serve(async (req) => {
       return json({ ok: true, conta, permissoes: concedidas, faltam: precisa.filter((p) => !concedidas.includes(p)), feed, permissoes_raw: perms.error || undefined });
     }
 
-    const cfg: Array<{ valor: { ativo?: boolean } }> = await db.get(`app_config?chave=eq.stories_auto&select=valor`);
+    const cfg: Array<{ valor: { ativo?: boolean; autores_permitidos?: string[]; autores_bloqueados?: string[]; so_proprios?: boolean } }> =
+      await db.get(`app_config?chave=eq.stories_auto&select=valor`);
     const ativo = cfg[0]?.valor?.ativo !== false;
+    // Quem entra no repertório além dos posts próprios. Lista vazia = todo
+    // mundo que marcou a fazenda; com nomes, só eles; bloqueados saem sempre.
+    const norm = (a?: string[]) => new Set((a || []).map((x) => String(x).replace(/^@/, "").trim().toLowerCase()).filter(Boolean));
+    _filtroAutores = { permitidos: norm(cfg[0]?.valor?.autores_permitidos), bloqueados: norm(cfg[0]?.valor?.autores_bloqueados), soProprios: cfg[0]?.valor?.so_proprios === true };
     const conta = await descobrirConta(TOKEN, IG_FIX);
     const ig = conta.ig_user_id;
 
@@ -275,6 +296,7 @@ Deno.serve(async (req) => {
       const sel = await escolher(ig, TOKEN, db);
       const manual = await equipeJaPostouHoje(ig, TOKEN, db).catch(() => null);
       return json({ ok: true, dry: true, conta, ativo, equipe_ja_postou_hoje: manual, feed: sel.feed, elegiveis: sel.elegiveis, rodizio: sel.rodizio,
+        filtro: { so_proprios: _filtroAutores.soProprios, permitidos: [..._filtroAutores.permitidos], bloqueados: [..._filtroAutores.bloqueados] },
         escolhido: sel.escolhido ? resumoPost(sel.escolhido) : null, proximos: sel.proximos.map(resumoPost) });
     }
 
