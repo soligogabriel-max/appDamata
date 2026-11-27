@@ -44,6 +44,8 @@ type Post = {
   id: string; caption?: string; media_type: string; media_url?: string; thumbnail_url?: string;
   permalink?: string; timestamp: string; like_count?: number; comments_count?: number;
   children?: { data: Array<{ media_type: string; media_url?: string }> };
+  username?: string;          // dono do post, quando veio da lista de marcados
+  marcado?: boolean;
 };
 
 function json(body: unknown, status = 200) {
@@ -104,21 +106,38 @@ async function descobrirConta(token: string, fixo: string) {
   return { ig_user_id: p.instagram_business_account.id, username: p.instagram_business_account.username, pagina: p.name };
 }
 
-// ── Feed dos últimos 12 meses ──
-async function lerFeed(ig: string, token: string): Promise<Post[]> {
-  const limite = new Date(); limite.setMonth(limite.getMonth() - MESES_JANELA);
+// ── Feed: posts próprios + posts em que a conta foi marcada ──
+// A lista de mídia só traz o que a conta publicou. Post em colaboração, ou
+// do fotógrafo marcando a fazenda, aparece no perfil mas vem só pela lista
+// de marcados (/tags) — e é a maior parte da grade.
+// `ordenado`: a lista de mídia vem do mais novo para o mais velho e dá para
+// parar na primeira fora da janela; a de marcados não garante ordem, então
+// lê tudo e filtra.
+async function lerLista(path: string, token: string, limite: Date, extra: Partial<Post>, ordenado = true): Promise<Post[]> {
   const posts: Post[] = [];
-  let path = `${ig}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,children{media_type,media_url}&limit=50`;
   for (let pag = 0; pag < 12 && path; pag++) {
     const d = await graph(path, token);
     for (const p of (d.data || []) as Post[]) {
-      if (new Date(p.timestamp) < limite) return posts;
-      posts.push(p);
+      if (new Date(p.timestamp) < limite) { if (ordenado) return posts; continue; }
+      posts.push({ ...p, ...extra });
     }
     const next = d.paging?.next as string | undefined;
     path = next ? next.replace(`${GRAPH}/`, "").replace(/([?&])access_token=[^&]*&?/, "$1") : "";
   }
   return posts;
+}
+let _erroMarcados = "";   // último erro da lista de marcados, para o diagnóstico mostrar
+async function lerFeed(ig: string, token: string): Promise<Post[]> {
+  _erroMarcados = "";
+  const limite = new Date(); limite.setMonth(limite.getMonth() - MESES_JANELA);
+  const campos = "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count";
+  const proprios = await lerLista(`${ig}/media?fields=${campos},children{media_type,media_url}&limit=50`, token, limite, { marcado: false });
+  let marcados: Post[] = [];
+  try {
+    marcados = await lerLista(`${ig}/tags?fields=${campos},username,children{media_type,media_url}&limit=50`, token, limite, { marcado: true }, false);
+  } catch (e) { console.warn("[publicar-story] lista de marcados falhou:", e); _erroMarcados = String(e instanceof Error ? e.message : e); }
+  const vistos = new Set(proprios.map((p) => p.id));
+  return proprios.concat(marcados.filter((p) => !vistos.has(p.id)));
 }
 
 function imagemDoPost(p: Post): string | null {
@@ -161,11 +180,11 @@ async function escolher(ig: string, token: string, db: ReturnType<typeof sb>) {
   const corte = desde.toISOString().slice(0, 10);
   const elegiveis = comImagem.filter((p) => !(ultimoUso.get(p.id) && ultimoUso.get(p.id)! >= corte));
   elegiveis.sort((a, b) => score(b) - score(a) || b.timestamp.localeCompare(a.timestamp));
-  if (elegiveis[0]) return { feed: feed.length, elegiveis: elegiveis.length, rodizio: false, escolhido: elegiveis[0] };
+  if (elegiveis[0]) return { feed: feed.length, elegiveis: elegiveis.length, rodizio: false, escolhido: elegiveis[0], proximos: elegiveis.slice(1, 6) };
   // Todos saíram nos últimos 60 dias: o feed é menor que a janela (21 posts
   // em 5 anos). Em vez de calar, volta o que saiu há mais tempo — rodízio.
   const fila = [...comImagem].sort((a, b) => (ultimoUso.get(a.id) || "").localeCompare(ultimoUso.get(b.id) || "") || score(b) - score(a));
-  return { feed: feed.length, elegiveis: 0, rodizio: true, escolhido: fila[0] || null };
+  return { feed: feed.length, elegiveis: 0, rodizio: true, escolhido: fila[0] || null, proximos: fila.slice(1, 6) };
 }
 
 // Story à mão hoje? A API lista os stories no ar; se algum é de hoje e não é
@@ -193,6 +212,7 @@ async function publicarStory(ig: string, token: string, imagemUrl: string) {
 
 const resumoPost = (p: Post) => ({
   media_id: p.id, tipo: p.media_type, permalink: p.permalink, data: p.timestamp.slice(0, 10),
+  autor: p.marcado ? p.username || "(marcado)" : "próprio",
   curtidas: p.like_count || 0, comentarios: p.comments_count || 0, score: score(p),
   legenda: (p.caption || "").slice(0, 80), imagem: imagemDoPost(p),
 });
@@ -235,7 +255,10 @@ Deno.serve(async (req) => {
         try {
           const u = await graph(`${ig}?fields=media_count,followers_count`, TOKEN);
           const m = await graph(`${ig}/media?fields=id,media_type,media_product_type,timestamp,like_count,comments_count&limit=12`, TOKEN);
+          const tudo = await lerFeed(ig, TOKEN);
           feed = { media_count: u.media_count, seguidores: u.followers_count,
+            na_janela: { proprios: tudo.filter((p) => !p.marcado).length, marcados: tudo.filter((p) => p.marcado).length, erro_marcados: _erroMarcados || undefined,
+              por_autor: Object.entries(tudo.filter((p) => p.marcado).reduce((m: Record<string, number>, p) => { m[p.username || "?"] = (m[p.username || "?"] || 0) + 1; return m; }, {})).sort((a, b) => b[1] - a[1]).slice(0, 8) },
             recentes: (m.data || []).map((x: Post & { media_product_type?: string }) => ({ data: x.timestamp.slice(0, 10), tipo: x.media_type, produto: x.media_product_type, curtidas: x.like_count, comentarios: x.comments_count })),
             tem_mais: !!m.paging?.next };
         } catch (e) { feed = { erro: String(e instanceof Error ? e.message : e) }; }
@@ -252,7 +275,7 @@ Deno.serve(async (req) => {
       const sel = await escolher(ig, TOKEN, db);
       const manual = await equipeJaPostouHoje(ig, TOKEN, db).catch(() => null);
       return json({ ok: true, dry: true, conta, ativo, equipe_ja_postou_hoje: manual, feed: sel.feed, elegiveis: sel.elegiveis, rodizio: sel.rodizio,
-        escolhido: sel.escolhido ? resumoPost(sel.escolhido) : null });
+        escolhido: sel.escolhido ? resumoPost(sel.escolhido) : null, proximos: sel.proximos.map(resumoPost) });
     }
 
     if (acao === "publicar") {
@@ -269,7 +292,7 @@ Deno.serve(async (req) => {
       if (!p) return json({ ok: true, pulado: "nenhum post elegível", feed: sel.feed });
       const imagem = imagemDoPost(p)!;
       const base = { dia: hoje, media_id: p.id, permalink: p.permalink || null, legenda: (p.caption || "").slice(0, 200),
-        imagem_url: imagem, tipo_post: p.media_type, score: score(p) };
+        imagem_url: imagem, tipo_post: p.media_type, score: score(p), autor: p.marcado ? (p.username || null) : null };
       try {
         const storyId = await publicarStory(ig, TOKEN, imagem);
         await db.post("stories_auto", { ...base, story_id: storyId, status: "publicado" });

@@ -19,6 +19,7 @@ create table if not exists stories_auto (
   legenda         text,                          -- começo da legenda do post, para a tela
   imagem_url      text,                          -- o que foi mandado para a API
   tipo_post       text,                          -- IMAGE / CAROUSEL_ALBUM / VIDEO
+  autor           text,                          -- dono do post quando veio da lista de marcados (colab/fotógrafo); null = próprio
   score           numeric,                       -- curtidas + 3 × comentários na hora da escolha
   story_id        text,                          -- id do story publicado
   status          text not null default 'publicado'
@@ -94,3 +95,6 @@ select cron.schedule('stories-auto-metricas', '30 13 * * *', $job$
     body    := '{"acao":"metricas"}'::jsonb,
     timeout_milliseconds := 60000)
 $job$);
+
+-- coluna acrescentada depois da primeira aplicação
+alter table stories_auto add column if not exists autor text;
